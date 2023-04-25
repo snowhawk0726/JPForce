@@ -85,7 +85,7 @@ extension PredicateOperable {
     var cannotDivideByZero: JpfError    {JpfError("0で割ることはできない。")}
     var cannotCompare: JpfError         {JpfError("では比較できない。")}
     var functionObjectNotFound: JpfError{JpfError("実行すべき関数が見つからない。")}
-    var escapeCharacterError: JpfError  {JpfError("に、「\\(値)」の閉じカッコ「）」が見つからない。")}
+    var escapeCharacterError: JpfError  {JpfError("に、「\\『値』」の閉じカッコ「』」が見つからない。")}
     var cannotJudgeGenuineness: JpfError{JpfError("で、正負を判定できる対象は、数値型のみ。")}
     var fileReadError: JpfError         {JpfError("ファイルの読み込みに失敗した。")}
     var detectParserError: JpfError     {JpfError("構文解析器がエラーを検出した。")}
@@ -123,7 +123,7 @@ struct PrintOperator : PredicateOperable {
             objects.append(leftOperand!.value!)
         }
         for object in objects.reversed() {
-            guard printWithTail(object.string) == true else {return "表示する文字列「\(object.string)」" + escapeCharacterError}
+            guard printWithTerminator(object.string) == true else {return "表示する文字列「\(object.string)」" + escapeCharacterError}
         }
         return nil
     }
@@ -132,7 +132,7 @@ struct PrintOperator : PredicateOperable {
     /// 「\末尾」は、文字列の末尾を改行の代わりに表示する。
     /// 例： 「こんにちは\末尾、」と「みなさん。」を表示する。
     ///     → こんにちは、みなさん。
-    private func printWithTail(_ string: String) -> Bool {
+    private func printWithTerminator(_ string: String) -> Bool {
         let strings = replaced(string)
         guard !strings.isEmpty else {return false}
         for s in strings {
@@ -148,25 +148,25 @@ struct PrintOperator : PredicateOperable {
     /// エスケープ文字を制御コードに変換する。
     /// 「\改行なし」が文字列の後尾にある場合、改行をせずに表示する。
     /// 　(\は、そのまま使えるが、Swiftに合わせた。(「"」とか「'」は合わせてない))
-    /// 「甲\『値』乙」の場合、「甲」と値と「乙」に分割する。
     private func replaced(_ string: String) -> [String] {
         let codes = [("\\t","\t"),("\\n","\n"),("\\0","\0"),("\\r","\r"),("\\\\","\\"),("\\改行なし","\\末尾")]
         let s = codes.reduce(string) {$0.replacingOccurrences(of: $1.0, with: $1.1)}
-        return split(s)
+        // カッコで囲われた識別子をオブジェクトに変換し表示する。
+        let strings = split(s, with: ("\\『", "』"))
+        return strings.flatMap {split($0, with: ("\\（", "）"))}
     }
-    // TODO: \『』だけでなく、\()も可能とする。
     // TODO: \()の中の式を可能とする。
-    // TODO: オブジェクトが見つからない時のエラー表示
-    /// \『<識別子>』を含む文字列を分割し、文字列の配列に入れる。
-    private func split(_ s: String) -> [String] {
+    /// \『<識別子>』または\(<識別子>)を含む文字列を分割し、文字列の配列に入れる。
+    private func split(_ s: String, with separator: (String, Character)) -> [String] {
         var strings: [String] = []
-        let beginOfIdent = "\\『", endOfIdent: Character = "』"
+        let beginOfIdent = separator.0, endOfIdent = separator.1
         if let range = s.firstRange(of: beginOfIdent) {
             guard let i = s[range.upperBound..<s.endIndex].firstIndex(of: endOfIdent) else {return []} // 終わりの「』」が無い
-            strings.append(String(s[s.startIndex..<range.lowerBound]) + "\\末尾")                 // 識別子の前の部分を切り出す(改行を抑止)
-            guard let object = object(from: String(s[range.upperBound..<i])) else {return []}   // 識別子を切り出す
-            strings.append(object.string + "\\末尾")
-            strings += split(String(s[s.index(after: i)..<s.endIndex]))                         // 残りを分割し、配列に追加
+            strings.append(String(s[s.startIndex..<range.lowerBound]) + "\\末尾") // 識別子の前の部分を切り出す(改行を抑止)
+            if let object = object(from: String(s[range.upperBound..<i])) {     // 識別子を切り出す
+                strings.append(object.string + "\\末尾")
+            }
+            strings += split(String(s[s.index(after: i)..<s.endIndex]), with: (beginOfIdent, endOfIdent))   // 残りを分割し、配列に追加
         } else {
             strings = [s]
         }
