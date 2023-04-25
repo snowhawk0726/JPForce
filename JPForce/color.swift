@@ -7,7 +7,11 @@
 
 import Foundation
 enum EscapeCode : UInt {
-    static var enabled = false
+    #if DEBUG
+        static var enabled = false
+    #else
+        static var enabled = true
+    #endif
     case reset = 0
     case black = 30, red, green, yellow, blue, magenta, cyan, white
     // 黒、赤、緑、黄色、青、紫、水色、白

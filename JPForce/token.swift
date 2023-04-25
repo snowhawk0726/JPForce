@@ -190,7 +190,19 @@ enum Token : Equatable {
         guard case .wrapped(_,let word) = self else {return literal}
         return ContinuativeForm(word).plainForm ?? literal
     }
+    var coloredLiteral: String {literal.color(color)}
     var number: Int? {if case .INT(let int) = self {return int} else {return nil}}
+    var color: EscapeCode {
+        switch type {
+        case .ident:        return .cyan
+        case .int:          return .blue
+        case .string:       return .red
+        case .keyword(_):   return .green
+        case .particle(_):  return .magenta
+        case .illegal:      return .red
+        default:            return .reset
+        }
+    }
     //　MARK: - 判定
     func isSameCategory(as token: Token) -> Bool {  // .keyword()等のKeywordレベルは比較しない。
         switch (self.type, token.type) {

@@ -19,7 +19,7 @@ while true {
     print()
     var token = lexer.getNext()
     while token != .symbol(.EOF) {
-        print("tokenized:\t", token)
+        print("tokenized:\t\(token.coloredLiteral)\t\(token)")
         token = lexer.getNext()
     }
 }

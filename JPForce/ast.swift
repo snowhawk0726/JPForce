@@ -94,7 +94,7 @@ struct Identifier : Expression {
     init(from token: Token) {self.init(token: token, value: token.literal)}
     //
     var tokenLiteral: String {token.literal}
-    var string: String {value.color(.cyan)}
+    var string: String {value.color(token.color)}
 }
 struct StringLiteral : ValueExpression {
     var token: Token                // 文字列(.STRING(value))トークン
@@ -103,7 +103,7 @@ struct StringLiteral : ValueExpression {
     init(from string: String) {self.init(token: Token(string: string), value: string)}
     init(from token: Token) {self.init(token: token, value: token.literal)}
     //
-    var string: String {value.color(.red)}
+    var string: String {value.color(token.color)}
 }
 struct IntegerLiteral : ValueExpression {
     var token: Token                // 数値(.INT(value))トークン
@@ -111,7 +111,7 @@ struct IntegerLiteral : ValueExpression {
     init(token: Token, value: Int) {self.token = token; self.value = value}
     init(from integer: Int) {self.init(token: Token(number: integer), value: integer)}
     //
-    var string: String {tokenLiteral.color(.blue)}
+    var string: String {token.coloredLiteral}
 }
 struct Boolean: ValueExpression {
     var token: Token                // 真偽値トークン(.TRUEまたは.FALSE)
@@ -126,7 +126,7 @@ struct RangeLiteral : Expression {
     var lowerBound: ExpressionStatement?    // 下限式(例：1以上）
     var upperBound: ExpressionStatement?    // 上限式(例：100以下、100未満)
     var tokenLiteral: String {token.literal}
-    var string: String {"範囲".color(.magenta) + "【" +
+    var string: String {token.coloredLiteral + "【" +
         (lowerBound.map {string(of: $0)} ?? "") + comma +
         (upperBound.map {string(of: $0)} ?? "") + "】"}
     private func string(of es: ExpressionStatement) -> String {
@@ -140,14 +140,14 @@ struct PhraseExpression : Expression {
     var left: Expression            // 式
     //
     var tokenLiteral: String {token.literal}
-    var string: String {left.string + tokenLiteral.color(.magenta)}
+    var string: String {left.string + token.coloredLiteral}
 }
 /// 述語。tokenはToken.Keyword, Token.IDENT(_)
 struct PredicateExpression : Expression {
     var token: Token                // 述語(predicate keyword)
     //
     var tokenLiteral: String {token.literal}
-    var string: String {tokenLiteral.color(.green)}
+    var string: String {token.coloredLiteral}
 }
 struct InfixExpression : Expression {
     var token: Token
@@ -164,8 +164,8 @@ struct CaseExpression : Expression {
     //
     var tokenLiteral: String {token.literal}
     var string: String {
-        "場合".color(.magenta) + "、【" + consequence.string + "】" +
-        (alternative.map {"、" + "それ以外は".color(.magenta) + "、【" + $0.string + "】"} ?? "")
+        token.coloredLiteral + "、【" + consequence.string + "】" +
+        (alternative.map {"、" + "それ以外は" + "、【" + $0.string + "】"} ?? "")
     }
 }
 struct LogicalExpression : Expression {
@@ -173,7 +173,7 @@ struct LogicalExpression : Expression {
     var right: BlockStatement
     //
     var tokenLiteral: String {token.literal}
-    var string: String {"\(tokenLiteral.color(.magenta))、【\(right.string)】"}
+    var string: String {"\(token.coloredLiteral)、【\(right.string)】"}
 }
 struct LoopExpression : Expression {
     var token: Token                // .LOOPキーワード(反復)
@@ -183,10 +183,10 @@ struct LoopExpression : Expression {
     //
     var tokenLiteral: String {token.literal}
     var string: String {
-        "反復".color(.magenta) + "【" +
-        (!parameters.isEmpty ? "入力が".color(.magenta) + "、\(parameters.map {$0.string}.joined(separator: "と".color(.magenta)))であり、" : "") +
-        (!condition.isEmpty ? "条件が".color(.magenta) + "、\(condition.map {$0.string}.joined(separator: "、"))間、" : "") +
-        "処理が".color(.magenta) + "、" + body.string + "】"
+        token.coloredLiteral + "【" +
+        (!parameters.isEmpty ? "入力が" + "、\(parameters.map {$0.string}.joined(separator: "と"))であり、" : "") +
+        (!condition.isEmpty ? "条件が" + "、\(condition.map {$0.string}.joined(separator: "、"))間、" : "") +
+        "処理が" + "、" + body.string + "】"
     }
 }
 struct FunctionLiteral : Expression {
@@ -196,9 +196,9 @@ struct FunctionLiteral : Expression {
     //
     var tokenLiteral: String {token.literal}
     var string: String {
-        "関数".color(.magenta) + "であって、【" +
-        (!parameters.isEmpty ? "入力が".color(.magenta) + "、\(parameters.map {$0.string}.joined(separator: "と".color(.magenta)))であり、" : "") +
-        "本体が".color(.magenta) + "、" + body.string + "】"
+        token.coloredLiteral + "であって、【" +
+        (!parameters.isEmpty ? "入力が" + "、\(parameters.map {$0.string}.joined(separator: "と"))であり、" : "") +
+        "本体が" + "、" + body.string + "】"
     }
 }
 struct ArrayLiteral : Expression {
@@ -207,8 +207,8 @@ struct ArrayLiteral : Expression {
     //
     var tokenLiteral: String {token.literal}
     var string: String {
-        "配列".color(.magenta) + "であって、【" +
-        (!elements.isEmpty ? "要素が".color(.magenta) + "、\(elements.map {$0.string}.joined(separator: "と".color(.magenta)))" : "") +
+        token.coloredLiteral + "であって、【" +
+        (!elements.isEmpty ? "要素が" + "、\(elements.map {$0.string}.joined(separator: "と"))" : "") +
         "】"
     }
 }
@@ -218,12 +218,12 @@ struct DictionaryLiteral : Expression {
     //
     var tokenLiteral: String {token.literal}
     var string: String {
-        "辞書".color(.magenta) + "であって、【" +
-        (!pairs.isEmpty ? "要素が".color(.magenta) + "、\(pairs.map {$0.string}.joined(separator: "と".color(.magenta)))" : "") +
+        token.coloredLiteral + "であって、【" +
+        (!pairs.isEmpty ? "要素が" + "、\(pairs.map {$0.string}.joined(separator: "と"))" : "") +
         "】"
     }
     struct PairExpression {
         var pair: (key: ExpressionStatement, value: ExpressionStatement)
-        var string: String {pair.key.string + "が".color(.magenta) + pair.value.string}
+        var string: String {pair.key.string + "が" + pair.value.string}
     }
 }
