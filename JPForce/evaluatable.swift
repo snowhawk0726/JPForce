@@ -21,7 +21,7 @@ extension Node {
     }
     // 評価エラー
     var notImplementedError: JpfError       {JpfError("の評価を未実装")}
-    var phaseExpressionFailed: JpfError     {JpfError("「句」の式の評価ができなかった。")}
+    var phaseValueNotFound: JpfError        {JpfError("句の値が無かった。(例：関数の返り値が無い。)")}
     var predicateNotSupported: JpfError     {JpfError("「述語」に対応する定義が見つからなかった。")}
     var identifierNotFound: JpfError        {JpfError("(識別子)が定義されていない。")}
     var caseConditionError: JpfError        {JpfError("「場合」の条件(真偽値)が見つからなかった。")}
@@ -108,15 +108,15 @@ extension RangeLiteral : Evaluatable {
         var lowerBound, upperBound: (JpfInteger, Token)?
         if let object = self.lowerBound?.evaluated(with: environment) {
             if object.isError {return object}
-            guard let integer = environment.peek as? JpfInteger else {return rangeTypeError + object.string}
+            guard let value = environment.peek as? JpfInteger else {return rangeTypeError + object.string}
             environment.drop()
-            lowerBound = (integer, self.lowerBound!.token)
+            lowerBound = (value, self.lowerBound!.token)
         }
         if let object = self.upperBound?.evaluated(with: environment) {
             if object.isError {return object}
-            guard let integer = environment.peek as? JpfInteger else {return rangeTypeError + object.string}
+            guard let value = environment.peek as? JpfInteger else {return rangeTypeError + object.string}
             environment.drop()
-            upperBound = (integer, self.upperBound!.token)
+            upperBound = (value, self.upperBound!.token)
         }
         let range = JpfRange(lowerBound: lowerBound, upperBound: upperBound)
         if let o = environment.peek, o.isNull {environment.drop()}
@@ -160,9 +160,11 @@ extension PhraseExpression : Evaluatable {
     /// 句(式+助詞)を返す。
     /// self.tokenは、助詞(Token.Particle)
     func evaluated(with environment: Environment) -> JpfObject? {
-        guard let value = left.evaluated(with: environment) else {return nil}
-        guard !value.isError else {return value}
-        return JpfPhrase(value: value, particle: token)
+        guard let result = left.evaluated(with: environment) else {return nil}
+        // TODO: 関数で値を返さないとnilが返り句もnilになってしまう。(スタックに値が残る)
+        // ここでエラーにすると、「空にする」の「に」等、冗長な句もエラーになってしまう。
+        guard !result.isError else {return result}
+        return JpfPhrase(value: result, particle: token)
     }
 }
 extension InfixExpression : Evaluatable {
@@ -236,7 +238,7 @@ extension LogicalExpression : Evaluatable {
         guard let object = right.evaluated(with: environment) else {return "「\(tokenLiteral)」" + logicalRightEvaluationError}
         if object.isError {return object}
         guard let right = environment.pull() else {return "「\(tokenLiteral)」" + logicalRightEvaluationError}
-        environment.drop()
+        environment.drop()      // 入力（左辺(条件)）を捨てる
         switch token {
         case .keyword(.OR):
             return JpfBoolean.object(of: condition.isTrue || right.isTrue)
@@ -276,7 +278,7 @@ extension LoopExpression : Evaluatable {
         }
     }
     // 反復【(条件が<条件式>(の)間、)<処理>】。
-    // (条件が無い場合、処理に中止するがあることが前提→無いと無限ループ)
+    // (条件が無い場合、処理に「中止する」があることが前提→無いと無限ループ)
     private func evaluatedLoop(with environment: Environment) -> JpfObject? {
         var result = evaluatedCondition(with: environment)
         while result.isTrue && !result.isError {
