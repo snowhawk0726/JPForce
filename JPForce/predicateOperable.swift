@@ -85,7 +85,8 @@ extension PredicateOperable {
     var cannotDivideByZero: JpfError    {JpfError("0で割ることはできない。")}
     var cannotCompare: JpfError         {JpfError("では比較できない。")}
     var functionObjectNotFound: JpfError{JpfError("実行すべき関数が見つからない。")}
-    var escapeCharacterError: JpfError  {JpfError("に、「\\『値』」の閉じカッコ「』」が見つからない。")}
+    var closingParenthesisNotFound: JpfError {JpfError("識別子を囲う、閉じカッコ「』」または「）」が見つからない。")}
+    var identifierNotFound: JpfError    {JpfError("表示しようとする識別子が見つかららない。")}
     var cannotJudgeGenuineness: JpfError{JpfError("で、正負を判定できる対象は、数値型のみ。")}
     var fileReadError: JpfError         {JpfError("ファイルの読み込みに失敗した。")}
     var detectParserError: JpfError     {JpfError("構文解析器がエラーを検出した。")}
@@ -123,56 +124,88 @@ struct PrintOperator : PredicateOperable {
             objects.append(leftOperand!.value!)
         }
         for object in objects.reversed() {
-            guard printWithTerminator(object.string) == true else {return "表示する文字列「\(object.string)」" + escapeCharacterError}
+            switch printWithTerminator(object.string) {
+            case .success(_):           break
+            case .failure(let error):   return printError(error)
+            }
         }
         return nil
+    }
+    enum PrintError : Error {
+        case escapeIdentifierError
+        case identifierNotFound(String)
+        
+    }
+    private func printError(_ error: PrintError) -> JpfError {
+        switch error {
+        case .escapeIdentifierError:        return closingParenthesisNotFound
+        case .identifierNotFound(let s):    return identifierNotFound + "識別子『\(s)』"
+        }
     }
     /// 文字列の中の制御文字を解析して表示(print)する。
     /// - Parameter string: 制御文字を含む文字列
     /// 「\末尾」は、文字列の末尾を改行の代わりに表示する。
     /// 例： 「こんにちは\末尾、」と「みなさん。」を表示する。
     ///     → こんにちは、みなさん。
-    private func printWithTerminator(_ string: String) -> Bool {
-        let strings = replaced(string)
-        guard !strings.isEmpty else {return false}
-        for s in strings {
-            if let range = s.firstRange(of: "\\末尾") {
-                let terminator = String(s[range.upperBound..<s.endIndex])   // 「末尾」の後の文字列
-                print(s[s.startIndex..<range.lowerBound], terminator: terminator)
-            } else {
-                print(s)
+    private func printWithTerminator(_ string: String) -> Result<Bool, PrintError> {
+        switch replaced(string) {
+        case .failure(let error):
+            return .failure(error)
+        case .success(let strings):
+            strings.forEach { s in
+                if let range = s.firstRange(of: "\\末尾") {
+                    let terminator = String(s[range.upperBound..<s.endIndex])   // 「末尾」の後の文字列
+                    print(s[s.startIndex..<range.lowerBound], terminator: terminator)
+                } else {
+                    print(s)
+                }
             }
         }
-        return true
+        return .success(true)
     }
     /// エスケープ文字を制御コードに変換する。
     /// 「\改行なし」が文字列の後尾にある場合、改行をせずに表示する。
     /// 　(\は、そのまま使えるが、Swiftに合わせた。(「"」とか「'」は合わせてない))
-    private func replaced(_ string: String) -> [String] {
+    private func replaced(_ string: String) -> Result<[String], PrintError> {
         let codes = [("\\t","\t"),("\\n","\n"),("\\0","\0"),("\\r","\r"),("\\\\","\\"),("\\改行なし","\\末尾")]
         let s = codes.reduce(string) {$0.replacingOccurrences(of: $1.0, with: $1.1)}
         // カッコで囲われた識別子をオブジェクトに変換し表示する。
-        let strings = split(s, with: ("\\『", "』"))
-        return strings.flatMap {split($0, with: ("\\（", "）"))}
+        var strings: [String] = []
+        switch split(s, with: ("\\『", "』")) {
+        case .failure(let error):
+            return .failure(error)
+        case .success(let splitted):
+            for string in splitted {
+                switch split(string, with: ("\\（", "）")) {
+                case .success(let splitted):
+                    strings += splitted
+                case .failure(let error):
+                    return .failure(error)
+                }
+            }
+        }
+        return .success(strings)
     }
     // TODO: \()の中の式を可能とする。
     /// \『<識別子>』または\(<識別子>)を含む文字列を分割し、文字列の配列に入れる。
-    private func split(_ s: String, with separator: (String, Character)) -> [String] {
+    private func split(_ s: String, with separator: (String, Character)) -> Result<[String], PrintError> {
         var strings: [String] = []
         let beginOfIdent = separator.0, endOfIdent = separator.1
         if let range = s.firstRange(of: beginOfIdent) {
-            guard let i = s[range.upperBound..<s.endIndex].firstIndex(of: endOfIdent) else {return []} // 終わりの「』」が無い
+            guard let i = s[range.upperBound..<s.endIndex].firstIndex(of: endOfIdent) else {return .failure(.escapeIdentifierError)}    // 閉じ括弧「』」が無い
             strings.append(String(s[s.startIndex..<range.lowerBound]) + "\\末尾") // 識別子の前の部分を切り出す(改行を抑止)
-            if let object = object(from: String(s[range.upperBound..<i])) {     // 識別子を切り出す
-                strings.append(object.string + "\\末尾")
+            let name = String(s[range.upperBound..<i])
+            guard let object = environment[name] else {return .failure(.identifierNotFound(name))}      // 識別子を切り出す
+            strings.append(object.string + "\\末尾")
+            switch split(String(s[s.index(after: i)..<s.endIndex]), with: (beginOfIdent, endOfIdent)) { // 残りを分割し、配列に追加
+            case .success(let splitted):    strings += splitted
+            case .failure(let error):       return .failure(error)
             }
-            strings += split(String(s[s.index(after: i)..<s.endIndex]), with: (beginOfIdent, endOfIdent))   // 残りを分割し、配列に追加
         } else {
             strings = [s]
         }
-        return strings
+        return .success(strings)
     }
-    private func object(from string: String) -> JpfObject? {environment[string]}
 }
 struct NewlineOperator : PredicateOperable {
     init(_ environment: Environment) {self.environment = environment}
