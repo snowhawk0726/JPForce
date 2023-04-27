@@ -57,7 +57,7 @@ class Environment {
         defer {drop()}
         return object.value ?? object
     }
-    /// 外部のスタック上の引数(オブジェクト)を各識別子に引き当て、内部の辞書に登録する。
+    /// 外部のスタック上の引数(オブジェクト)の形式チェックを行い値を取り出し、各識別子に引き当て、内部の辞書に登録する。
     /// - Parameter parameters: 識別子(Identifier)の配列
     /// - Parameter outer:引数を格納しているスタックを含む環境
     /// - Parameter designated: 指定の形式でチェックをする
