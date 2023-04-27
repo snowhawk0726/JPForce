@@ -47,22 +47,24 @@ extension Parsable {
     }
     func skipEol() {while currentToken.isEol {getNext()}}
     /// 入力部の解析
-    /// - 形式: 入力が、識別子1と 識別子2と...、であり、
-    func parseParameters(endSymbol: Token.Symbol) -> [Identifier]? {
+    /// - 形式: 入力が、識別子1（「型格」）と 識別子2（「型格」）と...、であり、
+    func parseParameters(endSymbol: Token.Symbol) -> [(Identifier, String)]? {
         guard getNext(whenNextIs: ExpressionStatement.input) else {return []}  // 空のパラメータ
         _ = getNext(whenNextIs: ExpressionStatement.ga + ExpressionStatement.wa, matchAll: false)   // 入力が、(入力は、)
         _ = getNext(whenNextIs: .COMMA)
-        var identifiers: [Identifier] = []
+        var parameters: [(Identifier, String)] = []
         repeat {
             getNext()
-            identifiers.append(Identifier(from: currentToken))  // 識別子
+            let identifier = Identifier(from: currentToken)     // 識別子
+            let format = getNext(whenNextIs: .string) ? currentToken.literal : ""   // 入力形式
+            parameters.append((identifier, format))
             _ = getNext(whenNextIs: .TO)                        // と
             guard nextToken != .symbol(endSymbol) && !nextToken.isEof else {return nil}
         } while !(getNext(whenNextIs: .DE) ||
                   getNext(whenNextIs: .COMMA))                  // で or 、
         _ = getNext(whenNextIs: ExpressionStatement.ari)        // (あり)
         _ = getNext(whenNextIs: .COMMA)                         // (、)
-        return identifiers
+        return parameters
     }
     // 判定
     var isBreakFactor: Bool {
@@ -392,13 +394,29 @@ struct FunctionLiteralParser : ExpressionParsable {
             error(message: "関数で、「入力が〜であり、」の解析に失敗した。")
             return nil
         }
+        let identifiers = paramenters.map {$0.0}
+        let signature = parseSignature(from: paramenters.map {$0.1})
         // Body block 解析
         _ = getNext(whenNextIs: ExpressionStatement.hontaiga + ExpressionStatement.hontaiwa, matchAll: false)   // 本体が、(本体は、)
         guard let body = BlockStatementParser(parser, symbol: endSymbol).blockStatement else {
             error(message: "関数で、「本体が、〜」の解析に失敗した。")
             return nil
         }
-        return FunctionLiteral(token: token, parameters: paramenters, body: body)
+        return FunctionLiteral(token: token, parameters: identifiers, signature: signature, body: body)
+    }
+    private func parseSignature(from strings: [String]) -> FunctionLiteral.InputFormat {
+        let threeDots = "…"
+        let formats = strings.map { string in
+            var type = "", particle = ""
+            let lexer = Lexer(string)
+            var token = lexer.getNext()
+            if token.isIdent || token.isKeyword {type = token.literal;token = lexer.getNext()}
+            if token.isParticle {particle = token.literal;token = lexer.getNext()}
+            if token.literal == threeDots {particle += token.literal}
+            return (type, particle)
+        }
+        let number = formats.map({$0.1}).contains {$0.hasSuffix(threeDots)} ? nil : strings.count
+        return FunctionLiteral.InputFormat(numberOfInputs: number, formats: formats)
     }
 }
 struct ArrayLiteralParser : ExpressionParsable {    // TODO: ArrayとDictionaryの共通化
@@ -619,6 +637,7 @@ struct LoopExpressionParser : ExpressionParsable {
             error(message: "反復で、「入力が〜であり、」の解析に失敗した。")
             return nil
         }
+        let identifiers = paramenters.map {$0.0}
         // Condition block 解析
         guard let condition = parseCondition(endSymbol: endSymbol) else {
             error(message: "反復で、「条件が〜の間、」の解析に失敗した。")
@@ -630,7 +649,7 @@ struct LoopExpressionParser : ExpressionParsable {
             error(message: "反復で、処理の解析に失敗した。")
             return nil
         }
-        return LoopExpression(token: token, parameters: paramenters, condition: condition, body: body)
+        return LoopExpression(token: token, parameters: identifiers, condition: condition, body: body)
     }
     private func parseCondition(endSymbol: Token.Symbol) -> [Expression]? {
         guard getNext(whenNextIs: ExpressionStatement.condition) else {return []}  // 空のパラメータ

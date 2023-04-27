@@ -192,13 +192,19 @@ struct LoopExpression : Expression {
 struct FunctionLiteral : Expression {
     var token: Token                // 関数トークン
     var parameters: [Identifier]    // 入力パラメータ
+    var signature: InputFormat      // 入力形式
     var body: BlockStatement
     //
     var tokenLiteral: String {token.literal}
     var string: String {
         token.coloredLiteral + "であって、【" +
-        (!parameters.isEmpty ? "入力が" + "、\(parameters.map {$0.string}.joined(separator: "と"))であり、" : "") +
+        (!parameters.isEmpty ? "入力が" + "、\(zip(parameters, signature.strings).map {$0.string + $1}.joined(separator: "と"))であり、" : "") +
         "本体が" + "、" + body.string + "】"
+    }
+    struct InputFormat {
+        var numberOfInputs: Int?
+        var formats: [(type: String, particle: String)] // パラメータ毎の型と格(無い場合は"")
+        var strings: [String] {formats.map {!($0.type.isEmpty && $0.particle.isEmpty) ? "「\($0.type + $0.particle)」" : ""}}
     }
 }
 struct ArrayLiteral : Expression {

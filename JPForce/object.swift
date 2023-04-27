@@ -153,11 +153,12 @@ struct JpfReturnValue : JpfObject {
 struct JpfFunction : JpfObject {
     static let type = "関数"
     var parameters: [Identifier]    // 入力パラメータ
+    var signature: FunctionLiteral.InputFormat  // 入力形式
     var body: BlockStatement
     var environment: Environment
     var string: String {"関数".color(.magenta) + "であって、【" +
         (parameters.isEmpty ? "" :
-         "入力が、\(parameters.map {$0.string}.joined(separator: "と"))であり、") +
+            "入力が、\(zip(parameters, signature.strings).map {$0.string + $1}.joined(separator: "と"))であり、") +
          "本体が、" + body.string + "】"
     }
 }

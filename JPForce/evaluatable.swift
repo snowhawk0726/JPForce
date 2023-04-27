@@ -383,7 +383,7 @@ extension DictionaryLiteral : Evaluatable {
 }
 extension FunctionLiteral : Evaluatable {
     func evaluated(with environment: Environment) -> JpfObject? {
-        accessed(with: environment) ?? JpfFunction(parameters: parameters, body: body, environment: environment)
+        accessed(with: environment) ?? JpfFunction(parameters: parameters, signature: signature, body: body, environment: environment)
     }
 }
 extension JpfFunction {
@@ -395,7 +395,8 @@ extension JpfFunction {
     func executed(with environment: Environment) -> JpfObject? {
         let local = Environment(outer: self.environment)    // 関数の環境を拡張
         let stackEnv = environment.outer != nil ? environment : self.environment
-        guard local.apply(parameters, from: stackEnv) else {return functionParameterError + String(parameters.count)}
+        let result = local.apply(parameters, with: signature, from: stackEnv)
+        guard !result.isError else {return result}
         defer {environment.push(local.pullAll())}           // スタックを戻す
         if let evaluated = Evaluator(from: body, with: local).object {
             guard !evaluated.isError else {return evaluated}

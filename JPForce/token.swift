@@ -216,6 +216,7 @@ enum Token : Equatable {
         default:                            return false
         }
     }
+    var isKeyword: Bool {if case .keyword(_) = self {return true} else {return false}}
     var isParticle: Bool {if case .particle(_) = self {return true} else {return false}}
     var isWrapped: Bool {if case .wrapped(_,_) = self {return true} else {return false}}
     var isIdent: Bool   {type == .ident}

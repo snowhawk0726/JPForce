@@ -190,6 +190,11 @@ final class EvaluatorTests: XCTestCase {
             ("減算は、関数【入力がaとb、aからbを引く】。適用は、関数【入力がaとbと演算、aとbを演算する】。10と2に、減算を適用する。", 8),
             ("正しいは、関数【入力がa、aが真である】。4が5より大きいは、正しくない。", true),
             ("『割った余り』は、関数【入力がxとy、xをyで割り、yを掛け、xから引いたものを返す】。23を11で『割った余り』は1である。", true),
+            ("加算は、関数【入力がa「数値に」とb「数値を」、aにbを足し、返す】。1に2を加算する。", 3),
+            ("加算は、関数【入力がa「数値」とb「数値」、aにbを足し、返す】。1と2の加算する。", 3),
+            ("加算は、関数【入力がa「数値に」とb「数値を」、aにbを足し、返す】。「a」に「b」を加算する。", "「関数」の入力の型が異なる。入力の型：文字列"),
+            ("加算は、関数【入力がa「数値に」とb「数値を」、aにbを足し、返す】。1と2を加算する。", "「関数」の入力の格が異なる。入力の格：と"),
+            ("加算は、関数【入力がa「数値と…」とb「数値を」、aをbと関数【入力が初期値と要素、初期値に要素を足す】でまとめ、返す】。1と2と3と4と5を加算する。", 15),
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
@@ -519,8 +524,13 @@ private func testObject(_ object: JpfObject, with exptected: Any?) throws {
             try testObject(object, with: int)
         }
     case let string as String:
-        let result = try XCTUnwrap(object as? JpfString, "object is \(object)")
-        XCTAssertEqual(result.value, string)
+        var result = ""
+        switch object {
+        case let s as JpfString:    result = s.value
+        case let e as JpfError:     result = e.message
+        default:                    XCTFail("object is \(object)")
+        }
+        XCTAssertEqual(result, string)
     case nil:
         XCTAssertTrue(object.isNull, "評価結果が「無」でなかった。")
     default:

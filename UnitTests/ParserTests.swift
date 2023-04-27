@@ -555,6 +555,27 @@ final class ParserTests: XCTestCase {
             print("テスト終了: \(statement.string)")
         }
     }
+    func testParameterSignatures() throws {
+        let testPatterns: [(input: String, number: Int?, type: String, particle: String)] = [
+            ("関数【入力が、甲、甲を表示する】", 1, "", ""),
+            ("関数【入力が、甲「の」、甲を表示する】", 1, "", "の"),
+            ("関数【入力が、甲「文字列」、甲を表示する】", 1, "文字列", ""),
+            ("関数【入力が、甲「配列を」、甲を表示する】", 1, "配列", "を"),
+            ("関数【入力が、甲と乙と丙、甲を表示する】", 3, "", ""),
+            ("関数【入力が、甲「と…」、甲を表示する】", nil, "", "と…"),
+            ("関数【入力が、甲「数値と…」、甲を表示する】", nil, "数値", "と…"),
+        ]
+        for test in testPatterns {
+            print("テストパターン: \(test.input)")
+            let program = try XCTUnwrap(parseProgram(with: test.input))
+            let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
+            let function = try XCTUnwrap(statement.expressions.first as? FunctionLiteral)
+            XCTAssertEqual(function.signature.numberOfInputs, test.number)
+            XCTAssertEqual(function.signature.formats.first?.type, test.type)
+            XCTAssertEqual(function.signature.formats.first?.particle, test.particle)
+            print("テスト終了: \(statement.string)")
+        }
+    }
     // MARK: - ヘルパー
     private func parseProgram(with input: String) -> Program? {
         let lexer = Lexer(input)
