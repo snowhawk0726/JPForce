@@ -91,9 +91,10 @@ extension PredicateOperable {
     var fileReadError: JpfError         {JpfError("ファイルの読み込みに失敗した。")}
     var detectParserError: JpfError     {JpfError("構文解析器がエラーを検出した。")}
     // メッセージ(使い方)
-    var printUsage: JpfError            {JpfError("「(〜と...)〜を表示する」。")}
-    var additionUsage: JpfError         {JpfError("「(〜と...)〜を足す」。")}
-    var multiplicationUsage: JpfError   {JpfError("「(〜と...)〜を掛ける」。")}
+    var printUsage: JpfError            {JpfError("「(〜と…)〜を表示する」。")}
+    var readUsage: JpfError             {JpfError("「(〜と…)〜を読む」。")}
+    var additionUsage: JpfError         {JpfError("「(〜と…)〜を足す」。")}
+    var multiplicationUsage: JpfError   {JpfError("「(〜と…)〜を掛ける」。")}
     var substractionUsage: JpfError     {JpfError("「(〜から)〜を引く」または「(〜を)〜から引く」。")}
     var divisionUsage: JpfError         {JpfError("「(〜を)〜で割る」または「(〜で)〜を割る」。")}
     var negateUsage: JpfError           {JpfError("「〜の負数」または「〜を負数にする」。")}
@@ -167,7 +168,7 @@ struct PrintOperator : PredicateOperable {
     /// 「\改行なし」が文字列の後尾にある場合、改行をせずに表示する。
     /// 　(\は、そのまま使えるが、Swiftに合わせた。(「"」とか「'」は合わせてない))
     private func replaced(_ string: String) -> Result<[String], PrintError> {
-        let codes = [("\\t","\t"),("\\n","\n"),("\\0","\0"),("\\r","\r"),("\\\\","\\"),("\\改行なし","\\末尾")]
+        let codes = [("\\t","\t"),("\\n","\n"),("\\r","\r"),("\\0","\0"),("\\\\","\\"),("\\改行なし","\\末尾")]
         let s = codes.reduce(string) {$0.replacingOccurrences(of: $1.0, with: $1.1)}
         // カッコで囲われた識別子をオブジェクトに変換し表示する。
         var strings: [String] = []
@@ -186,7 +187,6 @@ struct PrintOperator : PredicateOperable {
         }
         return .success(strings)
     }
-    // TODO: \()の中の式を可能とする。
     /// \『<識別子>』または\(<識別子>)を含む文字列を分割し、文字列の配列に入れる。
     private func split(_ s: String, with separator: (String, Character)) -> Result<[String], PrintError> {
         var strings: [String] = []
@@ -215,8 +215,9 @@ struct NewlineOperator : PredicateOperable {
 struct ReadOperator : PredicateOperable {
     init(_ environment: Environment, by op: Token) {self.environment = environment; self.op = op}
     let environment: Environment, op: Token
+    let talker = AVSpeechSynthesizer()
     func operated() -> JpfObject? {
-        guard let object = environment.unwrappedPeek else {return "「\(op.literal)」" + atLeastOneParamError + printUsage}
+        guard let object = environment.unwrappedPeek else {return "「\(op.literal)」" + atLeastOneParamError + readUsage}
         var objects: [JpfObject] = [object]
         environment.drop()
         while isPeekParticle(.TO) {             // スタックにト格があれば、中身を格納
@@ -226,7 +227,6 @@ struct ReadOperator : PredicateOperable {
         return nil
     }
     private func read(_ string: String) {
-        let talker = AVSpeechSynthesizer()
         let utterance = AVSpeechUtterance(string: string)
         utterance.voice = AVSpeechSynthesisVoice(language: "ja-JP")
         talker.speak(utterance)
