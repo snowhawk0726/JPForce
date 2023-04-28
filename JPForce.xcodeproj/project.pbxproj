@@ -77,6 +77,7 @@
 		5042124E29B5903F00D2EA98 /* evaluatable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = evaluatable.swift; sourceTree = "<group>"; };
 		50552F3C29B5B87D0061CDBE /* environment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = environment.swift; sourceTree = "<group>"; };
 		506561E829D937380016923D /* ObjectTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ObjectTests.swift; sourceTree = "<group>"; };
+		506F2FE229FBB23000F7083A /* test */ = {isa = PBXFileReference; lastKnownFileType = text; name = test; path = ../../../../../Documents/test; sourceTree = "<group>"; };
 		5070B1A729B61DDA00808FDE /* predicateOperable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = predicateOperable.swift; sourceTree = "<group>"; };
 		508BFEFA29ED3A6A00F1959A /* objectAccessible.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = objectAccessible.swift; sourceTree = "<group>"; };
 		509D910229CD85C200C22283 /* builtin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = builtin.swift; sourceTree = "<group>"; };
@@ -104,6 +105,7 @@
 		5042120A29B58CA700D2EA98 = {
 			isa = PBXGroup;
 			children = (
+				506F2FE229FBB23000F7083A /* test */,
 				5042121529B58CA700D2EA98 /* JPForce */,
 				5042123529B58E1500D2EA98 /* UnitTests */,
 				5042121429B58CA700D2EA98 /* Products */,

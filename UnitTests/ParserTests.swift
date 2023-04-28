@@ -446,7 +446,7 @@ final class ParserTests: XCTestCase {
                 try self.testKeywordLiteral(body.expressions[1], "表示")
                 try self.testKeywordLiteral(body.expressions[2], "する")
             }),
-            ("１から反復【1を足し、100より大きい場合、中止する】。", { expressions in
+            ("１から反復【1を足し、100より大きい場合、【中止する】】。", { expressions in
                 try self.testPhraseExpression(expressions[0], with: 1, "から")
                 let loop = try XCTUnwrap(expressions[1] as? LoopExpression)
                 XCTAssertEqual(loop.token, .keyword(.LOOP))

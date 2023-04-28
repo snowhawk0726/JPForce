@@ -164,6 +164,10 @@ struct BlockStatementParser : StatementParsable {
             }
             blockStatements.append(statement)
             if isEndOfBlock || currentToken.isEof {break}   // 文で、】を検出（句点が検出できなかった。）
+            if currentToken == .symbol(.RBBRACKET) && endBlockSymbol == .EOL {
+                error(message: "ブロック(【】)の「【」と「】」が矛盾(過不足)している。")
+                return nil
+            }
             getNext()                                       // 句点等を読み飛ばす。
         }
         if isEndOfBlock {
