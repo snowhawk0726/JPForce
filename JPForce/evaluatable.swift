@@ -271,7 +271,7 @@ extension LoopExpression : Evaluatable {
             case let range as JpfRange:
                 return evaluatedLoop(of: range, with: environment)
             default:
-                return arrayLoopUsage
+                return evaluatedLoop(with: environment)
             }
         } else {
             return evaluatedLoop(with: environment)
