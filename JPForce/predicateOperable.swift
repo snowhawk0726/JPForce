@@ -107,10 +107,10 @@ extension PredicateOperable {
     var rangeCheckUsage: JpfError       {JpfError("<数値>が範囲【<範囲式>】にある/ない。")}
     var containsUsage: JpfError         {JpfError("<配列、辞書、範囲>が<要素>を含む。")}
     var foreachUsage: JpfError          {JpfError("<配列、辞書、範囲>を<関数>で繰り返す。")}
-    var mapUsage: JpfError              {JpfError("<配列、辞書>を<関数>で写像する。")}
+    var mapUsage: JpfError              {JpfError("<配列、辞書、範囲>を<関数>で写像する。")}
     var filterUsage: JpfError           {JpfError("<配列、辞書>を<関数>でフィルターする。")}
-    var reduceUsage: JpfError           {JpfError("<配列、辞書>を<初期値>と<関数>でまとめる。")}
-    var sortUsage: JpfError             {JpfError("<配列、辞書>を<関数>で並び替える。または、<配列、辞書>を（「昇順」に、または「降順」に）並び替える。")}
+    var reduceUsage: JpfError           {JpfError("<配列、辞書、範囲>を<初期値>と<関数>でまとめる。")}
+    var sortUsage: JpfError             {JpfError("<配列>を<関数>で並び替える。または、<配列>を（「昇順」に、または「降順」に）並び替える。")}
     var reverseUsage: JpfError          {JpfError("<配列、文字列>を逆順にする。")}
 }
 // MARK: - 表示/音声
@@ -599,12 +599,18 @@ struct MapOperator : PredicateOperable {
     init(_ environment: Environment, by op: Token) {self.environment = environment; self.op = op}
     let environment: Environment, op: Token
     func operated() -> JpfObject? {
-        guard let params = environment.peek(2),
-              (params[0].particle == .particle(.WO) || params[0].particle == nil),
-              params[1].particle == .particle(.DE) else {return "「\(op.literal) 」" + twoParamsNeeded + mapUsage}
-        guard let left = params[0].value, let right = params[1].value as? JpfFunction else {return mapUsage}
-        environment.drop(2)
-        return left.map(right, with: environment)
+        if let params = environment.peek(2),
+           (params[0].particle == .particle(.WO) || params[0].particle == nil),
+           params[1].particle == .particle(.DE) {
+            guard let left = params[0].value, let function = params[1].value as? JpfFunction else {return mapUsage}
+            environment.drop(2)
+            return left.map(function, with: environment)
+        } else
+        if let range = environment.unwrappedPeek as? JpfRange { // 範囲を配列に変換
+            environment.drop()
+            return range.map()
+        }
+        return "「\(op.literal) 」" + twoParamsNeeded + mapUsage
     }
 }
 struct FilterOperator : PredicateOperable {

@@ -120,7 +120,7 @@ extension JpfRange {
         switch (lowerBound?.0.number, lowerBound?.1,
                 upperBound?.0.number, upperBound?.1) {
         case (let l?, Token(.KARA),    let u?, Token(.MADE)),
-            (let l?, Token(.GTEQUAL), let u?, Token(.LTEQUAL)):
+            (let l?, Token(.GTEQUAL),  let u?, Token(.LTEQUAL)):
             (l...u).forEach { element in
                 environment.push(JpfInteger(value: element))
                 _ = function.executed(with: environment)
@@ -135,11 +135,47 @@ extension JpfRange {
         }
         return nil
     }
+    func map() -> JpfObject {
+        var mapped: [JpfObject] = []
+        switch (lowerBound?.0.number, lowerBound?.1,
+                upperBound?.0.number, upperBound?.1) {
+        case (let l?, Token(.KARA),    let u?, Token(.MADE)),
+            (let l?, Token(.GTEQUAL),  let u?, Token(.LTEQUAL)):
+            mapped = (l...u).map {JpfInteger(value: $0)}
+        case (let l?, Token(.GTEQUAL), let u?, Token(.UNDER)):
+            mapped = (l..<u).map {JpfInteger(value: $0)}
+        default:
+            return JpfError(rangeFormatError)
+        }
+        return JpfArray(elements: mapped)
+    }
+    func map(_ function: JpfFunction, with environment: Environment) -> JpfObject {
+        var mapped: [JpfObject] = []
+        switch (lowerBound?.0.number, lowerBound?.1,
+                upperBound?.0.number, upperBound?.1) {
+        case (let l?, Token(.KARA),    let u?, Token(.MADE)),
+            (let l?, Token(.GTEQUAL),  let u?, Token(.LTEQUAL)):
+            mapped = (l...u).map { element in
+                environment.push(JpfInteger(value: element))
+                return function.executed(with: environment) ??
+                environment.pull() ?? JpfNull.object
+            }
+        case (let l?, Token(.GTEQUAL), let u?, Token(.UNDER)):
+            mapped = (l..<u).map { element in
+                environment.push(JpfInteger(value: element))
+                return function.executed(with: environment) ??
+                environment.pull() ?? JpfNull.object
+            }
+        default:
+            return JpfError(rangeFormatError)
+        }
+        return JpfArray(elements: mapped)
+    }
     func reduce(_ initial: JpfObject, _ function: JpfFunction, with environment: Environment) -> JpfObject {
         switch (lowerBound?.0.number, lowerBound?.1,
                 upperBound?.0.number, upperBound?.1) {
         case (let l?, Token(.KARA),    let u?, Token(.MADE)),
-            (let l?, Token(.GTEQUAL), let u?, Token(.LTEQUAL)):
+            (let l?, Token(.GTEQUAL),  let u?, Token(.LTEQUAL)):
             return (l...u).reduce(initial) {f($0, $1, function, with: environment)}
         case (let l?, Token(.GTEQUAL), let u?, Token(.UNDER)):
             return (l..<u).reduce(initial) {f($0, $1, function, with: environment)}
@@ -150,8 +186,8 @@ extension JpfRange {
     private func f(_ initial: JpfObject, _ element: Int, _ function: JpfFunction, with environment: Environment) -> JpfObject {
         environment.push(initial)
         environment.push(JpfInteger(value: element))
-        _ = function.executed(with: environment)
-        return environment.pull() ?? initial
+        return function.executed(with: environment) ??
+        environment.pull() ?? initial
     }
 }
 extension JpfString {
@@ -262,9 +298,9 @@ extension JpfArray {
     func contains(where function: JpfFunction, with environment: Environment) -> JpfObject {
         for element in elements {
             environment.push(element)
-            _ = function.executed(with: environment)
-            if let result = environment.pull(), result.isTrue {
-                return JpfBoolean.TRUE
+            if let result = function.executed(with: environment) ?? environment.pull(),
+               result.isTrue {
+                return result
             }
         }
         return JpfBoolean.FALSE
@@ -279,23 +315,23 @@ extension JpfArray {
     func map(_ function: JpfFunction, with environment: Environment) -> JpfObject {
         JpfArray(elements: elements.map { element in
             environment.push(element)
-            _ = function.executed(with: environment)
-            return environment.pull() ?? JpfNull.object
+            return function.executed(with: environment) ??
+            environment.pull() ?? JpfNull.object
         })
     }
     func filter(_ function: JpfFunction, with environment: Environment) -> JpfObject {
         JpfArray(elements: elements.filter { element in
             environment.push(element)
-            _ = function.executed(with: environment)
-            return environment.pull()?.isTrue ?? false
+            let result = function.executed(with: environment) ?? environment.pull()
+            return result?.isTrue ?? false
         })
     }
     func reduce(_ initial: JpfObject, _ function: JpfFunction, with environment: Environment) -> JpfObject {
         elements.reduce(initial) { initial, element in
             environment.push(initial)
             environment.push(element)
-            _ = function.executed(with: environment)
-            return environment.pull() ?? initial
+            return function.executed(with: environment) ??
+            environment.pull() ?? initial
         }
     }
     func sorted(by string: JpfString) -> JpfObject {
@@ -327,8 +363,8 @@ extension JpfArray {
         return JpfArray(elements: elements.sorted { lhs, rhs in
             environment.push(lhs)
             environment.push(rhs)
-            _ = function.executed(with: environment)
-            return environment.pull()?.isTrue ?? false
+            let result = function.executed(with: environment) ?? environment.pull()
+            return result?.isTrue ?? false
         })
     }
     /// 要素が並び替え可能であれば、その型(T)にキャストする
@@ -372,9 +408,9 @@ extension JpfDictionary {
         for element in pairs.values {
             environment.push(element.key)
             environment.push(element.value)
-            _ = function.executed(with: environment)
-            if let result = environment.pull(), result.isTrue {
-                return JpfBoolean.TRUE
+            if let result = function.executed(with: environment) ?? environment.pull(),
+               result.isTrue {
+                return result
             }
         }
         return JpfBoolean.FALSE
@@ -391,16 +427,16 @@ extension JpfDictionary {
         JpfArray(elements: pairs.values.map { key, value in
             environment.push(key)
             environment.push(value)
-            _ = function.executed(with: environment)
-            return environment.pull() ?? JpfNull.object
+            return function.executed(with: environment) ??
+            environment.pull() ?? JpfNull.object
         })
     }
     func filter(_ function: JpfFunction, with environment: Environment) -> JpfObject {
         let values = pairs.values.filter { key, value in
             environment.push(key)
             environment.push(value)
-            _ = function.executed(with: environment)
-            return environment.pull()?.isTrue ?? false
+            let result = function.executed(with: environment) ?? environment.pull()
+            return result?.isTrue ?? false
         }
         let keys = values.map {
             let k = $0.key as! JpfHashable
@@ -413,8 +449,8 @@ extension JpfDictionary {
             environment.push(initial)
             environment.push(element.key)
             environment.push(element.value)
-            _ = function.executed(with: environment)
-            return environment.pull() ?? initial
+            return function.executed(with: environment) ??
+            environment.pull() ?? initial
         }
     }
 }
