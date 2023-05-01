@@ -86,7 +86,7 @@ extension PredicateOperable {
     var cannotCompare: JpfError         {JpfError("では比較できない。")}
     var functionObjectNotFound: JpfError{JpfError("実行すべき関数が見つからない。")}
     var closingParenthesisNotFound: JpfError {JpfError("識別子を囲う、閉じカッコ「』」または「）」が見つからない。")}
-    var identifierNotFound: JpfError    {JpfError("表示しようとする識別子が見つかららない。")}
+    var identifierNotFound: JpfError    {JpfError("表示しようとする識別子が見つからない。")}
     var cannotJudgeGenuineness: JpfError{JpfError("で、正負を判定できる対象は、数値型のみ。")}
     var fileReadError: JpfError         {JpfError("ファイルの読み込みに失敗した。")}
     var detectParserError: JpfError     {JpfError("構文解析器がエラーを検出した。")}
@@ -107,7 +107,7 @@ extension PredicateOperable {
     var rangeCheckUsage: JpfError       {JpfError("<数値>が範囲【<範囲式>】にある/ない。")}
     var containsUsage: JpfError         {JpfError("<配列、辞書、範囲>が<要素>を含む。")}
     var foreachUsage: JpfError          {JpfError("<配列、辞書、範囲>を<関数>で繰り返す。")}
-    var mapUsage: JpfError              {JpfError("<配列、辞書、範囲>を<関数>で写像する。")}
+    var mapUsage: JpfError              {JpfError("<配列、辞書、範囲>を<関数>で写像する。または、<範囲>写像する。")}
     var filterUsage: JpfError           {JpfError("<配列、辞書>を<関数>でフィルターする。")}
     var reduceUsage: JpfError           {JpfError("<配列、辞書、範囲>を<初期値>と<関数>でまとめる。")}
     var sortUsage: JpfError             {JpfError("<配列>を<関数>で並び替える。または、<配列>を（「昇順」に、または「降順」に）並び替える。")}
@@ -320,7 +320,8 @@ struct SignOperator : PredicateOperable {
     init(_ environment: Environment, by op: Token) {self.environment = environment; self.op = op}
     let environment: Environment, op: Token
     func operated() -> JpfObject? {
-        if isPeekParticle(.GA), let number = leftOperand?.value as? JpfInteger {
+        if let number = environment.unwrappedPeek as? JpfInteger {
+            environment.drop()
             return number[op.literal]
         }
         return "「\(op.literal)」" + cannotJudgeGenuineness
@@ -610,7 +611,7 @@ struct MapOperator : PredicateOperable {
             environment.drop()
             return range.map()
         }
-        return "「\(op.literal) 」" + twoParamsNeeded + mapUsage
+        return "「\(op.literal) 」" + atLeastOneParamError + mapUsage
     }
 }
 struct FilterOperator : PredicateOperable {
