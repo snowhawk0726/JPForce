@@ -57,6 +57,47 @@ struct PredicateOperableFactory {
         }
     }
 }
+struct Splitter {
+    init(of string: String, with environment: Environment, terminator: String = "\\末尾") {self.string = string; self.environment = environment; self.terminator = terminator}
+    let string: String
+    let environment: Environment
+    let terminator: String
+    var error: JpfError?
+    /// \と括弧で囲われた識別子の中身を文字列の配列に分割する。
+    let separators: [(String, Character)] = [("\\『", "』"), ("\\（", "）")]
+    mutating func split() -> [String]? {
+        var strings: [String] = []
+        guard let splitted = split(string, with: separators[0]) else {return nil}
+        for string in splitted {
+            guard let splitted = split(string, with: separators[1]) else {return nil}
+            strings += splitted
+        }
+        return strings
+    }
+    mutating private func split(_ s: String, with parentheses: (String, Character)) -> [String]? {
+        let beginOfIdent = parentheses.0, endOfIdent = parentheses.1
+        var splitted: [String] = []
+        if let range = s.firstRange(of: beginOfIdent) {
+            guard let i = s[range.upperBound..<s.endIndex].firstIndex(of: endOfIdent) else {
+                error = JpfError("識別子を囲う、閉じカッコ「\(endOfIdent)」が見つからない。")   // 閉じ括弧「』」が無い
+                return nil
+            }
+            splitted.append(String(s[s.startIndex..<range.lowerBound]) + terminator)// 識別子の前の部分を切り出す
+            let name = String(s[range.upperBound..<i])
+            guard let object = environment[name] else {                             // 識別子を切り出す
+                error = JpfError("『\(name)』(識別子)が定義されていない。")
+                return nil
+            }
+            splitted.append(object.string + terminator)
+            let s = String(s[s.index(after: i)..<s.endIndex])
+            guard let strings = split(s, with: (beginOfIdent, endOfIdent)) else {return nil}   // 残りを分割し、配列に追加
+            splitted += strings
+        } else {
+            splitted = [s]
+        }
+        return splitted
+    }
+}
 // MARK: - implements
 extension PredicateOperable {
     // Stack operations
@@ -125,86 +166,35 @@ struct PrintOperator : PredicateOperable {
             objects.append(leftOperand!.value!)
         }
         for object in objects.reversed() {
-            switch printWithTerminator(object.string) {
-            case .success(_):           break
-            case .failure(let error):   return printError(error)
-            }
+            let result = printWithTerminator(object.string)
+            if result.isError {return result}
         }
         return nil
-    }
-    enum PrintError : Error {
-        case escapeIdentifierError
-        case identifierNotFound(String)
-        
-    }
-    private func printError(_ error: PrintError) -> JpfError {
-        switch error {
-        case .escapeIdentifierError:        return closingParenthesisNotFound
-        case .identifierNotFound(let s):    return identifierNotFound + "識別子『\(s)』"
-        }
     }
     /// 文字列の中の制御文字を解析して表示(print)する。
     /// - Parameter string: 制御文字を含む文字列
     /// 「\末尾」は、文字列の末尾を改行の代わりに表示する。
     /// 例： 「こんにちは\末尾、」と「みなさん。」を表示する。
     ///     → こんにちは、みなさん。
-    private func printWithTerminator(_ string: String) -> Result<Bool, PrintError> {
-        switch replaced(string) {
-        case .failure(let error):
-            return .failure(error)
-        case .success(let strings):
-            strings.forEach { s in
-                if let range = s.firstRange(of: "\\末尾") {
-                    let terminator = String(s[range.upperBound..<s.endIndex])   // 「末尾」の後の文字列
-                    print(s[s.startIndex..<range.lowerBound], terminator: terminator)
-                } else {
-                    print(s)
-                }
+    private func printWithTerminator(_ string: String) -> JpfObject {
+        var splitter = Splitter(of: replaced(string), with: environment)
+        guard let strings = splitter.split() else {return splitter.error!}
+        strings.forEach { s in
+            if let range = s.firstRange(of: "\\末尾") {
+                let terminator = String(s[range.upperBound..<s.endIndex])   // 「末尾」の後の文字列
+                print(s[s.startIndex..<range.lowerBound], terminator: terminator)
+            } else {
+                print(s)
             }
         }
-        return .success(true)
+        return JpfBoolean.TRUE
     }
     /// エスケープ文字を制御コードに変換する。
     /// 「\改行なし」が文字列の後尾にある場合、改行をせずに表示する。
     /// 　(\は、そのまま使えるが、Swiftに合わせた。(「"」とか「'」は合わせてない))
-    private func replaced(_ string: String) -> Result<[String], PrintError> {
+    private func replaced(_ string: String) -> String {
         let codes = [("\\t","\t"),("\\n","\n"),("\\r","\r"),("\\0","\0"),("\\\\","\\"),("\\改行なし","\\末尾")]
-        let s = codes.reduce(string) {$0.replacingOccurrences(of: $1.0, with: $1.1)}
-        // カッコで囲われた識別子をオブジェクトに変換し表示する。
-        var strings: [String] = []
-        switch split(s, with: ("\\『", "』")) {
-        case .failure(let error):
-            return .failure(error)
-        case .success(let splitted):
-            for string in splitted {
-                switch split(string, with: ("\\（", "）")) {
-                case .success(let splitted):
-                    strings += splitted
-                case .failure(let error):
-                    return .failure(error)
-                }
-            }
-        }
-        return .success(strings)
-    }
-    /// \『<識別子>』または\(<識別子>)を含む文字列を分割し、文字列の配列に入れる。
-    private func split(_ s: String, with separator: (String, Character)) -> Result<[String], PrintError> {
-        var strings: [String] = []
-        let beginOfIdent = separator.0, endOfIdent = separator.1
-        if let range = s.firstRange(of: beginOfIdent) {
-            guard let i = s[range.upperBound..<s.endIndex].firstIndex(of: endOfIdent) else {return .failure(.escapeIdentifierError)}    // 閉じ括弧「』」が無い
-            strings.append(String(s[s.startIndex..<range.lowerBound]) + "\\末尾") // 識別子の前の部分を切り出す(改行を抑止)
-            let name = String(s[range.upperBound..<i])
-            guard let object = environment[name] else {return .failure(.identifierNotFound(name))}      // 識別子を切り出す
-            strings.append(object.string + "\\末尾")
-            switch split(String(s[s.index(after: i)..<s.endIndex]), with: (beginOfIdent, endOfIdent)) { // 残りを分割し、配列に追加
-            case .success(let splitted):    strings += splitted
-            case .failure(let error):       return .failure(error)
-            }
-        } else {
-            strings = [s]
-        }
-        return .success(strings)
+        return codes.reduce(string) {$0.replacingOccurrences(of: $1.0, with: $1.1)}
     }
 }
 struct NewlineOperator : PredicateOperable {
@@ -215,7 +205,7 @@ struct NewlineOperator : PredicateOperable {
 struct ReadOperator : PredicateOperable {
     init(_ environment: Environment, by op: Token) {self.environment = environment; self.op = op}
     let environment: Environment, op: Token
-    let talker = AVSpeechSynthesizer()
+    let synthesizer = AVSpeechSynthesizer()
     func operated() -> JpfObject? {
         guard let object = environment.unwrappedPeek else {return "「\(op.literal)」" + atLeastOneParamError + readUsage}
         var objects: [JpfObject] = [object]
@@ -223,13 +213,32 @@ struct ReadOperator : PredicateOperable {
         while isPeekParticle(.TO) {             // スタックにト格があれば、中身を格納
             objects.append(leftOperand!.value!)
         }
-        objects.reversed().forEach {read($0.string)}
+        for object in objects.reversed() {
+            let result = readWithoutTerminator(object.string)
+            if result.isError {return result}
+        }
         return nil
+    }
+    private func readWithoutTerminator(_ s: String) -> JpfObject {
+        var splitter = Splitter(of: s, with: environment, terminator: "")
+        guard let splitted = splitter.split() else {return splitter.error!}
+        splitted.forEach {read($0)}
+        return JpfBoolean.TRUE
     }
     private func read(_ string: String) {
         let utterance = AVSpeechUtterance(string: string)
         utterance.voice = AVSpeechSynthesisVoice(language: "ja-JP")
-        talker.speak(utterance)
+        let delegate = ReadDelegate()
+        synthesizer.delegate = delegate
+        DispatchQueue.main.async {
+            synthesizer.speak(utterance)
+        }
+        CFRunLoopRun()
+    }
+    private class ReadDelegate : NSObject, AVSpeechSynthesizerDelegate {
+        func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
+            CFRunLoopStop(CFRunLoopGetCurrent())
+        }
     }
 }
 struct FilesOperator : PredicateOperable {
