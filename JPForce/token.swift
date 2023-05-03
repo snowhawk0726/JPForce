@@ -109,6 +109,7 @@ enum Token : Equatable {
         case PEEK       = "見る"
         case PULL       = "得る"
         case ASSIGN     = "代入"
+        case SWAP       = "入れ替える"
         case PRINT      = "表示"
         case NEWLINE    = "改行"
         case READ       = "読む"

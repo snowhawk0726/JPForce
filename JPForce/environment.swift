@@ -33,6 +33,7 @@ class Environment {
     func drop()                     {_ = pull()} // removeLast()を使うと、emptyチェックが必要
     func drop(_ n: Int)             {stack.removeLast(n <= count ? n : count)}
     func empty()                    {stack.removeAll()}
+    func swap()                     {if count >= 2 {stack.swapAt(count-2, count-1)}}
     //
     var isEmpty: Bool               {stack.isEmpty}
     var count: Int                  {stack.count}

@@ -32,6 +32,8 @@ struct PredicateOperableFactory {
         case .keyword(.EMPTY):      return EmptyOperator(environment, by: token)
         case .keyword(.PEEK),.keyword(.PULL):
                                     return PullOperator(environment, by: token)
+        case .keyword(.ASSIGN):     return AssignOperator(environment, by: token)
+        case .keyword(.SWAP):       return SwapOperator(environment, by: token)
         case .keyword(.EXECUTE):    return ExecuteOperator(environment) // 〜を実行
         case .keyword(.SURU):       return PerformOperator(environment) // 〜にする、〜をする
         case .keyword(.APPEND):     return AppendOperator(environment, by: token)
@@ -153,6 +155,8 @@ extension PredicateOperable {
     var reduceUsage: JpfError           {JpfError("<配列、辞書、範囲>を<初期値>と<関数>でまとめる。")}
     var sortUsage: JpfError             {JpfError("<配列>を<関数>で並び替える。または、<配列>を（「昇順」に、または「降順」に）並び替える。")}
     var reverseUsage: JpfError          {JpfError("<配列、文字列>を逆順にする。")}
+    var assignUsage: JpfError           {JpfError("「〜(を)「<識別子>」に代入する」または「「<識別子>」に〜を代入する」。")}
+    var swapUsage: JpfError             {JpfError("「「<識別子>」と「<識別子>」を入れ替える」または「〜と〜を入れ替える」。")}
 }
 // MARK: - 表示/音声
 struct PrintOperator : PredicateOperable {
@@ -482,7 +486,8 @@ struct PerformOperator : PredicateOperable {
             environment.drop()
             return function.executed(with: environment)
         } else
-        if let overload = environment.unwrappedPeek as? JpfArray {
+        if let overload = environment.unwrappedPeek as? JpfArray,
+           overload.elements.first is JpfFunction {
             environment.drop()
             return overload.executed(with: environment)
         }
@@ -797,5 +802,44 @@ struct EmptyOperator : PredicateOperable {
         }
         environment.empty()                         // 入力を空にする
         return nil
+    }
+}
+struct AssignOperator : PredicateOperable {
+    init(_ environment: Environment, by op: Token) {self.environment = environment; self.op = op}
+    let environment: Environment, op: Token
+    func operated() -> JpfObject? {
+        guard var params = environment.peek(2) else {return assignUsage}
+        switch (params[0].particle, params[1].particle) {
+        case (Token(.NI),Token(.WO)):
+            params.swapAt(0, 1)
+            fallthrough
+        case (Token(.WO),Token(.NI)), (nil,Token(.NI)):
+            guard let identifier = params[1].value as? JpfString else {return assignUsage}
+            environment.drop(2)
+            environment[identifier.value] = params[0].value
+            return nil
+        default:
+            return assignUsage
+        }
+    }
+}
+struct SwapOperator : PredicateOperable {
+    init(_ environment: Environment, by op: Token) {self.environment = environment; self.op = op}
+    let environment: Environment, op: Token
+    func operated() -> JpfObject? {
+        guard let params = environment.peek(2) else {return swapUsage}
+        switch (params[0].particle, params[1].particle) {
+        case (Token(.TO),Token(.WO)),(Token(.WO),Token(.TO)):
+            guard let first = params[0].value as? JpfString, let second = params[1].value as? JpfString,
+                  environment[first.value] != nil && environment[second.value] != nil else {fallthrough}
+            environment.drop(2)
+            swap(&environment[first.value], &environment[second.value])
+            return nil
+        case (nil,nil):
+            environment.swap()
+            return nil
+        default:
+            return swapUsage
+        }
     }
 }

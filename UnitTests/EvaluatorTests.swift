@@ -558,6 +558,21 @@ final class EvaluatorTests: XCTestCase {
             print("テスト(\(evaluated))終了")
         }
     }
+    func testAssignAndSwapOperations() throws {
+        let testPatterns: [(input: String, expected: Any?)] = [
+            ("甲は1。「甲」に「い」を代入する。甲。", "い"),
+            ("1を「甲」に代入する。甲。", 1),
+            ("1と2を足す。「甲」に代入する。甲。", 3),
+            ("甲は１。乙は２。「甲」と「乙」を入れ替える。甲", 2),
+            ("１と２を入れ替える。入力の最初の格", "を"),
+        ]
+        for test in testPatterns {
+            print("テストパターン: \(test.input)")
+            let evaluated = try XCTUnwrap(testEvaluator(test.input))
+            try testObject(evaluated, with: test.expected)
+            print("テスト(\(evaluated))終了")
+        }
+    }
 }
 // MARK: - ヘルパー
 private func testObject(_ object: JpfObject, with exptected: Int) throws {
