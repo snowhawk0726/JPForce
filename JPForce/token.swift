@@ -108,6 +108,7 @@ enum Token : Equatable {
         case DROP       = "捨てる" // remove last from stack
         case PEEK       = "見る"
         case PULL       = "得る"
+        case ASSIGN     = "代入"
         case PRINT      = "表示"
         case NEWLINE    = "改行"
         case READ       = "読む"
@@ -253,6 +254,7 @@ extension String {
     var isContinuativeForm: Bool {                                                  // 連用形？(Check self if continuative form)
         ContinuativeForm.hasEnd(of: self) || ContinuativeForm.hasIrregular(self)
     }
+    var isExecutable: Bool {isPainForm || isContinuativeForm}   // (終止形または連用形を持つ)動詞または形容詞
 }
 // MARK: - 連用形(Continuative Form)
 /// 連用形の文字列(word)を、終止形(Plain Form)に変換する。

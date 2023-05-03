@@ -153,7 +153,7 @@ struct JpfReturnValue : JpfObject {
 struct JpfFunction : JpfObject {
     static let type = "関数"
     var parameters: [Identifier]    // 入力パラメータ
-    var signature: FunctionLiteral.InputFormat  // 入力形式
+    var signature: InputFormat  // 入力形式
     var body: BlockStatement
     var environment: Environment
     var string: String {"関数".color(.magenta) + "であって、【" +

@@ -38,12 +38,14 @@ struct DefineStatement : Statement {
     var token: Token                // とは、は、
     var name: Identifier            // 識別子
     var value: ExpressionStatement  // 値(複数の式)
+    var isExtended: Bool = false    // 拡張識別
     //
     var tokenLiteral: String {token.literal}
     var string: String {name.string + tokenLiteral + "、" +
         value.expressions.reduce("") {$0 + $1.string} + (token == .particle(.WA) ? "。" : "のこと。")}
     static let wa = "は"
     static let towa = "とは"
+    static let further = "さらに"
     static let koto = "こと"          //　省略可
     static let dearu = "である"        //　省略可
     static let desu = "です"          // 代替可
@@ -201,11 +203,11 @@ struct FunctionLiteral : Expression {
         (!parameters.isEmpty ? "入力が" + "、\(zip(parameters, signature.strings).map {$0.string + $1}.joined(separator: "と"))であり、" : "") +
         "本体が" + "、" + body.string + "】"
     }
-    struct InputFormat {
-        var numberOfInputs: Int?
-        var formats: [(type: String, particle: String)] // パラメータ毎の型と格(無い場合は"")
-        var strings: [String] {formats.map {!($0.type.isEmpty && $0.particle.isEmpty) ? "「\($0.type + $0.particle)」" : ""}}
-    }
+}
+struct InputFormat {
+    var numberOfInputs: Int?                        // 期待するパラメータ数(可変の場合はnil)
+    var formats: [(type: String, particle: String)] // 期待するパラメータ毎の型と格(無い場合は"")
+    var strings: [String] {formats.map {!($0.type.isEmpty && $0.particle.isEmpty) ? "「\($0.type + $0.particle)」" : ""}}
 }
 struct ArrayLiteral : Expression {
     var token: Token                // 配列トークン

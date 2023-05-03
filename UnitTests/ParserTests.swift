@@ -13,16 +13,17 @@ final class ParserTests: XCTestCase {
     override func tearDownWithError() throws {
     }
     func testDefineStatements() throws {
-        let testPatterns: [(input: String, count: Int, expectedIdentifier: String, expectedValues: [Any])] = [
-            ("xは、５。", 1, "x", [5]),
-            ("yは、真。", 1, "y", [true]),
-            ("foobarはy。", 1, "foobar", ["y"]), //「、」が無い定義文の解析
+        let testPatterns: [(input: String, count: Int, expectedIdentifier: String, expectedValues: [Any], isExtended: Bool)] = [
+            ("xは、５。", 1, "x", [5], false),
+            ("yは、真。", 1, "y", [true], false),
+            ("foobarはy。", 1, "foobar", ["y"], false), //「、」が無い定義文の解析
             ("""
                 zは、1。※ 改行がある定義文の解析
             
                 zは、0。
-            """, 2, "z", [1, 0]),
-            ("『割った余り』は、2。",1,"割った余り",[2]),
+            """, 2, "z", [1, 0], false),
+            ("『割った余り』は、2。",1,"割った余り",[2], false),
+            ("正しいは、さらに、関数であって、入力が甲、本体が、甲である。", 1, "正しい", ["関数であって、【入力が、甲であり、本体が、甲である。】"], true),
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
@@ -33,7 +34,8 @@ final class ParserTests: XCTestCase {
                     program.statements[i],
                     name: test.expectedIdentifier,
                     "は",
-                    with: test.expectedValues[i])
+                    with: test.expectedValues[i],
+                    flag: test.isExtended)
             }
             print("テスト(\(program.string))終了")
         }
@@ -594,12 +596,13 @@ final class ParserTests: XCTestCase {
         XCTFail()
     }
     //
-    private func testDefStatement(_ statement: Statement?, name: String, _ string: String, with value: Any) throws {
+    private func testDefStatement(_ statement: Statement?, name: String, _ string: String, with value: Any, flag: Bool) throws {
         let defStatement = try XCTUnwrap(statement as? DefineStatement)
         XCTAssertEqual(defStatement.token.literal, string)
         XCTAssertEqual(defStatement.name.value, name)
         XCTAssertEqual(defStatement.name.tokenLiteral, name)
         try testLiteralExpression(defStatement.value.expressions.first!, with: value)
+        XCTAssertEqual(defStatement.isExtended, flag)
     }
     private func testPhraseExpression(_ expression: Expression,  with expected: Any, _ particle: String) throws {
         let p = try XCTUnwrap(expression as? PhraseExpression)
@@ -624,7 +627,7 @@ final class ParserTests: XCTestCase {
         case let int as Int:
             try testIntegerLiteral(expression, value: int)
         case let string as String:
-            try testIdentifier(expression, value: string)
+            XCTAssertEqual(expression?.string, string)
         case let bool as Bool:
             try testBooleanLiteral(expression, value: bool)
         case let token as Token:

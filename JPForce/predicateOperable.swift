@@ -442,25 +442,32 @@ struct ExecuteOperator : PredicateOperable {
     /// 入力が、文字列であれば、Documentディレクトリにあるファイルを解析・評価する。
     /// - Returns: 実行結果(またはエラー)を返す。
     func operated() -> JpfObject? {
-        if let function = environment.unwrappedPeek as? JpfFunction {   // 関数を実行する
+        switch environment.unwrappedPeek {
+        case let function as JpfFunction:   // 関数を実行する
             environment.drop()
             return function.executed(with: environment)
-        } else
-        if let fliename = environment.unwrappedPeek as? JpfString {     // ファイルを実行(解析・評価)する
+        case let overload as JpfArray:      // 多重定義を実行する
+            environment.drop()
+            return overload.executed(with: environment)
+        case let fliename as JpfString:     // ファイルを実行(解析・評価)する
             environment.drop()
             let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
             guard let contents = try? String(contentsOfFile: url.path() + fliename.value, encoding: .utf8) else {return fileReadError}
-            let lexer = Lexer(contents)
-            let parser = Parser(lexer)
-            guard let program = parser.parseProgram(), parser.errors.isEmpty else {
-                print(contents)
-                parser.errors.forEach {print("\t\($0)")}
-                return detectParserError
-            }
-            let evaluated = program.evaluated(with: environment)
-            return evaluated
+            return executed(by: contents)
+        default:
+            return functionObjectNotFound
         }
-        return functionObjectNotFound
+    }
+    /// contentsに書かれたプログラムを実行し、結果を返す。
+    private func executed(by contents: String) -> JpfObject? {
+        let lexer = Lexer(contents)
+        let parser = Parser(lexer)
+        guard let program = parser.parseProgram(), parser.errors.isEmpty else {
+            print(contents)
+            parser.errors.forEach {print("\t\($0)")}
+            return detectParserError
+        }
+        return program.evaluated(with: environment)
     }
 }
 struct PerformOperator : PredicateOperable {
@@ -474,6 +481,10 @@ struct PerformOperator : PredicateOperable {
         if let function = environment.unwrappedPeek as? JpfFunction {
             environment.drop()
             return function.executed(with: environment)
+        } else
+        if let overload = environment.unwrappedPeek as? JpfArray {
+            environment.drop()
+            return overload.executed(with: environment)
         }
         return environment.unwrapPhrase()
     }

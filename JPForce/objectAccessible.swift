@@ -129,7 +129,10 @@ extension JpfRange : JpfObjectAccessible {
 extension JpfFunction : JpfObjectAccessible {
     func accessed(by name: String, with environment: Environment) -> JpfObject? {
         accessed(type: type, with: environment) ??  // 関数でオブジェクトにアクセスしている？→ Yesならエラー
-        (isExecutable(name) ? executed(with: environment) : self)}
-    // (終止形または連用形を持つ)動詞または形容詞
-    private func isExecutable(_ name: String) -> Bool {name.isPainForm || name.isContinuativeForm}
+        (name.isExecutable ? executed(with: environment) : self)}
+}
+extension JpfArray : JpfObjectAccessible {
+    func accessed(by name: String, with environment: Environment) -> JpfObject? {
+        accessed(type: type, with: environment) ??  // 関数配列でオブジェクトにアクセスしている？→ Yesならエラー
+        (name.isExecutable ? executed(with: environment) : self)}
 }

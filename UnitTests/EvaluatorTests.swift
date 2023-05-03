@@ -176,7 +176,7 @@ final class EvaluatorTests: XCTestCase {
         XCTAssertEqual(function.parameters.count, 1)
         XCTAssertEqual(function.parameters.first?.string, "x")
         XCTAssertEqual(function.body.string, "xに2を足す。")
-        print("テスト(\(function))終了")
+        print("テスト(\(function.string))終了")
     }
     func testFunctionApplication() throws {
         let testPatterns: [(input: String, exptected: Any)] = [
@@ -202,6 +202,59 @@ final class EvaluatorTests: XCTestCase {
             try testObject(evaluated, with: test.exptected)
             print("テスト(\(evaluated))終了")
         }
+    }
+    func testOverloadObject() throws {
+        let input = "加算は、さらに、関数【入力がa「数値に」とb「数値を」、aにbを足す】。加算。"
+        print("テストパターン: \(input)")
+        let overload = try XCTUnwrap(testEvaluator(input) as? JpfArray)
+        let function = try XCTUnwrap(overload.elements.first as? JpfFunction)
+        XCTAssertEqual(function.parameters.count, 2)
+        XCTAssertEqual(function.parameters[0].string, "a")
+        XCTAssertEqual(function.parameters[1].string, "b")
+        XCTAssertEqual(function.body.string, "aにbを足す。")
+        print("テスト(\(function.string))終了")
+    }
+    func testOverloadObjects() throws {
+        let input = """
+            加算は、関数【入力がa「数値」とb「数値」、aにbを足し、返す】。
+            加算は、さらに、関数【入力がa「数値に」とb「数値を」、aにbを足し、返す】。
+            加算は、さらに、関数【入力がa「文字列」とb「文字列」、aにbを足し、返す】。
+            加算。
+        """
+        print("テストパターン: \(input)")
+        let overload = try XCTUnwrap(testEvaluator(input) as? JpfArray)
+        XCTAssertEqual(overload.elements.count, 3)
+        var function = try XCTUnwrap(overload.elements[0] as? JpfFunction)
+        XCTAssertEqual(function.signature.numberOfInputs, 2)
+        XCTAssertEqual(function.signature.strings[0], "「数値」")
+        XCTAssertEqual(function.signature.strings[1], "「数値」")
+        function = try XCTUnwrap(overload.elements[1] as? JpfFunction)
+        XCTAssertEqual(function.signature.numberOfInputs, 2)
+        XCTAssertEqual(function.signature.strings[0], "「数値に」")
+        XCTAssertEqual(function.signature.strings[1], "「数値を」")
+        function = try XCTUnwrap(overload.elements[2] as? JpfFunction)
+        XCTAssertEqual(function.signature.numberOfInputs, 2)
+        XCTAssertEqual(function.signature.strings[0], "「文字列」")
+        XCTAssertEqual(function.signature.strings[1], "「文字列」")
+        print("テスト(\(overload.string))終了")
+    }
+    func testOverloadExecution() throws {
+        let input = """
+            加えるは、関数【入力がa「文字列と…」とb「文字列を」、aの最初にbを足し、返す】。
+            加えるは、さらに、関数【入力がa「数値に」とb「数値を」、aにbを足し、返す】。
+            加えるは、さらに、関数【入力がa「文字列を」とb「文字列に」、bにaを足し、返す】。
+            甲は、「あ」と「い」を加えたもの。
+            乙は、1に2を加えたもの。
+            丙は、「あ」を「い」に加えたもの。
+            配列【甲、乙、丙】。
+        """
+        print("テストパターン: \(input)")
+        let array = try XCTUnwrap(testEvaluator(input) as? JpfArray)
+        XCTAssertEqual(array.elements.count, 3)
+        XCTAssertEqual(array.elements[0].string, "あい")
+        XCTAssertEqual(array.elements[1].string, "3")
+        XCTAssertEqual(array.elements[2].string, "いあ")
+        print("テスト(\(array.string))終了")
     }
     func testStringConcation() throws {
         let input = "「こんにちは」と「、」と「みなさん。」を足す。"
@@ -255,7 +308,7 @@ final class EvaluatorTests: XCTestCase {
         try testObject(evaluated.elements[0], with: 1)
         try testObject(evaluated.elements[1], with: 4)
         try testObject(evaluated.elements[2], with: 6)
-        print("テスト(\(evaluated))終了")
+        print("テスト(\(evaluated.string))終了")
     }
     func testArrayIndexExpressions() throws {
         let testPatterns: [(input: String, expected: Int?)] = [
@@ -331,7 +384,7 @@ final class EvaluatorTests: XCTestCase {
             let pair = try XCTUnwrap(result.pairs[expectedKey])
             try testObject(pair.value, with: expectedValue)
         }
-        print("テスト(\(evaluated))終了")
+        print("テスト(\(evaluated.string))終了")
     }
     func testDitctionaryIndexExpressions() throws {
         let testPatterns: [(input: String, expected: Any?)] = [

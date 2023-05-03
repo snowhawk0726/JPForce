@@ -62,7 +62,7 @@ class Environment {
     /// - Parameter outer:引数を格納しているスタックを含む環境
     /// - Parameter designated: 指定の形式でチェックをする
     /// - Returns: 引数がパラメータおよび指定形式に合わない場合は、JpfErrorを返す。
-    func apply(_ parameters: [Identifier], with designated: FunctionLiteral.InputFormat, from outer: Environment) -> JpfObject {
+    func apply(_ parameters: [Identifier], with designated: InputFormat, from outer: Environment) -> JpfObject {
         if designated.numberOfInputs == nil {    // 可変長入力
             guard let o = outer.peek else {return numberOfParameterError + String(parameters.count)}
             for (p, f) in zip(parameters.reversed(), designated.formats.reversed()) {
@@ -116,11 +116,11 @@ class Environment {
         return .success(values)
     }
     /// 対象のオブジェクトの型をチェック
-    private func isSameType(of object: JpfObject, as type: String) -> Bool {
+    func isSameType(of object: JpfObject, as type: String) -> Bool {
         return type.isEmpty || object.value?.type == type
     }
     /// 対象のオブジェクトの格をチェック
-    private func isSameParticle(of object: JpfObject, as particle: String) -> Bool {
+    func isSameParticle(of object: JpfObject, as particle: String) -> Bool {
         return particle.isEmpty || object.particle?.literal == particle
     }
     // エラー

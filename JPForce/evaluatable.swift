@@ -34,6 +34,8 @@ extension Node {
     var conditionEvaluationError: JpfError  {JpfError("「反復」の条件が正しくない。")}
     var loopParameterError: JpfError        {JpfError("「反復」の入力が正しくない。")}
     var rangeTypeError: JpfError            {JpfError("「範囲」の上下限が、数値でない。：")}
+    var overloadNeedFuncDefinition: JpfError{JpfError("「関数」以外を「さらに」で拡張している。")}
+    // 仕様表示
     var strideLoopUsage: JpfError           {JpfError("仕様：<数値>から<数値>まで（<数値>ずつ）反復【入力が<識別子(カウント値)>、<処理>】。")}
     var rangeLoopUsage: JpfError            {JpfError("仕様：範囲【<下限><上限>】を反復【入力が<識別子(カウント値)>、<処理>】。")}
     var arrayLoopUsage: JpfError            {JpfError("仕様：<配列>を反復【入力が<識別子(値)>、<処理>】。")}
@@ -76,7 +78,24 @@ extension BlockStatement : Evaluatable {
 extension DefineStatement : Evaluatable {
     func evaluated(with environment: Environment) -> JpfObject? {
         if let result = value.evaluated(with: environment), result.isError {return result}
-        environment[name.value] = environment.pull()
+        var object = environment.pull()
+        if isExtended {                                 // 多重定義
+            guard let function = object as? JpfFunction else {return overloadNeedFuncDefinition + "(拡張先が\(object?.type ?? "無い"))"}
+            var elements: [JpfObject] = []
+            if let original = environment[name.value] { // 既存定義
+                switch original {
+                case let f as JpfFunction:              // 関数定義
+                    elements.append(f)
+                case let a as JpfArray:                 // 多重定義
+                    elements = a.elements
+                default:
+                    return overloadNeedFuncDefinition + "(拡張元が\(original.type))"
+                }
+            }
+            elements.append(function)                   // 配列に関数を追加
+            object = JpfArray(elements: elements)
+        }
+        environment[name.value] = object
         return nil
     }
 }
@@ -411,6 +430,35 @@ extension JpfFunction {
     private func unwrappedReturnValue(of object: JpfObject) -> JpfObject? {
         object.isReturnValue ? object.value! : nil
     }
-    var functionParameterError: JpfError    {JpfError("「関数」の入力の数が足りていない。必要数：")}
-    var couldnotEvaluate: JpfError          {JpfError("「関数」の本体が評価できなかった。本体：")}
+}
+extension JpfArray {
+    func executed(with environment: Environment) -> JpfObject? {
+        for element in elements.reversed() {    // 逆順に入力形式をチェック
+            guard let function = element as? JpfFunction else {return notExecutableObject + element.type}
+            if let number = function.signature.numberOfInputs { // 固定長入力
+                guard let params = environment.peek(number) else {continue}
+                for (param, designated) in zip(params, function.signature.formats) {
+                    if environment.isSameType(of: param, as: designated.type) &&
+                        environment.isSameParticle(of: param, as: designated.particle) {
+                        return function.executed(with: environment)
+                    }
+                }
+            } else {                                            // 可変長入力
+                for designated in function.signature.formats {
+                    if contains(designated, in: environment) {
+                        return function.executed(with: environment)
+                    }
+                }
+            }
+        }
+        return functionParameterError
+    }
+    private func contains(_ designated: (String, String), in environment: Environment) -> Bool {
+        let particle = designated.1.hasSuffix("…") ? String(designated.1.dropLast(1)) : designated.1
+        return environment.getAll().contains { object in
+            environment.isSameType(of: object, as: designated.0) && environment.isSameParticle(of: object, as: particle)
+        }
+    }
+    private var notExecutableObject: JpfError   {JpfError("「関数」以外を実行しようとした。型：")}
+    private var functionParameterError: JpfError{JpfError("「関数」の入力が指定形式と一致しない。")}
 }

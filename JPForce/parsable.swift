@@ -100,11 +100,16 @@ struct DefStatementParser : StatementParsable {
     let syntax1 = "定義文「<識別子>とは、<式(値)>ことである。」"
     let syntax2 = "定義文「<識別子>は、<式(値)>。」"
     func parse() -> Statement? {
+        var isExtended = false
         let identifier = Identifier(token: currentToken, value: currentToken.literal) // 識別子名はそのまま
         getNext()
         let token = currentToken           // 「は」「とは」
         let syntax = (token.literal == DefineStatement.towa) ? syntax1 : syntax2
         _ = getNext(whenNextIs: .COMMA)    // 読点(、)を読み飛ばす
+        if getNext(whenNextIs: DefineStatement.further) {
+            isExtended = true
+            _ = getNext(whenNextIs: .COMMA) // 読点(、)を読み飛ばす
+        }
         getNext()
         guard let parsed = ExpressionStatementParser(parser).parse() as? ExpressionStatement else {
             error(message: "\(syntax)で、式の解釈に失敗した。")
@@ -116,7 +121,7 @@ struct DefStatementParser : StatementParsable {
             _ = getNext(whenNextIs: .PERIOD)
             while getNext(whenNextIs: .EOL) {}  // EOLの前で解析を停止する。
         }
-        return DefineStatement(token: token, name: identifier, value: parsed)
+        return DefineStatement(token: token, name: identifier, value: parsed, isExtended: isExtended)
     }
 }
 /// 文の終わりまで、式を解析する。
@@ -408,7 +413,7 @@ struct FunctionLiteralParser : ExpressionParsable {
         }
         return FunctionLiteral(token: token, parameters: identifiers, signature: signature, body: body)
     }
-    private func parseSignature(from strings: [String]) -> FunctionLiteral.InputFormat {
+    private func parseSignature(from strings: [String]) -> InputFormat {
         let threeDots = "…"
         let formats = strings.map { string in
             var type = "", particle = ""
@@ -420,7 +425,7 @@ struct FunctionLiteralParser : ExpressionParsable {
             return (type, particle)
         }
         let number = formats.map({$0.1}).contains {$0.hasSuffix(threeDots)} ? nil : strings.count
-        return FunctionLiteral.InputFormat(numberOfInputs: number, formats: formats)
+        return InputFormat(numberOfInputs: number, formats: formats)
     }
 }
 struct ArrayLiteralParser : ExpressionParsable {    // TODO: ArrayとDictionaryの共通化
