@@ -103,10 +103,8 @@ struct Splitter {
 // MARK: - implements
 extension PredicateOperable {
     // Stack operations
-    // 副作用なし
     var isPeekNumber: Bool {environment.peek?.isNumber ?? false}
     func isPeekParticle(_ expected: Token.Particle) -> Bool {environment.peek?.particle == .particle(expected)}
-    // 副作用あり
     var leftOperand: JpfObject? {return environment.pull()}
     var leftNumber: Int? {
         guard let number = environment.peek?.number else {return nil}
@@ -123,7 +121,8 @@ extension PredicateOperable {
     var additionParamError: JpfError    {JpfError("には、２つ以上の数値、文字列、配列の入力が必要。")}
     var particleError: JpfError         {JpfError("助詞が間違っている。")}
     var valueNotFound: JpfError         {JpfError("で判定すべき値が無かった。")}
-    var rangeParamError: JpfError       {JpfError("の範囲の判定式が間違っている。")}
+    var determineError: JpfError        {JpfError("判定の述語が間違っている。述語：「ある」「ない」「等しい」")}
+    var rangeFormatError: JpfError      {JpfError("範囲の判定対象は数値のみ。")}
     var returnParamError: JpfError      {JpfError("返すべき値がない。")}
     var cannotDivideByZero: JpfError    {JpfError("0で割ることはできない。")}
     var cannotCompare: JpfError         {JpfError("では比較できない。")}
@@ -134,29 +133,30 @@ extension PredicateOperable {
     var fileReadError: JpfError         {JpfError("ファイルの読み込みに失敗した。")}
     var detectParserError: JpfError     {JpfError("構文解析器がエラーを検出した。")}
     // メッセージ(使い方)
-    var printUsage: JpfError            {JpfError("「(〜と…)〜を表示する」。")}
-    var readUsage: JpfError             {JpfError("「(〜と…)〜を読む」。")}
-    var additionUsage: JpfError         {JpfError("「(〜と…)〜を足す」。")}
-    var multiplicationUsage: JpfError   {JpfError("「(〜と…)〜を掛ける」。")}
-    var substractionUsage: JpfError     {JpfError("「(〜から)〜を引く」または「(〜を)〜から引く」。")}
-    var divisionUsage: JpfError         {JpfError("「(〜を)〜で割る」または「(〜で)〜を割る」。")}
-    var negateUsage: JpfError           {JpfError("「〜の負数」または「〜を負数にする」。")}
-    var equalUsage: JpfError            {JpfError("「〜(と)〜(が)等しい」。")}
-    var beUsage: JpfError               {JpfError("「(〜が)〜である」または「(〜は)〜である」。")}
-    var notUsage: JpfError              {JpfError("「(〜が)〜で(は)ない」または「(〜は)〜で(は)ない」。")}
-    var appendUsage: JpfError           {JpfError("「〜を〜に追加する」または「(〜に)〜を追加する」。")}
-    var appendDictionaryUsage: JpfError {JpfError("「〜が〜を〜に追加する」または「(〜に)〜が〜を追加する」。")}
-    var removeUsage: JpfError           {JpfError("「(〜から)〜を削除する」。")}
-    var rangeCheckUsage: JpfError       {JpfError("<数値>が範囲【<範囲式>】にある/ない。")}
-    var containsUsage: JpfError         {JpfError("<配列、辞書、範囲>が<要素>を含む。")}
-    var foreachUsage: JpfError          {JpfError("<配列、辞書、範囲>を<関数>で繰り返す。")}
-    var mapUsage: JpfError              {JpfError("<配列、辞書、範囲>を<関数>で写像する。または、<範囲>写像する。")}
-    var filterUsage: JpfError           {JpfError("<配列、辞書>を<関数>でフィルターする。")}
-    var reduceUsage: JpfError           {JpfError("<配列、辞書、範囲>を<初期値>と<関数>でまとめる。")}
-    var sortUsage: JpfError             {JpfError("<配列>を<関数>で並び替える。または、<配列>を（「昇順」に、または「降順」に）並び替える。")}
-    var reverseUsage: JpfError          {JpfError("<配列、文字列>を逆順にする。")}
-    var assignUsage: JpfError           {JpfError("「〜(を)「<識別子>」に代入する」または「「<識別子>」に〜を代入する」。")}
-    var swapUsage: JpfError             {JpfError("「「<識別子>」と「<識別子>」を入れ替える」または「〜と〜を入れ替える」。")}
+    var printUsage: JpfError            {JpfError("仕様：(〜と…)〜を表示する。")}
+    var readUsage: JpfError             {JpfError("仕様：(〜と…)〜を読む。")}
+    var additionUsage: JpfError         {JpfError("仕様：(〜と…)〜を足す。")}
+    var multiplicationUsage: JpfError   {JpfError("仕様：(〜と…)〜を掛ける。")}
+    var substractionUsage: JpfError     {JpfError("仕様：(〜から)〜を引く。または、(〜を)〜から引く。")}
+    var divisionUsage: JpfError         {JpfError("仕様：(〜を)〜で割る。または、(〜で)〜を割る。")}
+    var negateUsage: JpfError           {JpfError("仕様：〜の負数。または、〜を負数にする。")}
+    var equalUsage: JpfError            {JpfError("仕様：〜(と)〜(が)等しい。")}
+    var beUsage: JpfError               {JpfError("仕様：(〜が)〜である。または、(〜は)〜である。")}
+    var notUsage: JpfError              {JpfError("仕様：(〜が)〜で(は)ない。または、(〜は)〜で(は)ない。")}
+    var appendUsage: JpfError           {JpfError("仕様：〜を〜に追加する。または、(〜に)〜を追加する。")}
+    var appendDictionaryUsage: JpfError {JpfError("仕様：〜が〜を〜に追加する。または、(〜に)〜が〜を追加する。")}
+    var removeUsage: JpfError           {JpfError("仕様：(〜から)〜を削除する。")}
+    var rangeCheckUsage: JpfError       {JpfError("仕様：<数値>が範囲【<範囲式>】に")}
+    var determineUsage: JpfError        {JpfError("仕様：〜が<配列、範囲>に")}
+    var containsUsage: JpfError         {JpfError("仕様：<配列、辞書、範囲>が<要素>を含む。")}
+    var foreachUsage: JpfError          {JpfError("仕様：<配列、辞書、範囲>を<関数>で繰り返す。")}
+    var mapUsage: JpfError              {JpfError("仕様：<配列、辞書、範囲>を<関数>で写像する。または、<範囲>写像する。")}
+    var filterUsage: JpfError           {JpfError("仕様：<配列、辞書>を<関数>でフィルターする。")}
+    var reduceUsage: JpfError           {JpfError("仕様：<配列、辞書、範囲>を<初期値>と<関数>でまとめる。")}
+    var sortUsage: JpfError             {JpfError("仕様：<配列>を<関数>で並び替える。または、<配列>を（「昇順」に、または「降順」に）並び替える。")}
+    var reverseUsage: JpfError          {JpfError("仕様：<配列、文字列>を逆順にする。")}
+    var assignUsage: JpfError           {JpfError("仕様：〜(を)「<識別子>」に代入する。または、「<識別子>」に〜を代入する。")}
+    var swapUsage: JpfError             {JpfError("仕様：「<識別子>」と「<識別子>」を入れ替える。または、〜と〜を入れ替える。")}
 }
 // MARK: - 表示/音声
 struct PrintOperator : PredicateOperable {
@@ -175,7 +175,7 @@ struct PrintOperator : PredicateOperable {
         }
         return nil
     }
-    /// 文字列の中の制御文字を解析して表示(print)する。
+    /// 文字列の中のエスケープ文字を解析して表示(print)する。
     /// - Parameter string: 制御文字を含む文字列
     /// 「\末尾」は、文字列の末尾を改行の代わりに表示する。
     /// 例： 「こんにちは\末尾、」と「みなさん。」を表示する。
@@ -193,7 +193,7 @@ struct PrintOperator : PredicateOperable {
         }
         return JpfBoolean.TRUE
     }
-    /// エスケープ文字を制御コードに変換する。
+    /// エスケープ文字を(Swiftの)制御コードに変換する。
     /// 「\改行なし」が文字列の後尾にある場合、改行をせずに表示する。
     /// 　(\は、そのまま使えるが、Swiftに合わせた。(「"」とか「'」は合わせてない))
     private func replaced(_ string: String) -> String {
@@ -248,6 +248,8 @@ struct ReadOperator : PredicateOperable {
 struct FilesOperator : PredicateOperable {
     init(_ environment: Environment, by op: Token) {self.environment = environment; self.op = op}
     let environment: Environment, op: Token
+    /// 「書類」ディレクトリのファイル一覧を配列して返す。
+    /// - Returns: ファイル名の配列、無い場合は「無」
     func operated() -> JpfObject? {
         let documentUrl = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         guard let fileNames = try? FileManager.default.contentsOfDirectory(atPath: documentUrl.path()) else {return JpfNull.object}
@@ -347,72 +349,65 @@ struct BooleanOperator : PredicateOperable {
     func operated() -> JpfObject? {
         if let params = environment.peek(2) {                   // 入力が２つ
             switch (params[0].particle, params[1].particle, op.type) {
-            case (.particle(.GA),.particle(.DE),.keyword(.BE)),
-                (.particle(.WA),.particle(.DE),.keyword(.BE)),
-                (.particle(.GA),.particle(.DE),.keyword(.NOT)),
-                (.particle(.WA),.particle(.DE),.keyword(.NOT)),
-                (.particle(.GA),.particle(.DEWA),.keyword(.NOT)),
-                (.particle(.WA),.particle(.DEWA),.keyword(.NOT)),
-                (_,_,.keyword(.EQUAL)):
+            case (.particle(.GA),.particle(.DE),.keyword(.BE)),(.particle(.WA),.particle(.DE),.keyword(.BE)),
+                (.particle(.GA),.particle(.DE),.keyword(.NOT)),(.particle(.WA),.particle(.DE),.keyword(.NOT)),
+                (.particle(.GA),.particle(.DEWA),.keyword(.NOT)),(.particle(.WA),.particle(.DEWA),.keyword(.NOT)),
+                (_,_,.keyword(.EQUAL)):                         // 当否判定
                 guard let left = params[0].value, let right = params[1].value else {
-                    // 想定していないエラー
                     return "「\(op.literal)」:" + valueNotFound + ": \(params[0])または\(params[1])"
                 }
                 environment.drop(2)
-                return JpfBoolean.object(of: determined(left, op.type, right)!)
-            case (.particle(.GA),.particle(.NI),.keyword(.BE)),
-                (.particle(.WA),.particle(.NI),.keyword(.BE)),
-                (.particle(.GA),.particle(.NI),.keyword(.NOT)),
-                (.particle(.WA),.particle(.NI),.keyword(.NOT)):
-                guard let left = params[0].value, left.isNumber,
-                      let right = params[1].value, (right is JpfRange || right is JpfArray) else {
-                    return "「\(op.literal)」:" + rangeParamError + rangeCheckUsage
+                return determined(left, op.type, right)
+            case (.particle(.GA),.particle(.NI),.keyword(.BE)),(.particle(.WA),.particle(.NI),.keyword(.BE)),
+                (.particle(.GA),.particle(.NI),.keyword(.NOT)),(.particle(.WA),.particle(.NI),.keyword(.NOT)): // 有無判定(含む)
+                guard let left = params[0].value, let right = params[1].value else {return determineUsage + "\(op.literal)。"}
+                switch right {
+                case is JpfRange:
+                    guard left.isNumber else {return rangeFormatError + rangeCheckUsage  + "\(op.literal)。"}
+                case is JpfArray:
+                    break
+                default:
+                    return determineUsage + "\(op.literal)。"
                 }
                 environment.drop(2)
-                return JpfBoolean.object(of: determined(left, op.type, right)!)
-            case (_,_,.keyword(.BE)),(_,_,.keyword(.NOT)):
+                return determined(left, op.type, right)
+            case (_,_,.keyword(.BE)),(_,_,.keyword(.NOT)):      // 当否判定
                 environment.drop()
-                return JpfBoolean.object(of: determined(params[1], op.type)!)
+                return determined(params[1], op.type)
             default:
-                // .EQUAL, .BE, .NOTでは、ここは通らない。
-                return "「\(op.literal)」:" + particleError +
-                (op.type == .keyword(.BE) ? beUsage : notUsage)
+                return "「\(op.literal)」:" + particleError + (op.type == .keyword(.BE) ? beUsage : notUsage)
             }
         } else
-        if let operand = environment.peek,                      // 入力が１つ
-           let result = determined(operand, op.type)  {
+        if let operand = environment.peek {                     // 入力が１つ
+            guard op.type != .keyword(.EQUAL) else {return "「\(op.literal)」" + twoParamsNeeded + equalUsage}
             environment.drop()
-            return JpfBoolean.object(of: result)
-        }
-        // 入力が不足
-        if op.type == .keyword(.EQUAL) {
-            return "「\(op.literal)」" + twoParamsNeeded + equalUsage
+            return determined(operand, op.type)                 // 当否判定
         }
         return "「\(op.literal)」" + atLeastOneParamError + (op.type == .keyword(.BE) ? beUsage : notUsage)
     }
-    private func determined(_ left: JpfObject, _ opType: Token.TokenType, _ right: JpfObject) -> Bool? {
+    private func determined(_ left: JpfObject, _ opType: Token.TokenType, _ right: JpfObject) -> JpfObject {
         if let array = right as? JpfArray {
             let result = array.contains(left)
             return determined(result, opType)
         }
         if let range = right as? JpfRange {
             let result = range.contains(left)
-            guard !result.isError else {return nil}
+            guard !result.isError else {return result} // 範囲の形式エラー
             return determined(result, opType)
         }
         switch opType {
         case .keyword(.BE),
-             .keyword(.EQUAL):  return left.isEqual(to: right)
-        case .keyword(.NOT):    return !left.isEqual(to: right)
-        default:                return nil
+             .keyword(.EQUAL):  return JpfBoolean.object(of: left.isEqual(to: right))
+        case .keyword(.NOT):    return JpfBoolean.object(of: !left.isEqual(to: right))
+        default:                return determineError
         }
     }
-    private func determined(_ operand: JpfObject, _ opType: Token.TokenType) -> Bool? {
+    private func determined(_ operand: JpfObject, _ opType: Token.TokenType) -> JpfObject {
         switch opType {
         case .keyword(.BE),
-             .keyword(.EQUAL):  return operand.isTrue
-        case .keyword(.NOT):    return !operand.isTrue
-        default:                return nil
+             .keyword(.EQUAL):  return JpfBoolean.object(of: operand.isTrue)
+        case .keyword(.NOT):    return JpfBoolean.object(of: !operand.isTrue)
+        default:                return determineError
         }
     }
 }
