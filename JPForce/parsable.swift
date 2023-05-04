@@ -45,7 +45,7 @@ extension Parsable {
         }
         return true
     }
-    func skipEol() {while currentToken.isEol {getNext()}}
+    func skipEols() {parser.skipEols()}
     /// 入力部の解析
     /// - 形式: 入力が、識別子1（「型格」）と 識別子2（「型格」）と...、であり、
     func parseParameters(endSymbol: Token.Symbol) -> [(Identifier, String)]? {
@@ -65,6 +65,19 @@ extension Parsable {
         _ = getNext(whenNextIs: ExpressionStatement.ari)        // (あり)
         _ = getNext(whenNextIs: .COMMA)                         // (、)
         return parameters
+    }
+    func parseRangeExpression(with expression: Expression) -> Expression? {
+        let keyword = nextToken
+        switch keyword {
+        case .keyword(.GTEQUAL):
+            getNext()
+            return RangeLiteral(token: .keyword(.RANGE), lowerBound: ExpressionStatement(token: keyword, expressions: [expression]))
+        case .keyword(.LTEQUAL),.keyword(.UNDER):
+            getNext()
+            return RangeLiteral(token: .keyword(.RANGE), upperBound: ExpressionStatement(token: keyword, expressions: [expression]))
+        default:
+            return expression
+        }
     }
     // 判定
     var isBreakFactor: Bool {
@@ -134,7 +147,7 @@ struct ExpressionStatementParser : StatementParsable {
         var expressions: [Expression] = []
         let token = currentToken
         while !isEndOfStatement && !isEndOfBlock && !currentToken.isEof {
-            skipEol()
+            skipEols()
             guard let expression = ExpressionPareser(parser).parse() else {
                 error(message: "式文で、式の解析に失敗した。")
                 return nil
@@ -249,7 +262,7 @@ struct PrefixExpressionParserFactory {
 struct IdentifierParser : ExpressionParsable {
     init(_ parser: Parser) {self.parser = parser}
     let parser: Parser
-    func parse() -> Expression? {Identifier(from: currentToken)}
+    func parse() -> Expression? {parseRangeExpression(with: Identifier(from: currentToken))}
 }
 struct StringLiteralParser : ExpressionParsable {
     init(_ parser: Parser) {self.parser = parser}
@@ -264,18 +277,7 @@ struct IntegerLiteralParser : ExpressionParsable {
             error(message: "整数リテラルの解析で、「\(currentToken.literal)」を整数に変換できなかった。")
             return nil
         }
-        let integer = IntegerLiteral(from: value)
-        let keyword = nextToken
-        switch keyword {
-        case .keyword(.GTEQUAL):
-            getNext()
-            return RangeLiteral(token: .keyword(.RANGE), lowerBound: ExpressionStatement(token: keyword, expressions: [integer]))
-        case .keyword(.LTEQUAL),.keyword(.UNDER):
-            getNext()
-            return RangeLiteral(token: .keyword(.RANGE), upperBound: ExpressionStatement(token: keyword, expressions: [integer]))
-        default:
-            return integer
-        }
+        return parseRangeExpression(with: IntegerLiteral(from: value))
     }
 }
 struct BooleanParser : ExpressionParsable {
@@ -463,7 +465,7 @@ struct ArrayLiteralParser : ExpressionParsable {    // TODO: ArrayとDictionary�
         var expressions: [Expression] = []
         let token = currentToken
         while true {
-            skipEol()
+            skipEols()
             guard let expression = ExpressionPareser(parser).parse() else {
                 error(message: "配列で、式の解析に失敗した。")
                 return nil
@@ -513,7 +515,7 @@ struct DictionaryLiteralParser : ExpressionParsable {
         var expressions: [Expression] = []
         var beginOfValueExpressions = 0     // 値の開始位置
         while true {
-            skipEol()
+            skipEols()
             guard let expression = ExpressionPareser(parser).parse() else {
                 error(message: "辞書で、式の解析に失敗した。")
                 return nil
@@ -606,7 +608,7 @@ struct LogicalExpressionParser : ExpressionParsable {
         var expressions: [Expression] = []
         let token = currentToken
         while !isEndOfStatement && !isEndOfBlock && !currentToken.isEof {
-            skipEol()
+            skipEols()
             guard let expression = ExpressionPareser(parser).parse() else {
                 error(message: "条件式で、右辺の解析に失敗した。")
                 return nil
@@ -667,7 +669,7 @@ struct LoopExpressionParser : ExpressionParsable {
         getNext()
         var expressions: [Expression] = []
         while true {
-            skipEol()
+            skipEols()
             guard let expression = ExpressionPareser(parser).parse() else {
                 error(message: "反復で、条件式の解析に失敗した。")
                 return nil

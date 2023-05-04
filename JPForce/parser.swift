@@ -24,6 +24,7 @@ class Parser {
     func parseProgram() -> Program? {
         var program = Program()
         while !currentToken.isEof {
+            skipEols()
             guard let statement = parseStatement() else {return nil}
             program.statements.append(statement)
             while getNext(whenNextIs: Token.symbol(.EOL)) {}
@@ -69,4 +70,5 @@ class Parser {
         getNext()
         return true
     }
+    func skipEols() {while currentToken.isEol {getNext()}}
 }
