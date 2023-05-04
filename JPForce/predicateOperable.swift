@@ -81,7 +81,7 @@ struct Splitter {
         var splitted: [String] = []
         if let range = s.firstRange(of: beginOfIdent) {
             guard let i = s[range.upperBound..<s.endIndex].firstIndex(of: endOfIdent) else {
-                error = JpfError("識別子を囲う、閉じカッコ「\(endOfIdent)」が見つからない。")   // 閉じ括弧「』」が無い
+                error = JpfError("識別子を囲う、閉じカッコ「\(endOfIdent)」が見つからない。")
                 return nil
             }
             splitted.append(String(s[s.startIndex..<range.lowerBound]) + terminator)// 識別子の前の部分を切り出す
@@ -176,11 +176,16 @@ struct PrintOperator : PredicateOperable {
         return nil
     }
     /// 文字列の中のエスケープ文字を解析して表示(print)する。
+    /// (stringが識別子として登録されている場合はエスケープせずに登録されたオブジェクトを表示する。)
     /// - Parameter string: 制御文字を含む文字列
     /// 「\末尾」は、文字列の末尾を改行の代わりに表示する。
     /// 例： 「こんにちは\末尾、」と「みなさん。」を表示する。
     ///     → こんにちは、みなさん。
     private func printWithTerminator(_ string: String) -> JpfObject {
+        if let object = environment[string] {   // 識別子をエスケープ文字制御なしで表示する。
+            print(object.string)
+            return JpfBoolean.TRUE
+        }
         var splitter = Splitter(of: replaced(string), with: environment)
         guard let strings = splitter.split() else {return splitter.error!}
         strings.forEach { s in
@@ -224,6 +229,11 @@ struct ReadOperator : PredicateOperable {
         return nil
     }
     private func readWithoutTerminator(_ s: String) -> JpfObject {
+        if let object = environment[s] {        // 識別子として登録されている場合はエスケープせずに登録されたオブジェクトを表示
+
+            print(object.string)
+            return JpfBoolean.TRUE
+        }
         var splitter = Splitter(of: s, with: environment, terminator: "")
         guard let splitted = splitter.split() else {return splitter.error!}
         splitted.forEach {read($0)}
