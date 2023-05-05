@@ -231,7 +231,7 @@ struct ReadOperator : PredicateOperable {
     private func readWithoutTerminator(_ s: String) -> JpfObject {
         if let object = environment[s] {        // 識別子として登録されている場合はエスケープせずに登録されたオブジェクトを表示
 
-            print(object.string)
+            read(object.string)
             return JpfBoolean.TRUE
         }
         var splitter = Splitter(of: s, with: environment, terminator: "")
