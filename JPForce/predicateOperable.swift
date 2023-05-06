@@ -34,6 +34,8 @@ struct PredicateOperableFactory {
                                     return PullOperator(environment, by: token)
         case .keyword(.ASSIGN):     return AssignOperator(environment, by: token)
         case .keyword(.SWAP):       return SwapOperator(environment, by: token)
+        case .keyword(.IDENTIFIERS):
+                                    return IdentifiersOperator(environment, by: token)
         case .keyword(.EXECUTE):    return ExecuteOperator(environment) // 〜を実行
         case .keyword(.SURU):       return PerformOperator(environment) // 〜にする、〜をする
         case .keyword(.APPEND):     return AppendOperator(environment, by: token)
@@ -127,8 +129,6 @@ extension PredicateOperable {
     var cannotDivideByZero: JpfError    {JpfError("0で割ることはできない。")}
     var cannotCompare: JpfError         {JpfError("では比較できない。")}
     var functionObjectNotFound: JpfError{JpfError("実行すべき関数が見つからない。")}
-    var closingParenthesisNotFound: JpfError {JpfError("識別子を囲う、閉じカッコ「』」または「）」が見つからない。")}
-    var identifierNotFound: JpfError    {JpfError("表示しようとする識別子が見つからない。")}
     var cannotJudgeGenuineness: JpfError{JpfError("で、正負を判定できる対象は、数値型のみ。")}
     var fileReadError: JpfError         {JpfError("ファイルの読み込みに失敗した。")}
     var detectParserError: JpfError     {JpfError("構文解析器がエラーを検出した。")}
@@ -847,4 +847,11 @@ struct SwapOperator : PredicateOperable {
             return swapUsage
         }
     }
+}
+struct IdentifiersOperator : PredicateOperable {
+    init(_ environment: Environment, by op: Token) {self.environment = environment; self.op = op}
+    let environment: Environment, op: Token
+    /// 識別子の一覧を配列して返す。
+    /// - Returns: 識別子(JpfString)の配列
+    func operated() -> JpfObject? {JpfArray(elements: environment.enumerated.map {JpfString(value: $0.key)})}
 }

@@ -18,6 +18,7 @@ extension JpfObject {
         case "格":   return particle.map {JpfString(value: $0.literal)} ?? JpfNull.object
         case "値":   return value ?? JpfNull.object
         case "数値":  return number.map {JpfInteger(value: $0)} ?? JpfNull.object
+        case "文字列":return JpfString(value: string)
         case "数":   return count        // オブジェクトの要素数
         case "空":   return isEmpty      // オブジェクトの要素が空？
         default:    return nil

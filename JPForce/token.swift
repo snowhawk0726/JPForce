@@ -99,7 +99,7 @@ enum Token : Equatable {
         case MAP        = "写像"
         case REDUCE     = "まとめる"
         case FILTER     = "フィルター"
-        case SORT       = "並び替える"
+        case SORT       = "並べ替える"
         case REVERSE    = "逆順"
         case CONTAINS   = "含む"
         case INPUT      = "入力"
@@ -114,6 +114,7 @@ enum Token : Equatable {
         case NEWLINE    = "改行"
         case READ       = "読む"
         case FILES      = "ファイル一覧"
+        case IDENTIFIERS = "識別子一覧"
     }
     /// 文字列の連想値について識別しないための分類(.IDENT("文字列") → .ident)
     enum TokenType : Hashable {
