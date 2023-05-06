@@ -148,8 +148,15 @@ class Lexer {
         nextToken = getNextToken()
     }
     private func skipToken(until endSymbol: Token.Symbol) -> Bool {
+        let beginSymbol = [")":"(", "）":"（", "」":"「", "』":"『",][endSymbol.rawValue]
         while nextToken != .symbol(endSymbol) && nextToken != Self.EoT {
             if nextToken.literal == Self.ESC {skipToken()}  // ESC + endSymbolの場合は、スキップ
+            if nextToken.literal == beginSymbol {
+                while nextToken != .symbol(endSymbol) && nextToken != Self.EoT {
+                    guard positionTobeRead < taggedWords.count else {return false}
+                    skipToken()
+                }
+            }   // endSymbolに対応するbeginSymbolを見つけたら、endSymbolmまで読み飛ばす。
             skipToken()
         }
         guard positionTobeRead < taggedWords.count else {return false}  // endSymbolが見つからない

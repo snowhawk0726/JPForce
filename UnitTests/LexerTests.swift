@@ -78,6 +78,7 @@ final class LexerTests: XCTestCase {
     }
    func testNextToken() throws {
         let input = """
+            (「\\(コメント化)」)
             2に3を足す。
             10から3を引く。
             最低温度（「括弧内」はコメント）は、５度。※ ５は全角
