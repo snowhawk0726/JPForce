@@ -105,7 +105,7 @@ struct StringLiteral : ValueExpression {
     init(from string: String) {self.init(token: Token(string: string), value: string)}
     init(from token: Token) {self.init(token: token, value: token.literal)}
     //
-    var string: String {value.color(token.color)}
+    var string: String {"「\(value)」".color(token.color)}
 }
 struct IntegerLiteral : ValueExpression {
     var token: Token                // 数値(.INT(value))トークン
