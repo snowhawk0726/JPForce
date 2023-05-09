@@ -156,10 +156,12 @@ struct JpfFunction : JpfObject {
     var signature: InputFormat  // 入力形式
     var body: BlockStatement
     var environment: Environment
-    var string: String {"関数".color(.magenta) + "であって、【" +
+    var string: String {
+        let s = "関数".color(.magenta) + "であって、【" +
         (parameters.isEmpty ? "" :
             "入力が、\(zip(parameters, signature.strings).map {$0.string + $1}.joined(separator: "と"))であり、") +
          "本体が、" + body.string + "】"
+        return s.replacingOccurrences(of: "。】", with: "】")
     }
 }
 struct JpfArray : JpfObject {
