@@ -573,6 +573,19 @@ final class EvaluatorTests: XCTestCase {
             print("テスト(\(evaluated))終了")
         }
     }
+    func testLabelExpressions() throws {
+        let testPatterns: [(input: String, expected: String)] = [
+            ("二倍は２。識別子「二倍」。『識別子』。", "二倍"),
+            ("『割った余り』は１。識別子『割った余り』。『識別子』。", "割った余り"),
+            ("ファイル「サンプル」。『ファイル』。", "サンプル"),
+        ]
+        for test in testPatterns {
+            print("テストパターン: \(test.input)")
+            let evaluated = try XCTUnwrap(testEvaluator(test.input))
+            try testObject(evaluated, with: test.expected)
+            print("テスト(\(evaluated))終了")
+        }
+    }
 }
 // MARK: - ヘルパー
 private func testObject(_ object: JpfObject, with exptected: Int) throws {

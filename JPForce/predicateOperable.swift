@@ -182,10 +182,23 @@ struct PrintOperator : PredicateOperable {
     /// 例： 「こんにちは\末尾、」と「みなさん。」を表示する。
     ///     → こんにちは、みなさん。
     private func printWithTerminator(_ string: String) -> JpfObject {
-        if let object = environment[string] {   // 識別子をエスケープ文字制御なしで表示する。
+        switch string {
+        case Token.Keyword.IDENTIFIER.rawValue: // 識別子をエスケープ文字制御なしで表示する。
+            guard let identifier = environment[string] as? JpfString else {break}
+            guard let object = environment[identifier.value] else {return JpfError("『\(identifier.value)』(識別子)が定義されていない。")}
             print(object.string)
+            environment[string] = nil
             return JpfBoolean.TRUE
-        }
+        case Token.Keyword.FILE.rawValue:       // ファイルの内容をエスケープ文字制御なしで表示する。
+            guard let filename = environment[string] as? JpfString else {break}
+            let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            guard let contents = try? String(contentsOfFile: url.path() + filename.value, encoding: .utf8) else {return fileReadError}
+            print(contents)
+            environment[string] = nil
+            return JpfBoolean.TRUE
+        default:
+            break
+        }                                       // エスケープ文字制御した結果を表示する。
         var splitter = Splitter(of: replaced(string), with: environment)
         guard let strings = splitter.split() else {return splitter.error!}
         strings.forEach { s in
@@ -228,13 +241,25 @@ struct ReadOperator : PredicateOperable {
         }
         return nil
     }
-    private func readWithoutTerminator(_ s: String) -> JpfObject {
-        if let object = environment[s] {        // 識別子として登録されている場合はエスケープせずに登録されたオブジェクトを表示
-
+    private func readWithoutTerminator(_ string: String) -> JpfObject {
+        switch string {
+        case Token.Keyword.IDENTIFIER.rawValue: // 識別子をエスケープ文字制御なしで表示する。
+            guard let identifier = environment[string] as? JpfString else {break}
+            guard let object = environment[identifier.value] else {return JpfError("『\(identifier.value)』(識別子)が定義されていない。")}
             read(object.string)
+            environment[string] = nil
             return JpfBoolean.TRUE
+        case Token.Keyword.FILE.rawValue:       // ファイルの内容をエスケープ文字制御なしで表示する。
+            guard let filename = environment[string] as? JpfString else {break}
+            let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            guard let contents = try? String(contentsOfFile: url.path() + filename.value, encoding: .utf8) else {return fileReadError}
+            read(contents)
+            environment[string] = nil
+            return JpfBoolean.TRUE
+        default:
+            break
         }
-        var splitter = Splitter(of: s, with: environment, terminator: "")
+        var splitter = Splitter(of: string, with: environment, terminator: "")
         guard let splitted = splitter.split() else {return splitter.error!}
         splitted.forEach {read($0)}
         return JpfBoolean.TRUE
@@ -458,10 +483,14 @@ struct ExecuteOperator : PredicateOperable {
         case let overload as JpfArray:      // 多重定義を実行する
             environment.drop()
             return overload.executed(with: environment)
-        case let fliename as JpfString:     // ファイルを実行(解析・評価)する
-            environment.drop()
+        case var filename as JpfString:     // ファイルを実行(解析・評価)する
+            if filename.value == Token.Keyword.FILE.rawValue,
+               let name = environment[filename.value] as? JpfString {   // ファイル「ファイル名」
+                filename = name
+            }
             let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            guard let contents = try? String(contentsOfFile: url.path() + fliename.value, encoding: .utf8) else {return fileReadError}
+            guard let contents = try? String(contentsOfFile: url.path() + filename.value, encoding: .utf8) else {return fileReadError}
+            environment.drop()
             return executed(by: contents)
         default:
             return functionObjectNotFound

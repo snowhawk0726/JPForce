@@ -58,7 +58,7 @@ final class ParserTests: XCTestCase {
     }
     func testIdentifierExpressions() throws {
         let testPatterns: [(input: String, value: String, literal: String)] = [
-            ("識別子。", "識別子", "識別子"),
+            ("識別。", "識別", "識別"),
             ("加え、", "加え", "加え"),
             ("二倍し、", "二倍", "二倍"),
             ("『足した数』", "足した数", "足した数"),
@@ -575,6 +575,22 @@ final class ParserTests: XCTestCase {
             XCTAssertEqual(function.signature.numberOfInputs, test.number)
             XCTAssertEqual(function.signature.formats.first?.type, test.type)
             XCTAssertEqual(function.signature.formats.first?.particle, test.particle)
+            print("テスト終了: \(statement.string)")
+        }
+    }
+    func testLabelExpressions() throws {
+        let testPatterns: [(input: String, label: String, name: String)] = [
+            ("識別子「二倍」", "識別子", "二倍"),
+            ("識別子『割った余り』", "識別子", "割った余り"),
+            ("ファイル「サンプル」", "ファイル", "サンプル"),
+        ]
+        for test in testPatterns {
+            print("テストパターン: \(test.input)")
+            let program = try XCTUnwrap(parseProgram(with: test.input))
+            let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
+            let label = try XCTUnwrap(statement.expressions.first as? Label)
+            XCTAssertEqual(label.tokenLiteral, test.label)
+            XCTAssertEqual(label.value, test.name)
             print("テスト終了: \(statement.string)")
         }
     }

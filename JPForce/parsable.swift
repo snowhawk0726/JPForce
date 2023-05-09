@@ -254,6 +254,8 @@ struct PrefixExpressionParserFactory {
         case .keyword(.RANGE):      return RangeLiteralParser(parser)
         case .keyword(.CASE):       return CaseExpressionParser(parser)
         case .keyword(.LOOP):       return LoopExpressionParser(parser)
+        case .keyword(.IDENTIFIER),.keyword(.FILE):
+                                    return LabelExpressionParser(parser)
         case .keyword(_):           return PredicateExpressionParser(parser)
         default:                    return nil
         }
@@ -284,6 +286,19 @@ struct BooleanParser : ExpressionParsable {
     init(_ parser: Parser) {self.parser = parser}
     let parser: Parser
     func parse() -> Expression? {Boolean(from: currentToken.isTrue)}
+}
+struct LabelExpressionParser : ExpressionParsable {
+    init(_ parser: Parser) {self.parser = parser}
+    let parser: Parser
+    func parse() -> Expression? {
+        let token = currentToken
+        guard nextToken.type == .string || nextToken.type == .ident else {
+            error(message: "「\(token.literal)」の後続が「文字列」(または「識別子」)でなかった。)")
+            return nil
+        }
+        getNext()
+        return Label(token: token, value: currentToken.literal)
+    }
 }
 // 1. 範囲【<範囲式><キーワード>】
 // 2. 範囲【<下限式><下限キーワード><上限式><上限キーワード>】

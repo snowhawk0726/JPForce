@@ -374,6 +374,15 @@ extension LoopExpression : Evaluatable {
     // ループが「中止する」で中止されたか判定
     private func isTerminated(by evaluated: JpfObject) -> Bool {evaluated.isReturnValue && !evaluated.hasValue}
 }
+extension Label : Evaluatable {
+    /// ラベルに割り当てられた識別子を辞書に格納する。
+    /// - Parameter environment: 格納先
+    /// - Returns: ラベル
+    func evaluated(with environment: Environment) -> JpfObject? {
+        environment[tokenLiteral] = JpfString(value: value)
+        return JpfString(value: tokenLiteral)
+    }
+}
 extension ArrayLiteral : Evaluatable {
     func evaluated(with environment: Environment) -> JpfObject? {
         var results: [JpfObject] = []

@@ -105,6 +105,7 @@ final class LexerTests: XCTestCase {
         """
         print("テストパターン: \(input)")
         let testPatterns: [(expectedType: Token, expectedLiteral: String)] = [
+            (Token(.EOL),"\n"),
             (.INT(),"2"),(Token(.NI),"に"),(.INT(),"3"),(Token(.WO),"を"),(Token(.ADD),"足す"),(Token(.PERIOD),"。"),(Token(.EOL),"\n"),
             (.INT(),"10"),(Token(.KARA),"から"),(.INT(),"3"),(Token(.WO),"を"),(Token(.SUBSTRACT),"引く"),(Token(.PERIOD),"。"),(Token(.EOL),"\n"),
             (.IDENT(), "最低温度"),(Token(.WA),"は"),(Token(.COMMA),"、"),(.INT(),"5"),(Token(.PERIOD),"。"),(Token(.EOL),"\n"),
@@ -112,8 +113,7 @@ final class LexerTests: XCTestCase {
             (.IDENT(),"二倍"),(Token(.TOWA),"とは"),(Token(.COMMA),"、"),(.INT(),"2"),(Token(.WO),"を"),(Token(.MULTIPLY),"掛ける"),(Token(.KOTO),"こと"),(Token(.PERIOD),"。"),(Token(.EOL),"\n"),
             (.INT(),"2"),(Token(.WO),"を"),(.IDENT(),"二倍"),(Token(.SURU),"し"),(Token(.COMMA),"、"),(.INT(),"3"),(Token(.DE),"で"),(Token(.DIVIDE),"割る"),(Token(.PERIOD),"。"),(Token(.EOL),"\n"),
             (.IDENT(),"絶対防空圏内"),(Token(.EOL),"\n"),
-            (.STRING(),"こんにちは "),(Token(.EOL),"\n"), (.STRING(),"今日は、みなさん。"),(Token(.EOL),"\n"),
-            (Token(.INPUT),"入力"),(Token(.GA),"が"),(Token(.COMMA),"、"),(.INT(),"10"),(Token(.UNDER),"未満"),(Token(.NO),"の"),(Token(.CASE),"場合"),(Token(.COMMA),"、"),(Token(.TRUE),"真"),(Token(.WO),"を"),(Token(keyword: .RETURN),"返し"),(Token(.COMMA),"、"),(.IDENT(),"それ"),(.IDENT(),"以外"),(Token(.WA),"は"),(Token(.COMMA),"、"),(Token(.FALSE),"偽"),(Token(.WO),"を"),(Token(keyword: .RETURN),"返す"),(Token(.PERIOD),"。"),(Token(.EOL),"\n"),
+            (.STRING(),"こんにちは "),(Token(.EOL),"\n"), (.STRING(),"今日は、みなさん。"),(Token(.EOL),"\n"),            (Token(.INPUT),"入力"),(Token(.GA),"が"),(Token(.COMMA),"、"),(.INT(),"10"),(Token(.UNDER),"未満"),(Token(.NO),"の"),(Token(.CASE),"場合"),(Token(.COMMA),"、"),(Token(.TRUE),"真"),(Token(.WO),"を"),(Token(keyword: .RETURN),"返し"),(Token(.COMMA),"、"),(.IDENT(),"それ"),(.IDENT(),"以外"),(Token(.WA),"は"),(Token(.COMMA),"、"),(Token(.FALSE),"偽"),(Token(.WO),"を"),(Token(keyword: .RETURN),"返す"),(Token(.PERIOD),"。"),(Token(.EOL),"\n"),
             (.INT(),"10"),(Token(.WA),"は"),(Token(.COMMA),"、"),(.INT(),"10"),(Token(.NI),"に"),(Token(.EQUAL),"等しい"),(Token(.PERIOD),"。"),(Token(.EOL),"\n"),
             (.INT(),"10"),(Token(.WA),"は"),(Token(.COMMA),"、"),(.INT(),"5"),(Token(.NI),"に"),(Token(.EQUAL),"等しく"),(Token(.NOT),"ない"),(Token(.PERIOD),"。"),(Token(.EOL),"\n"),
             (.IDENT(),"変数"),(Token(.NI),"に"),(Token(.COMMA),"、"),(.INT(),"2"),(Token(.WO),"を"),(Token(.ADD),"足し"),(Token(.COMMA),"、"),(.INT(),"3"),(Token(.WO),"を"),(Token(.SUBSTRACT),"引き"),(Token(.COMMA),"、"),(.INT(),"4"),(Token(.WO),"を"),(Token(.MULTIPLY),"掛け"),(Token(.COMMA),"、"),(.INT(),"5"),(Token(.DE),"で"),(Token(.DIVIDE),"割る"),(Token(.PERIOD),"。"),(Token(.EOL),"\n"),

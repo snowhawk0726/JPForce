@@ -114,7 +114,9 @@ enum Token : Equatable {
         case NEWLINE    = "改行"
         case READ       = "読む"
         case FILES      = "ファイル一覧"
+        case FILE       = "ファイル"
         case IDENTIFIERS = "識別子一覧"
+        case IDENTIFIER = "識別子"
     }
     /// 文字列の連想値について識別しないための分類(.IDENT("文字列") → .ident)
     enum TokenType : Hashable {
