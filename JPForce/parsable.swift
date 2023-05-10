@@ -66,6 +66,9 @@ extension Parsable {
         _ = getNext(whenNextIs: .COMMA)                         // (、)
         return parameters
     }
+    /// 範囲式の解析(例：1以上→範囲【1以上】) *: 上限か下限のみ、上下限は対応不可
+    /// - Parameter expression: 範囲の式(数値、識別子)
+    /// - Returns: 範囲リテラル
     func parseRangeExpression(with expression: Expression) -> Expression? {
         let keyword = nextToken
         switch keyword {
@@ -80,6 +83,7 @@ extension Parsable {
         }
     }
     // 判定
+    /// 解析中止要因：】, EOF, EOL, 。
     var isBreakFactor: Bool {
         isEndOfBlock || currentToken.isEof || currentToken.isEol || isEndOfStatement
     }
@@ -119,7 +123,7 @@ struct DefStatementParser : StatementParsable {
         let token = currentToken           // 「は」「とは」
         let syntax = (token.literal == DefineStatement.towa) ? syntax1 : syntax2
         _ = getNext(whenNextIs: .COMMA)    // 読点(、)を読み飛ばす
-        if getNext(whenNextIs: DefineStatement.further) {
+        if getNext(whenNextIs: DefineStatement.further) {   // 「さらに、」
             isExtended = true
             _ = getNext(whenNextIs: .COMMA) // 読点(、)を読み飛ばす
         }
@@ -153,8 +157,7 @@ struct ExpressionStatementParser : StatementParsable {
                 return nil
             }
             expressions.append(expression)
-            if isBreakFactor || isEndOfBlock ||
-                getNext(whenNextIs: .PERIOD) || getNext(whenNextIs: .EOL) {
+            if isBreakFactor || getNext(whenNextIs: .PERIOD) || getNext(whenNextIs: .EOL) {
                 break
             }   // 文の終わり、または停止要因
             _ = getNext(whenNextIs: .COMMA)     // 読点を読み飛ばし、
@@ -174,6 +177,7 @@ struct BlockStatementParser : StatementParsable {
         var blockStatements: [Statement] = []
         let token = currentToken
         getNext()
+        incrementBlockCounter()
         while !isEndOfBlock && !currentToken.isEof {
             skipEolInBlock()                    // ブロック内での改行は読み飛ばす
             guard let statement = StatementParserFactory.create(from: parser).parse() else {
@@ -188,9 +192,10 @@ struct BlockStatementParser : StatementParsable {
             }
             getNext()                                       // 句点等を読み飛ばす。
         }
-        if isEndOfBlock {
-            _ = getNext(whenNextIs: .PERIOD)                // ブロック外の句点を読み飛ばす。
+        decrementBlockCounter()
+        if isEndOfBlock && parser.blockCounter != 1 {
             _ = getNext(whenNextIs: endBlockSymbol)         // ブロック外のブロック終了記号を読み飛ばす。
+            _ = getNext(whenNextIs: .PERIOD)                // ブロック外の句点を読み飛ばす。
             _ = getNext(whenNextIs: .EOL)                   // ブロック外のEOLを読み飛ばす。
         }
         return BlockStatement(token: token, statements: blockStatements)
@@ -200,6 +205,8 @@ struct BlockStatementParser : StatementParsable {
     private func skipEolInBlock() {
         while endBlockSymbol != .EOL && currentToken == .symbol(.EOL) {getNext()}
     }
+    private func incrementBlockCounter() {if endBlockSymbol == .RBBRACKET {parser.increment()}}
+    private func decrementBlockCounter() {if endBlockSymbol == .RBBRACKET {parser.decrement()}}
 }
 // MARK: - expression parser
 /// 中間置演算子の優先順位(未使用)

@@ -20,21 +20,18 @@ class Parser {
     var nextToken: Token
     var previousToken: Token
     var errors: [String] = []
+    var blockCounter = 0
     // MARK: - プログラムの解析
     func parseProgram() -> Program? {
         var program = Program()
         while !currentToken.isEof {
             skipEols()
-            guard let statement = parseStatement() else {return nil}
+            guard let statement = StatementParserFactory.create(from: self).parse() else {return nil}
             program.statements.append(statement)
             while getNext(whenNextIs: Token.symbol(.EOL)) {}
             getNext()
         }
         return program
-    }
-    // MARK: - 文の解析（tokenToAst.swiftのParsableに移譲）
-    private func parseStatement() -> Statement? {
-        return StatementParserFactory.create(from: self).parse()
     }
     // MARK: - ヘルパー
     // トークン解析制御
@@ -71,4 +68,6 @@ class Parser {
         return true
     }
     func skipEols() {while currentToken.isEol {getNext()}}
+    func increment() {blockCounter += 1}
+    func decrement() {blockCounter -= 1}
 }
