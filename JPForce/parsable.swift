@@ -90,7 +90,9 @@ extension Parsable {
     var isEndOfStatement: Bool {currentToken.isPeriod}
     var isEndOfBlock: Bool {currentToken == .symbol(.RBBRACKET)}
     var isEndOfElements: Bool {
-        nextToken.type == .symbol(.COMMA) || nextToken.type == .symbol(.RBBRACKET) || nextToken.type == .symbol(.EOL) || nextToken.type == .symbol(.EOF)
+        nextToken.type == .symbol(.COMMA) || nextToken.type == .symbol(.PERIOD) ||
+        nextToken.type == .symbol(.RBBRACKET) ||
+        nextToken.type == .symbol(.EOL) || nextToken.type == .symbol(.EOF)
     }
     /// エラー出力
     func error(message: String) {parser.errors.append(message + "(解析位置:\(currentToken.literal))")}
@@ -157,9 +159,7 @@ struct ExpressionStatementParser : StatementParsable {
                 return nil
             }
             expressions.append(expression)
-            if isBreakFactor || getNext(whenNextIs: .PERIOD) || getNext(whenNextIs: .EOL) {
-                break
-            }   // 文の終わり、または停止要因
+            if getNext(whenNextIs: .PERIOD) || getNext(whenNextIs: .RBBRACKET) || isBreakFactor {break}    // 文の終わり
             _ = getNext(whenNextIs: .COMMA)     // 読点を読み飛ばし、
             getNext()                           // 次の式解析に
         }
@@ -177,7 +177,6 @@ struct BlockStatementParser : StatementParsable {
         var blockStatements: [Statement] = []
         let token = currentToken
         getNext()
-        incrementBlockCounter()
         while !isEndOfBlock && !currentToken.isEof {
             skipEolInBlock()                    // ブロック内での改行は読み飛ばす
             guard let statement = StatementParserFactory.create(from: parser).parse() else {
@@ -192,12 +191,6 @@ struct BlockStatementParser : StatementParsable {
             }
             getNext()                                       // 句点等を読み飛ばす。
         }
-        decrementBlockCounter()
-        if isEndOfBlock && parser.blockCounter != 1 {
-            _ = getNext(whenNextIs: endBlockSymbol)         // ブロック外のブロック終了記号を読み飛ばす。
-            _ = getNext(whenNextIs: .PERIOD)                // ブロック外の句点を読み飛ばす。
-            _ = getNext(whenNextIs: .EOL)                   // ブロック外のEOLを読み飛ばす。
-        }
         return BlockStatement(token: token, statements: blockStatements)
     }
     private var isEndOfBlock: Bool {currentToken == .symbol(endBlockSymbol)}
@@ -205,8 +198,6 @@ struct BlockStatementParser : StatementParsable {
     private func skipEolInBlock() {
         while endBlockSymbol != .EOL && currentToken == .symbol(.EOL) {getNext()}
     }
-    private func incrementBlockCounter() {if endBlockSymbol == .RBBRACKET {parser.increment()}}
-    private func decrementBlockCounter() {if endBlockSymbol == .RBBRACKET {parser.decrement()}}
 }
 // MARK: - expression parser
 /// 中間置演算子の優先順位(未使用)
@@ -459,7 +450,7 @@ struct ArrayLiteralParser : ExpressionParsable {    // TODO: ArrayとDictionary�
         let token = currentToken                                // 配列であって、(であり、)
         _ = getNext(whenNextIs: ExpressionStatement.deatte + ExpressionStatement.deari, matchAll: false)
         // 要素の解析
-        let endSymbol: Token.Symbol = getNext(whenNextIs: .LBBRACKET) ? .RBBRACKET : .EOL
+        let endSymbol: Token.Symbol = getNext(whenNextIs: .LBBRACKET) ? .RBBRACKET : .PERIOD
         _ = getNext(whenNextIs: ExpressionStatement.yousoga + ExpressionStatement.yousowa, matchAll: false) // 要素が、(要素は、)
         guard let elements = parseElements(until: endSymbol) else {
             error(message: "配列で、「要素が、〜」の解析に失敗した。")
@@ -470,17 +461,20 @@ struct ArrayLiteralParser : ExpressionParsable {    // TODO: ArrayとDictionary�
     private func parseElements(until endSymbol: Token.Symbol) -> [ExpressionStatement]? {
         var elements: [ExpressionStatement] = []
         repeat {
-            if nextToken.type == .symbol(endSymbol) {break}
+            if nextToken == .symbol(endSymbol) {break}  // 空の配列
             getNext()
             guard let parsed = parseExpressions() else {
                 error(message: "配列で、要素の式の解釈に失敗した。")
                 return nil
             }
             elements.append(parsed)
-            if nextToken == .symbol(endSymbol) || nextToken.isEof {break}
-        } while getNext(whenNextIs: .COMMA)
-        _ = getNext(whenNextIs: endSymbol)  // ブロックを読み飛ばす。
-        _ = getNext(whenNextIs: .PERIOD)    // ブロック外の句点を読み飛ばす。
+        } while !nextToken.isEof && getNext(whenNextIs: .COMMA)
+        while nextToken.isEol {getNext()}               // 改行を読み飛ばす。
+        guard nextToken == .symbol(endSymbol) else {    // ブロックの終端をチェック
+            error(message: "配列の終わりを示す「\(endSymbol)」が見つからなかった。")
+            return nil
+        }
+        _ = getNext(whenNextIs: .RBBRACKET)
         return elements
     }
     private func parseExpressions() -> ExpressionStatement? {
@@ -509,7 +503,7 @@ struct DictionaryLiteralParser : ExpressionParsable {
         let token = currentToken            // 辞書であって、(であり、)
         _ = getNext(whenNextIs: ExpressionStatement.deatte + ExpressionStatement.deari, matchAll: false)
         // 要素の解析
-        let endSymbol: Token.Symbol = getNext(whenNextIs: .LBBRACKET) ? .RBBRACKET : .EOL
+        let endSymbol: Token.Symbol = getNext(whenNextIs: .LBBRACKET) ? .RBBRACKET : .PERIOD
         _ = getNext(whenNextIs: ExpressionStatement.yousoga + ExpressionStatement.yousowa, matchAll: false)   // 要素が、(要素は、)
         guard let pairs = parseElements(until: endSymbol) else {
             error(message: "辞書で、「要素が、〜」の解析に失敗した。")
@@ -520,17 +514,20 @@ struct DictionaryLiteralParser : ExpressionParsable {
     private func parseElements(until endSymbol: Token.Symbol) -> [DictionaryLiteral.PairExpression]? {
         var elements: [DictionaryLiteral.PairExpression] = []
         repeat {
-            if nextToken.type == .symbol(endSymbol) {break}
+            if nextToken == .symbol(endSymbol) {break}  // 空の辞書
             getNext()
             guard let parsed = parsePairExpression() else {
                 error(message: "辞書で、要素の式の解釈に失敗した。")
                 return nil
             }
             elements.append(parsed)
-            if nextToken == .symbol(endSymbol) || nextToken.isEof {break}
-        } while getNext(whenNextIs: .COMMA)
-        _ = getNext(whenNextIs: endSymbol)  // ブロックを読み飛ばす。
-        _ = getNext(whenNextIs: .PERIOD)    // ブロック外の句点を読み飛ばす。
+        } while !nextToken.isEof && getNext(whenNextIs: .COMMA)
+        while nextToken.isEol {getNext()}               // 改行を読み飛ばす。
+        guard nextToken == .symbol(endSymbol) else {    // ブロックの終端をチェック
+            error(message: "辞書の終わりを示す「\(endSymbol)」が見つからなかった。")
+            return nil
+        }
+        _ = getNext(whenNextIs: .RBBRACKET)
         return elements
     }
     private func parsePairExpression() ->  DictionaryLiteral.PairExpression? {

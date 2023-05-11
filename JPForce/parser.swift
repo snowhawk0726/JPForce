@@ -20,7 +20,6 @@ class Parser {
     var nextToken: Token
     var previousToken: Token
     var errors: [String] = []
-    var blockCounter = 0
     // MARK: - プログラムの解析
     func parseProgram() -> Program? {
         var program = Program()
@@ -68,6 +67,4 @@ class Parser {
         return true
     }
     func skipEols() {while currentToken.isEol {getNext()}}
-    func increment() {blockCounter += 1}
-    func decrement() {blockCounter -= 1}
 }
