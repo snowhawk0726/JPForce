@@ -143,8 +143,8 @@ extension PredicateOperable {
     var equalUsage: JpfError            {JpfError("仕様：〜(と)〜(が)等しい。")}
     var beUsage: JpfError               {JpfError("仕様：(〜が)〜である。または、(〜は)〜である。")}
     var notUsage: JpfError              {JpfError("仕様：(〜が)〜で(は)ない。または、(〜は)〜で(は)ない。")}
-    var appendUsage: JpfError           {JpfError("仕様：〜を〜に追加する。または、(〜に)〜を追加する。")}
-    var appendDictionaryUsage: JpfError {JpfError("仕様：〜が〜を〜に追加する。または、(〜に)〜が〜を追加する。")}
+    var appendUsage: JpfError           {JpfError("仕様：〜(を)〜に追加する。または、〜(に)〜を追加する。")}
+    var appendDictionaryUsage: JpfError {JpfError("仕様：〜が〜(を)〜に追加する。または、〜(に)〜が〜を追加する。")}
     var removeUsage: JpfError           {JpfError("仕様：(〜から)〜を削除する。")}
     var rangeCheckUsage: JpfError       {JpfError("仕様：<数値>が範囲【<範囲式>】に")}
     var determineUsage: JpfError        {JpfError("仕様：〜が<配列、範囲>に")}
@@ -563,10 +563,10 @@ struct AppendOperator : PredicateOperable {
     private func appendedArrayOrDictionary(with pair: (first: JpfObject, second: JpfObject)) -> JpfObject? {
         var first = pair.first, second = pair.second
         switch (first.particle, second.particle) {
-        case (.particle(.NI),.particle(.WO)), (nil,.particle(.WO)):
+        case (.particle(.NI),.particle(.WO)),(nil,.particle(.WO)):
             swap(&first, &second)
             fallthrough
-        case (.particle(.WO),.particle(.NI)):
+        case (.particle(.WO),.particle(.NI)),(nil,.particle(.NI)):
             switch second.value {
             case var array as JpfArray:
                 environment.drop(2)
@@ -592,10 +592,10 @@ struct AppendOperator : PredicateOperable {
     private func appendedDictionary(with operands: [JpfObject]) -> JpfObject? {
         var particles: [Token.Particle: JpfObject?] = [.GA: operands[0].value, .WO: operands[1].value, .NI: operands[2].value]
         switch (operands[0].particle, operands[1].particle, operands[2].particle) {
-        case (.particle(.NI),.particle(.GA),.particle(.WO)), (nil,.particle(.GA),.particle(.WO)):
+        case (.particle(.NI),.particle(.GA),.particle(.WO)),(nil,.particle(.GA),.particle(.WO)):
             particles[.NI] = operands[0].value; particles[.GA] = operands[1].value; particles[.WO] = operands[2].value
             fallthrough
-        case (.particle(.GA),.particle(.WO),.particle(.NI)):
+        case (.particle(.GA),.particle(.WO),.particle(.NI)),(.particle(.GA),nil,.particle(.NI)):
             guard var dictioncary = particles[.NI] as? JpfDictionary else {return nil}
             guard let key = particles[.GA] as? JpfObject, let value = particles[.WO] as? JpfObject else {break}
             environment.drop(3)

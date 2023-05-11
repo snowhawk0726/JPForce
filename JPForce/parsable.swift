@@ -152,19 +152,21 @@ struct ExpressionStatementParser : StatementParsable {
     func parse() -> Statement? {
         var expressions: [Expression] = []
         let token = currentToken
-        while !isEndOfStatement && !isEndOfBlock && !currentToken.isEof {
+        while !isEndOfStatement && !currentToken.isEof {
             skipEols()
             guard let expression = ExpressionPareser(parser).parse() else {
                 error(message: "式文で、式の解析に失敗した。")
                 return nil
             }
             expressions.append(expression)
-            if getNext(whenNextIs: .PERIOD) || getNext(whenNextIs: .RBBRACKET) || isBreakFactor {break}    // 文の終わり
+            if getNextWhenNextIsEndOfStatement || isBreakFactor {break}    // 文の終わり
             _ = getNext(whenNextIs: .COMMA)     // 読点を読み飛ばし、
             getNext()                           // 次の式解析に
         }
         return ExpressionStatement(token: token, expressions: expressions)
     }
+    private var isEndOfStatement: Bool {currentToken.isPeriod || currentToken.isEol || isEndOfBlock}
+    private var getNextWhenNextIsEndOfStatement: Bool {getNext(whenNextIs: .PERIOD) || getNext(whenNextIs: .EOL) || getNext(whenNextIs: .RBBRACKET)}
 }
 /// ブロック(【】)内で式を解析したstatementを、statementsに格納
 /// ブロッックの終わり: endSymbolを.EOLとすることで、【】を省略し行末までをブロックとして扱うことができる。
@@ -285,11 +287,14 @@ struct BooleanParser : ExpressionParsable {
     let parser: Parser
     func parse() -> Expression? {Boolean(from: currentToken.isTrue)}
 }
+/// ラベル(キーワード)と、後続の文字列(または識別子)を記憶する。
+/// ※：例：ファイル「text.txt」、識別子『割った余り』
+/// ※：キーワードに識別子を続けると、合成された識別子となるので、『』で明示的に表記する必要がある。
 struct LabelExpressionParser : ExpressionParsable {
     init(_ parser: Parser) {self.parser = parser}
     let parser: Parser
     func parse() -> Expression? {
-        let token = currentToken
+        let token = currentToken           // Token.Keyword
         guard nextToken.type == .string || nextToken.type == .ident else {
             error(message: "「\(token.literal)」の後続が「文字列」(または「識別子」)でなかった。)")
             return nil
@@ -302,7 +307,7 @@ struct LabelExpressionParser : ExpressionParsable {
 // 2. 範囲【<下限式><下限キーワード><上限式><上限キーワード>】
 // <下限キーワード>: 以上、から
 // <上限キーワード>: 以下、未満、まで
-// ※：範囲式内のキーワード使用はエラー(例：範囲【１０から１を引くから、１０に１を足すまで】)
+// ※：範囲式内の上下限キーワード使用はエラー(例：範囲【１０から１を引くから、１０に１を足すまで】)
 struct RangeLiteralParser : ExpressionParsable {
     init(_ parser: Parser) {self.parser = parser}
     let parser: Parser
@@ -705,7 +710,7 @@ struct LoopExpressionParser : ExpressionParsable {
 // MARK: - infix expression parsers and those instance factory
 struct InfixExpressionParserFactory {
     static func create(from parser: Parser, with left: Expression?) -> ExpressionParsable? {
-        switch parser.nextToken.type {   // peekTokenに続くトークンを解析する解析器
+        switch parser.nextToken.type {   // nextTokenに続くトークンを解析する解析器
         case .keyword(.OR):         return InfixExpressionParser(parser, with: left)
         default:                    return nil
         }
