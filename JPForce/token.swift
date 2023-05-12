@@ -108,6 +108,7 @@ enum Token : Equatable {
         case DROP       = "捨てる" // remove last from stack
         case PEEK       = "見る"
         case PULL       = "得る"
+        case DUPLICATE  = "複写"
         case ASSIGN     = "代入"
         case SWAP       = "入れ替える"
         case PRINT      = "表示"

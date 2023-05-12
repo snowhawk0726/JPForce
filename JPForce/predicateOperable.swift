@@ -32,6 +32,7 @@ struct PredicateOperableFactory {
         case .keyword(.EMPTY):      return EmptyOperator(environment, by: token)
         case .keyword(.PEEK),.keyword(.PULL):
                                     return PullOperator(environment, by: token)
+        case .keyword(.DUPLICATE):  return DuplicateOperator(environment, by: token)
         case .keyword(.ASSIGN):     return AssignOperator(environment, by: token)
         case .keyword(.SWAP):       return SwapOperator(environment, by: token)
         case .keyword(.IDENTIFIERS):
@@ -801,6 +802,17 @@ struct PullOperator : PredicateOperable {
         case "数値":  return !objects.contains(where: {!$0.isNumber})
         default:    return true
         }
+    }
+}
+/// 「見る」と同じ。
+/// (結果が入力に返るので、入力が複製されることになる。)
+/// ※：「複写する」の様に「する」を付けると、格がアンラップされる。
+struct DuplicateOperator : PredicateOperable {
+    init(_ environment: Environment, by op: Token) {self.environment = environment; self.op = op}
+    let environment: Environment, op: Token
+    func operated() -> JpfObject? {
+        guard let param = environment.peek else {return "「\(op.literal)」" + oneParamNeeded}
+        return param
     }
 }
 struct DropOperator : PredicateOperable {
