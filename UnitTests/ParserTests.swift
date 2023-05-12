@@ -494,6 +494,9 @@ final class ParserTests: XCTestCase {
             ("範囲【1から10まで】", [Token(.KARA), Token(.MADE)]),
             ("範囲【1以上10以下】", [Token(.GTEQUAL), Token(.LTEQUAL)]),
             ("範囲【1以上10未満】", [Token(.GTEQUAL), Token(.UNDER)]),
+            ("1以上",             [Token(.GTEQUAL), nil]),
+            ("10以下",            [nil, Token(.LTEQUAL)]),
+            ("10未満",            [nil, Token(.UNDER)]),
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
@@ -557,7 +560,7 @@ final class ParserTests: XCTestCase {
             print("テスト終了: \(statement.string)")
         }
     }
-    func testParameterSignatures() throws {
+    func testFunctionSignatures() throws {
         let testPatterns: [(input: String, number: Int?, type: String, particle: String)] = [
             ("関数【入力が、甲、甲を表示する】", 1, "", ""),
             ("関数【入力が、甲「の」、甲を表示する】", 1, "", "の"),
@@ -593,6 +596,66 @@ final class ParserTests: XCTestCase {
             XCTAssertEqual(label.value, test.name)
             print("テスト終了: \(statement.string)")
         }
+    }
+    func testEndOfStatements() throws {
+        let testPatterns: [(input: String, statements: Int, expressions: Int)] = [
+            // コメント内番号は、想定する句点、読点、】、EOL、EOFの組み合わせパターン
+            ("甲は１。乙は２。",2,1),   // 1. EOF, 2. 。次, 3. 。EOF
+            ("関数【甲を表示する。】",1,1),    // 4. 。】, 11. 】EOF
+            ("関数【甲を表示する。乙を表示する。】",1,1), // 2. 。次
+            ("""
+                甲を表示する。
+                乙を表示する。
+            """,2,3),   // 5. 。EOL, 12. EOL次
+            ("関数【甲を表示する】を表示する。",1,3),    // 6. 】次
+            ("甲が1より小さい場合【甲を表示する。】乙を表示する。",2,4), // 6. 】次
+            ("甲が1より小さい場合【甲を表示し】、それ以外は【乙を表示する】。",1,4),    // 7. 】、9. 】。
+            ("関数【甲が1より小さい場合、【甲を表示する】】",1,1),    // 8. 。】
+            ("""
+                甲が1より小さい場合【甲を表示する。】
+                乙を表示する。
+            """,2,4), // 10. 】EOL
+            ("""
+                関数【甲を表示する。
+                    乙を表示する。】
+            """,1,1), // 12. EOL次
+            ("""
+                甲は１。
+            
+            """,1,1),   // 13. EOL EOF
+            ("""
+                関数【
+                    甲が1より小さい場合、【甲を表示する】
+                】
+            """,1,1),    // 14. EOL 】
+            ("""
+            
+            
+                甲は１。
+            
+            
+            """,1,1),   // 15. EOL EOL
+            ("""
+                関数【
+
+                    甲を表示する。
+            
+                】
+            """,1,1),   // 15. EOL EOL
+        ]
+        for test in testPatterns {
+            print("テストパターン: \(test.input)")
+            let program = try XCTUnwrap(parseProgram(with: test.input))
+            XCTAssertEqual(program.statements.count, test.statements, "program.statements.count")
+            if let statement = program.statements.first as? DefineStatement {
+                XCTAssertEqual(statement.value.expressions.count, test.expressions, "statement.expressions.count")
+            } else
+            if let statement = program.statements.first as? ExpressionStatement {
+                XCTAssertEqual(statement.expressions.count, test.expressions, "statement.expressions.count")
+            }
+            print("テスト終了: \(program.string)")
+        }
+
     }
     // MARK: - ヘルパー
     private func parseProgram(with input: String) -> Program? {

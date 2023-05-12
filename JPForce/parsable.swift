@@ -166,6 +166,7 @@ struct ExpressionStatementParser : StatementParsable {
         return ExpressionStatement(token: token, expressions: expressions)
     }
     private var isEndOfStatement: Bool {currentToken.isPeriod || currentToken.isEol || isEndOfBlock}
+    /// 文の終わりを検出する。(例えば、「】。」の場合、isBreakFactorによるbreakを抑止する)
     private var getNextWhenNextIsEndOfStatement: Bool {getNext(whenNextIs: .PERIOD) || getNext(whenNextIs: .EOL) || getNext(whenNextIs: .RBBRACKET)}
 }
 /// ブロック(【】)内で式を解析したstatementを、statementsに格納
