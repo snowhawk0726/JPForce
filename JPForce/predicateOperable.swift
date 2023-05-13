@@ -383,6 +383,14 @@ struct BooleanOperator : PredicateOperable {
     init(_ environment: Environment, by op: Token) {self.environment = environment; self.op = op}
     let environment: Environment, op: Token
     func operated() -> JpfObject? {
+        if let params = environment.peek(3),
+           params[1] is JpfRange && params[2].value is JpfRange {   // 上限と下限に分かれた範囲をマージする。
+            guard let range = mergeRanges(params[1], with: params[2]) else {
+                return determineUsage + "\(op.literal)。"
+            }
+            environment.drop(2)
+            environment.push(range)
+        }
         if let params = environment.peek(2) {                   // 入力が２つ
             switch (params[0].particle, params[1].particle, op.type) {
             case (.particle(.GA),.particle(.DE),.keyword(.BE)),(.particle(.WA),.particle(.DE),.keyword(.BE)),
@@ -445,6 +453,12 @@ struct BooleanOperator : PredicateOperable {
         case .keyword(.NOT):    return JpfBoolean.object(of: !operand.isTrue)
         default:                return determineError
         }
+    }
+    private func mergeRanges(_ o1: JpfObject, with o2: JpfObject) -> JpfPhrase? {
+        guard let r = o1 as? JpfRange, let lower = r.lowerBound else {return nil}
+        guard let p = o2 as? JpfPhrase,
+              let r = p.value as? JpfRange, let upper = r.upperBound else {return nil}
+        return JpfPhrase(value: JpfRange(lowerBound: lower, upperBound: upper), particle: p.particle)
     }
 }
 struct CompareOperator : PredicateOperable {

@@ -46,6 +46,20 @@ extension Parsable {
         return true
     }
     func skipEols() {parser.skipEols()}
+    // 判定
+    /// 解析中止要因：】, EOF, EOL, 。
+    var isBreakFactor: Bool {
+        isEndOfBlock || currentToken.isEof || currentToken.isEol || isEndOfStatement
+    }
+    var isEndOfStatement: Bool {currentToken.isPeriod}
+    var isEndOfBlock: Bool {currentToken == .symbol(.RBBRACKET)}
+    var isEndOfElements: Bool {
+        nextToken.type == .symbol(.COMMA) || nextToken.type == .symbol(.PERIOD) ||
+        nextToken.type == .symbol(.RBBRACKET) ||
+        nextToken.type == .symbol(.EOL) || nextToken.type == .symbol(.EOF)
+    }
+    /// エラー出力
+    func error(message: String) {parser.errors.append(message + "(解析位置:\(currentToken.literal))")}
     /// 入力部の解析
     /// - 形式: 入力が、識別子1（「型格」）と 識別子2（「型格」）と...、であり、
     func parseParameters(endSymbol: Token.Symbol) -> [(Identifier, String)]? {
@@ -82,20 +96,74 @@ extension Parsable {
             return expression
         }
     }
-    // 判定
-    /// 解析中止要因：】, EOF, EOL, 。
-    var isBreakFactor: Bool {
-        isEndOfBlock || currentToken.isEof || currentToken.isEol || isEndOfStatement
+    func parseRangeExpressions(_ expressions: [Expression], token: Token) -> Expression? {
+        let lowerBound = getBound(of: [Token(.KARA), Token(.GTEQUAL)], from: expressions)
+        let rest = getRest(of: expressions, except: lowerBound)
+        guard rest.isEmpty || getBound(of: [Token(.KARA), Token(.GTEQUAL)], from: rest) == nil else {
+            error(message: "範囲で、範囲式の解析に失敗した。(下限「\(lowerBound?.tokenLiteral ?? "?")」が重複)")
+            return nil
+        }
+        let upperBound = getBound(of: [Token(.MADE), Token(.LTEQUAL), Token(.UNDER)], from: rest)
+        if upperBound != nil {
+            guard getRest(of: rest, except: upperBound).isEmpty else {
+                error(message: "範囲で、範囲式の解析に失敗した。(上限「\(upperBound?.tokenLiteral ?? "?")」に後続の式がある。)")
+                return nil
+            }
+        }
+        return RangeLiteral(token: token, lowerBound: lowerBound, upperBound: upperBound)
     }
-    var isEndOfStatement: Bool {currentToken.isPeriod}
-    var isEndOfBlock: Bool {currentToken == .symbol(.RBBRACKET)}
-    var isEndOfElements: Bool {
-        nextToken.type == .symbol(.COMMA) || nextToken.type == .symbol(.PERIOD) ||
-        nextToken.type == .symbol(.RBBRACKET) ||
-        nextToken.type == .symbol(.EOL) || nextToken.type == .symbol(.EOF)
+    /// 解析された式の配列から、上限もしくは下限(キーワードと式)を抽出する。
+    /// *1* 「<数値>(または<識別子>)キーワード」は、範囲【<数値>(または<識別子>)キーワード】と解析されている。
+    /// *2* 「<式>から」は、カラ句に解析されている。
+    /// *3* 「<式>まで」は、マデ句に解析されている。
+    /// - Parameters:
+    ///   - tokens: 上下限のトークン(*: 先頭は格「から」または「まで」)
+    ///   - expressions: 式の配列
+    /// - Returns: 抽出した上限もしくは下限(式文)
+    private func getBound(of tokens: [Token], from expressions: [Expression]) -> ExpressionStatement? {
+        // 式がIntegerLiteralで、tokenが、RangeLiteralまたはPhraseExpressionに解析済みの場合
+        if let e = expressions.first as? RangeLiteral {return isLowBound(tokens.first) ? e.lowerBound : e.upperBound}
+        if let e = expressions.first as? PhraseExpression, e.token == tokens.first {return ExpressionStatement(token: e.token, expressions: [e.left])}
+        // 複数式から、キーワードを拾いだす。(index.0: 下限キーワード、index.1: 拾いだした式の位置)
+        guard let index = firstIndex(of: expressions, by: tokens) else {return nil}
+        var rangeExpressions = [Expression](expressions[0..<index.1])
+        if index.0 == tokens.first {
+            if let p = expressions[index.1] as? PhraseExpression {rangeExpressions.append(p.left)}
+        }
+        return ExpressionStatement(token: index.0, expressions: rangeExpressions)
     }
-    /// エラー出力
-    func error(message: String) {parser.errors.append(message + "(解析位置:\(currentToken.literal))")}
+    /// expressionsから、es部分を除いた残りを返す。
+    /// - Parameters:
+    ///   - expressions: 入力の式配列
+    ///   - es: 下限部
+    /// - Returns: 残りの式配列
+    private func getRest(of expressions: [Expression], except es: ExpressionStatement?) -> [Expression] {
+        guard let es = es else {return expressions}
+        var position = es.expressions.count
+        guard position < expressions.count else {return []}
+        if let e = expressions[position] as? PredicateExpression, e.token == es.token {
+            position += 1
+        }
+        return [Expression](expressions[position..<expressions.count])
+    }
+    /// 上下限キーワードの位置を返す。
+    /// - Parameters:
+    ///   - expressions: 対象の式配列
+    ///   - tokens: 検索するキーワード配列
+    /// - Returns: ０： 検出したキーワード(Token)、１：検出した位置
+    private func firstIndex(of expressions: [Expression], by tokens: [Token]) -> (Token, Int)? {
+        for t in tokens {
+            if let i = expressions.firstIndex(where: {
+                if let p = $0 as? PredicateExpression {return p.token == t} // 以上、以下、未満
+                if let p = $0 as? PhraseExpression {return p.token == t}    // から、まで
+                return false
+            }) {
+                return (t, i)
+            }
+        }
+        return nil
+    }
+    private func isLowBound(_ token: Token?) -> Bool {[Token(.KARA), Token(.GTEQUAL)].contains(token)}
 }
 // MARK: - statemt parsers and those instance factory
 struct StatementParserFactory {
@@ -327,89 +395,7 @@ struct RangeLiteralParser : ExpressionParsable {
             error(message: "範囲で、範囲式の解析に失敗した。(式が取り出せない。)")
             return nil
         }
-        let lowerBound = getLowerBound(from: es.expressions)
-        let rest = getRest(of: es.expressions, without: lowerBound)
-        guard rest.isEmpty || getLowerBound(from: rest) == nil else {
-            error(message: "範囲で、範囲式の解析に失敗した。(下限「\(lowerBound?.tokenLiteral ?? "?")」が重複)")
-            return nil
-        }
-        let upperBound = getUpperBound(from: rest)
-        if upperBound != nil {
-            guard getRest(of: rest, without: upperBound).isEmpty else {
-                error(message: "範囲で、範囲式の解析に失敗した。(上限「\(upperBound?.tokenLiteral ?? "?")」に後続の式がある。)")
-                return nil
-            }
-        }
-        return RangeLiteral(token: token, lowerBound: lowerBound, upperBound: upperBound)
-    }
-    /// 解析された式の配列から、下限(キーワードと式)を抽出する。
-    /// *1* 「<数値>キーワード」は、範囲【<数値>キーワード】と解析されている。
-    /// *2* 「<式>から」は、から句に解析されている。
-    /// - Parameter expressions: 式の配列
-    /// - Returns: 抽出した下限(式文)
-    private func getLowerBound(from expressions: [Expression]) -> ExpressionStatement? {
-        // 式がIntegerLiteralで、tokenが、RangeLiteralまたはPhraseExpressionに解析済みの場合
-        if let e = expressions.first as? RangeLiteral {return e.lowerBound}
-        if let e = expressions.first as? PhraseExpression, e.token == .particle(.KARA) {return ExpressionStatement(token: e.token, expressions: [e.left])}
-        // 複数式から、キーワードを拾いだす。(index.0: 下限キーワード、index.1: 拾いだした式の位置)
-        guard let index = firstIndex(of: expressions, by: [Token(.GTEQUAL),Token(.KARA)]) else {
-            return nil
-        }
-        var rangeExpressions = [Expression](expressions[0..<index.1])
-        if index.0 == .particle(.KARA) {
-            if let p = expressions[index.1] as? PhraseExpression {rangeExpressions.append(p.left)}
-        }
-        return ExpressionStatement(token: index.0, expressions: rangeExpressions)
-    }
-    /// 解析された式の配列から、上限(キーワードと式)を抽出する。
-    /// *1* 「<数値>キーワード」は、範囲【<数値>キーワード】と解析されている。
-    /// *2* 「<式>まで」は、まで句に解析されている。
-    /// - Parameter expressions: 式の配列
-    /// - Returns: 抽出した上限(式文)
-    private func getUpperBound(from expressions: [Expression]) -> ExpressionStatement? {
-        // 式がIntegerLiteralで、tokenが、RangeLiteralまたはPhraseExpressionに解析済みの場合
-        if let e = expressions.first as? RangeLiteral {return e.upperBound}
-        if let e = expressions.first as? PhraseExpression, e.token == .particle(.MADE) {return ExpressionStatement(token: e.token, expressions: [e.left])}
-        // 複数式から、キーワードを拾いだす。(index.0: 上限キーワード、index.1: 拾いだした式の位置)
-        guard let index = firstIndex(of: expressions, by: [Token(.LTEQUAL),Token(.MADE),Token(.UNDER)]) else {
-            return nil
-        }
-        var rangeExpressions = [Expression](expressions[0..<index.1])
-        if index.0 == .particle(.MADE) {
-            if let p = expressions[index.1] as? PhraseExpression {rangeExpressions.append(p.left)}
-        }
-        return ExpressionStatement(token: index.0, expressions: rangeExpressions)
-    }
-    /// expressionsから、es部分を除いた残りを返す。
-    /// - Parameters:
-    ///   - expressions: 入力の式配列
-    ///   - es: 下限部
-    /// - Returns: 残りの式配列
-    private func getRest(of expressions: [Expression], without es: ExpressionStatement?) -> [Expression] {
-        guard let es = es else {return expressions}
-        var position = es.expressions.count
-        guard position < expressions.count else {return []}
-        if let e = expressions[position] as? PredicateExpression, e.token == es.token {
-            position += 1
-        }
-        return [Expression](expressions[position..<expressions.count])
-    }
-    /// 上下限キーワードの位置を返す。
-    /// - Parameters:
-    ///   - expressions: 対象の式配列
-    ///   - tokens: 検索するキーワード配列
-    /// - Returns: ０： 検出したキーワード(Token)、１：検出した位置
-    private func firstIndex(of expressions: [Expression], by tokens: [Token]) -> (Token, Int)? {
-        for t in tokens {
-            if let i = expressions.firstIndex(where: {
-                if let p = $0 as? PredicateExpression {return p.token == t} // 以上、以下、未満
-                if let p = $0 as? PhraseExpression {return p.token == t}    // から、まで
-                return false
-            }) {
-                return (t, i)
-            }
-        }
-        return nil
+        return parseRangeExpressions(es.expressions, token: token)
     }
 }
 struct FunctionLiteralParser : ExpressionParsable {
