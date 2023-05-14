@@ -80,9 +80,9 @@ extension Parsable {
         _ = getNext(whenNextIs: .COMMA)                         // (、)
         return parameters
     }
-    /// 範囲式の解析(例：1以上→範囲【1以上】) *: 上限か下限のみ、上下限は対応不可
-    /// - Parameter expression: 範囲の式(数値、識別子)
-    /// - Returns: 範囲リテラル
+    /// 式の解析　(例：1以上→範囲【1以上】)
+    /// - Parameter expression: 式(数値、識別子)
+    /// - Returns: 上限もしくは下限の範囲リテラル(もしくは元の式)
     func parseRangeExpression(with expression: Expression) -> Expression? {
         let keyword = nextToken
         switch keyword {
@@ -96,6 +96,11 @@ extension Parsable {
             return expression
         }
     }
+    /// 式の配列の解析(上下限を範囲リテラルとして切り出す)
+    /// - Parameters:
+    ///   - expressions: 範囲式
+    ///   - token: 「範囲」トークン
+    /// - Returns: 範囲リテラル
     func parseRangeExpressions(_ expressions: [Expression], token: Token) -> Expression? {
         let lowerBound = getBound(of: [Token(.KARA), Token(.GTEQUAL)], from: expressions)
         let rest = getRest(of: expressions, except: lowerBound)
@@ -163,7 +168,94 @@ extension Parsable {
         }
         return nil
     }
-    private func isLowBound(_ token: Token?) -> Bool {[Token(.KARA), Token(.GTEQUAL)].contains(token)}
+    private func isLowBound(_ token: Token?) -> Bool {[Token(.KARA), Token(.GTEQUAL)].contains(token)
+    }
+    /// 配列・辞書の要素を解析する
+    /// - Parameters:
+    ///   - token: 配列・辞書のトークン
+    ///   - endSymbol: 終端記号
+    /// - Returns: 解析した要素の配列
+    func parseElements<T>(of token: Token, until endSymbol: Token.Symbol) -> [T]? {
+        var elements: [T] = []
+        repeat {
+            if nextToken == .symbol(endSymbol) {break}  // 空の配列
+            getNext()
+            guard let parsed: T = parseElement(of: token) else {
+                error(message: "\(token.literal)で、要素の式の解釈に失敗した。")
+                return nil
+            }
+            elements.append(parsed)
+        } while !nextToken.isEof && getNext(whenNextIs: .COMMA)
+        while nextToken.isEol {getNext()}               // 改行を読み飛ばす。
+        guard nextToken == .symbol(endSymbol) else {    // ブロックの終端をチェック
+            error(message: "\(token.literal)の終わりを示す「\(endSymbol)」が見つからなかった。")
+            return nil
+        }
+        _ = getNext(whenNextIs: .RBBRACKET)
+        return elements
+    }
+    private func parseElement<T>(of token: Token) -> T? {
+        return token == .keyword(.ARRAY) ?
+            parseExpressionStatement() as! T : parsePairExpression() as! T
+    }
+    /// 配列の要素を解析する。
+    /// - Returns: 要素を式文として返す。
+    private func parseExpressionStatement() -> ExpressionStatement? {
+        var expressions: [Expression] = []
+        let token = currentToken
+        while true {
+            skipEols()
+            guard let expression = ExpressionPareser(parser).parse() else {
+                error(message: "配列で、式の解析に失敗した。")
+                return nil
+            }
+            expressions.append(expression)
+            if isEndOfElements {break}
+            getNext()
+        }
+        if let phrase = expressions.last as? PhraseExpression, phrase.token.literal == ExpressionStatement.to {
+            expressions[expressions.count-1] = phrase.left  // 「と」を取り除く
+        }
+        return ExpressionStatement(token: token, expressions: expressions)
+    }
+    /// 辞書の要素を解析する。
+    /// - Returns: 要素を式文のペア(索引と値)として返す。
+    private func parsePairExpression() -> PairExpression? {
+        var expressions: [Expression] = []
+        var beginOfValueExpressions = 0     // 値の開始位置
+        while true {
+            skipEols()
+            guard let expression = ExpressionPareser(parser).parse() else {
+                error(message: "辞書で、式の解析に失敗した。")
+                return nil
+            }
+            expressions.append(expression)
+            if let phrase = expression as? PhraseExpression, phrase.token.literal == ExpressionStatement.ga {   // 区切り「が」の検出
+                beginOfValueExpressions = expressions.count
+                _ = getNext(whenNextIs: .COMMA) // 読点(、)を読み飛ばす
+            }
+            if isEndOfElements {break}
+            getNext()
+        }
+        guard beginOfValueExpressions > 0 else {
+            error(message: "辞書で、索引と値の区切り「が」が見つからなかった。")
+            return nil
+        }
+        // 索引
+        if let phrase = expressions[beginOfValueExpressions-1] as? PhraseExpression {
+            expressions[beginOfValueExpressions-1] = phrase.left // 「が」を取り除く
+        }
+        let keyToken = Token(word: expressions[0].tokenLiteral)
+        let keyExpressions = ExpressionStatement(token: keyToken, expressions: Array(expressions[0..<beginOfValueExpressions]))
+        // 値
+        if let phrase = expressions.last as? PhraseExpression, phrase.token.literal == ExpressionStatement.to {
+            expressions[expressions.count-1] = phrase.left       // 「と」を取り除く
+        }
+        let valueToken = Token(word: expressions[beginOfValueExpressions].tokenLiteral)
+        let valueExpressions = ExpressionStatement(token: valueToken, expressions: Array(expressions[beginOfValueExpressions..<expressions.count]))
+        //
+        return PairExpression(pair: (key: keyExpressions, value: valueExpressions))
+    }
 }
 // MARK: - statemt parsers and those instance factory
 struct StatementParserFactory {
@@ -435,7 +527,7 @@ struct FunctionLiteralParser : ExpressionParsable {
         return InputFormat(numberOfInputs: number, formats: formats)
     }
 }
-struct ArrayLiteralParser : ExpressionParsable {    // TODO: ArrayとDictionaryの共通化
+struct ArrayLiteralParser : ExpressionParsable {
     init(_ parser: Parser) {self.parser = parser}
     let parser: Parser
     func parse() -> Expression? {
@@ -444,48 +536,11 @@ struct ArrayLiteralParser : ExpressionParsable {    // TODO: ArrayとDictionary�
         // 要素の解析
         let endSymbol: Token.Symbol = getNext(whenNextIs: .LBBRACKET) ? .RBBRACKET : .PERIOD
         _ = getNext(whenNextIs: ExpressionStatement.yousoga + ExpressionStatement.yousowa, matchAll: false) // 要素が、(要素は、)
-        guard let elements = parseElements(until: endSymbol) else {
+        guard let elements: [ExpressionStatement] = parseElements(of: token, until: endSymbol) else {
             error(message: "配列で、「要素が、〜」の解析に失敗した。")
             return nil
         }
         return ArrayLiteral(token: token, elements: elements)
-    }
-    private func parseElements(until endSymbol: Token.Symbol) -> [ExpressionStatement]? {
-        var elements: [ExpressionStatement] = []
-        repeat {
-            if nextToken == .symbol(endSymbol) {break}  // 空の配列
-            getNext()
-            guard let parsed = parseExpressions() else {
-                error(message: "配列で、要素の式の解釈に失敗した。")
-                return nil
-            }
-            elements.append(parsed)
-        } while !nextToken.isEof && getNext(whenNextIs: .COMMA)
-        while nextToken.isEol {getNext()}               // 改行を読み飛ばす。
-        guard nextToken == .symbol(endSymbol) else {    // ブロックの終端をチェック
-            error(message: "配列の終わりを示す「\(endSymbol)」が見つからなかった。")
-            return nil
-        }
-        _ = getNext(whenNextIs: .RBBRACKET)
-        return elements
-    }
-    private func parseExpressions() -> ExpressionStatement? {
-        var expressions: [Expression] = []
-        let token = currentToken
-        while true {
-            skipEols()
-            guard let expression = ExpressionPareser(parser).parse() else {
-                error(message: "配列で、式の解析に失敗した。")
-                return nil
-            }
-            expressions.append(expression)
-            if isEndOfElements {break}
-            getNext()
-        }
-        if let phrase = expressions.last as? PhraseExpression, phrase.token.literal == ExpressionStatement.to {
-            expressions[expressions.count-1] = phrase.left  // 「と」を取り除く
-        }
-        return ExpressionStatement(token: token, expressions: expressions)
     }
 }
 struct DictionaryLiteralParser : ExpressionParsable {
@@ -497,65 +552,11 @@ struct DictionaryLiteralParser : ExpressionParsable {
         // 要素の解析
         let endSymbol: Token.Symbol = getNext(whenNextIs: .LBBRACKET) ? .RBBRACKET : .PERIOD
         _ = getNext(whenNextIs: ExpressionStatement.yousoga + ExpressionStatement.yousowa, matchAll: false)   // 要素が、(要素は、)
-        guard let pairs = parseElements(until: endSymbol) else {
+        guard let pairs: [PairExpression] = parseElements(of: token, until: endSymbol) else {
             error(message: "辞書で、「要素が、〜」の解析に失敗した。")
             return nil
         }
         return DictionaryLiteral(token: token, pairs: pairs)
-    }
-    private func parseElements(until endSymbol: Token.Symbol) -> [DictionaryLiteral.PairExpression]? {
-        var elements: [DictionaryLiteral.PairExpression] = []
-        repeat {
-            if nextToken == .symbol(endSymbol) {break}  // 空の辞書
-            getNext()
-            guard let parsed = parsePairExpression() else {
-                error(message: "辞書で、要素の式の解釈に失敗した。")
-                return nil
-            }
-            elements.append(parsed)
-        } while !nextToken.isEof && getNext(whenNextIs: .COMMA)
-        while nextToken.isEol {getNext()}               // 改行を読み飛ばす。
-        guard nextToken == .symbol(endSymbol) else {    // ブロックの終端をチェック
-            error(message: "辞書の終わりを示す「\(endSymbol)」が見つからなかった。")
-            return nil
-        }
-        _ = getNext(whenNextIs: .RBBRACKET)
-        return elements
-    }
-    private func parsePairExpression() ->  DictionaryLiteral.PairExpression? {
-        var expressions: [Expression] = []
-        var beginOfValueExpressions = 0     // 値の開始位置
-        while true {
-            skipEols()
-            guard let expression = ExpressionPareser(parser).parse() else {
-                error(message: "辞書で、式の解析に失敗した。")
-                return nil
-            }
-            expressions.append(expression)
-            if let phrase = expression as? PhraseExpression, phrase.token.literal == ExpressionStatement.ga {   // 区切り「が」の検出
-                beginOfValueExpressions = expressions.count
-                _ = getNext(whenNextIs: .COMMA) // 読点(、)を読み飛ばす
-            }
-            if isEndOfElements {break}
-            getNext()
-        }
-        guard beginOfValueExpressions > 0 else {
-            error(message: "辞書で、索引と値の区切り「が」が見つからなかった。")
-            return nil
-        }
-        // 索引
-        if let phrase = expressions[beginOfValueExpressions-1] as? PhraseExpression {
-            expressions[beginOfValueExpressions-1] = phrase.left // 「が」を取り除く
-        }
-        let keyToken = Token(word: expressions[0].tokenLiteral)
-        let keyExpressions = ExpressionStatement(token: keyToken, expressions: Array(expressions[0..<beginOfValueExpressions]))
-        // 値
-        if let phrase = expressions.last as? PhraseExpression, phrase.token.literal == ExpressionStatement.to {
-            expressions[expressions.count-1] = phrase.left       // 「と」を取り除く
-        }
-        let valueToken = Token(word: expressions[beginOfValueExpressions].tokenLiteral)
-        let valueExpressions = ExpressionStatement(token: valueToken, expressions: Array(expressions[beginOfValueExpressions..<expressions.count]))
-        return DictionaryLiteral.PairExpression(pair: (key: keyExpressions, value: valueExpressions))
     }
 }
 struct PredicateExpressionParser : ExpressionParsable {

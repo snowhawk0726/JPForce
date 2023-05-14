@@ -237,8 +237,8 @@ struct DictionaryLiteral : Expression {
         (!pairs.isEmpty ? "要素が" + "、\(pairs.map {$0.string}.joined(separator: "と"))" : "") +
         "】"
     }
-    struct PairExpression {
-        var pair: (key: ExpressionStatement, value: ExpressionStatement)
-        var string: String {pair.key.string + "が" + pair.value.string}
-    }
+}
+struct PairExpression {
+    var pair: (key: ExpressionStatement, value: ExpressionStatement)
+    var string: String {pair.key.string + "が" + pair.value.string}
 }
