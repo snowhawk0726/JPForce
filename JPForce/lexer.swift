@@ -38,7 +38,7 @@ class Lexer {
         switch (token, nextToken, compoundToken) {
         case (_,_,.keyword(_)), (_,_,.particle(_)),
             (.IDENT(_),.IDENT(_),_), (.IDENT(_),.wrapped(.ident,_),_), (.IDENT(_),.INT(_),_),
-            (.keyword(_),.IDENT(_),_):
+            (.keyword(_),.IDENT(_),_),(.wrapped(.ident,_),.IDENT(_),_):
             token = Token(word: token.literal + getNext().literal)
         case (.INT(_),.IDENT(_),_):                     // 数値 + 単位 → 単位を無視する
             while nextToken.type == .ident {skipToken()}
