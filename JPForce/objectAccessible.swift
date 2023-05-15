@@ -55,6 +55,9 @@ extension ObjectAccessible {
                 let hashKey = JpfHashKey(type: JpfInteger.type, value: integer.hashValue)
                 guard let pair = dictionary.pairs[hashKey] else {return JpfNull.object}
                 return pair.value               // <辞書>の<索引(数値)>
+            case let string as JpfString:
+                environment.drop()
+                return string[integer]          // <文字列>の<数値>
             default:
                 break
             }

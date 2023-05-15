@@ -287,7 +287,6 @@ final class EvaluatorTests: XCTestCase {
             ("配列【１、２0、３、４0、５】を、関数【入力が要素、要素が10より大きい】でフィルターする。", [20,40]),
             ("辞書【「あ」が１、「い」が２、「う」が30】を、関数【入力がキーと値、値が10より大きい】でフィルターし、関数【入力がキーと値、値】で写像する。", [30]),
             ("配列【３、１、４、２、５】を逆順にする。", [5,2,4,1,3]),
-            ("「あいうえお」を逆順にする。", "おえういあ"),
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
@@ -297,6 +296,22 @@ final class EvaluatorTests: XCTestCase {
             } else {
                 try testObject(evaluated, with: test.exptected)
             }
+            print("テスト(\(evaluated))終了")
+        }
+    }
+    func testStringBuiltins() throws {
+        let testPatterns: [(input: String, exptected: String?)] = [
+            ("「あいうえお」の先頭", "あ"),
+            ("「あいうえお」の後尾", "お"),
+            ("「あいうえお」の２番目", "う"),
+            ("「あいうえお」の残り", "いうえお"),
+            ("「あいうえお」を逆順にする。", "おえういあ"),
+            ("「」の最初", nil), ("「」の最後", nil), ("「」の２番目", nil), ("「」の残り", nil), 
+        ]
+        for test in testPatterns {
+            print("テストパターン: \(test.input)")
+            let evaluated = try XCTUnwrap(testEvaluator(test.input))
+            try testObject(evaluated, with: test.exptected)
             print("テスト(\(evaluated))終了")
         }
     }

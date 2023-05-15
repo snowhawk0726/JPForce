@@ -203,6 +203,22 @@ extension JpfString {
         return JpfBoolean.object(of: value.contains(string.value))
     }
     func reversed() -> JpfObject {JpfString(value: String(value.reversed()))}
+    // 要素アクセス
+    subscript(index: Int) -> JpfObject? {
+        guard case 0..<value.count = index else {return JpfNull.object}
+        let i = value.index(value.startIndex, offsetBy: index)
+        return JpfString(value: String(value[i]))
+    }
+    subscript(name: String) -> JpfObject? {
+        switch name {
+        case "最初","先頭": return value.first.map {JpfString(value: String($0))} ?? JpfNull.object
+        case "最後","後尾": return value.last.map {JpfString(value: String($0))} ?? JpfNull.object
+        case "残り":
+            guard !value.isEmpty else {return JpfNull.object}
+            return JpfString(value: String(value.dropFirst()))
+        default:        return getObject(from: name)
+        }
+    }
 }
 extension JpfInput {
     var count: JpfObject {JpfInteger(value: stack.count)}
@@ -214,9 +230,9 @@ extension JpfInput {
     }
     subscript(name: String) -> JpfObject? {
         switch name {
-        case "最初", "先頭":    return stack.first ?? JpfNull.object
-        case "最後", "後尾":    return stack.last ?? JpfNull.object
-        default:            return getObject(from: name)
+        case "最初","先頭": return stack.first ?? JpfNull.object
+        case "最後","後尾": return stack.last ?? JpfNull.object
+        default:        return getObject(from: name)
         }
     }
 }
