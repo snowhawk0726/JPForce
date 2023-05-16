@@ -500,8 +500,9 @@ struct ExecuteOperator : PredicateOperable {
             return overload.executed(with: environment)
         case var filename as JpfString:     // ファイルを実行(解析・評価)する
             if filename.value == Token.Keyword.FILE.rawValue,
-               let name = environment[filename.value] as? JpfString {   // ファイル「ファイル名」
-                filename = name
+               let object = environment[filename.value] as? JpfString {   // ファイル「ファイル名」
+                environment[filename.value] = nil
+                filename = object
             }
             let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
             guard let contents = try? String(contentsOfFile: url.path() + filename.value, encoding: .utf8) else {return fileReadError}
