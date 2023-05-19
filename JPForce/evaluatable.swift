@@ -388,9 +388,19 @@ extension ArrayLiteral : Evaluatable {
         var results: [JpfObject] = []
         for element in elements {
             if let result = element.evaluated(with: environment), result.isError {return result}
+            if let params = environment.peek(2), let elements = elements(from: params) {
+                environment.drop(2)
+                results = elements
+                break
+            }
             results.append(environment.pull()!)     // スタックに積まれた評価結果を回収
         }
         return JpfArray(elements: results)
+    }
+    private func elements(from objects: [JpfObject]) -> [JpfObject]? {
+        // 同一要素を指定個数で(例：配列【10個の０】）
+        guard let phrase = objects.first as? JpfPhrase, phrase.isNumber && phrase.isParticle(.KO) else {return nil}
+        return Array(repeating: objects[1], count: phrase.number!)
     }
 }
 extension DictionaryLiteral : Evaluatable {

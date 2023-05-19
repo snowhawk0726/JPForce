@@ -118,6 +118,7 @@ enum Token : Equatable {
         case FILE       = "ファイル"
         case IDENTIFIERS = "識別子一覧"
         case IDENTIFIER = "識別子"
+        case TYPE       = "型"
     }
     /// 文字列の連想値について識別しないための分類(.IDENT("文字列") → .ident)
     enum TokenType : Hashable {
@@ -244,7 +245,8 @@ enum Token : Equatable {
             e.rawValue.zenkaku.map {d[$0] = e}
         }
         d["−"] = .MINUS
-        d[","] = .COMMA
+        d["，"] = .COMMA;    d[","] = .COMMA
+        d["．"] = .PERIOD;   d["."] = .PERIOD
         return d
     }()
 }

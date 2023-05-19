@@ -256,12 +256,22 @@ final class EvaluatorTests: XCTestCase {
         XCTAssertEqual(array.elements[2].string, "いあ")
         print("テスト(\(array.string))終了")
     }
-    func testStringConcation() throws {
-        let input = "「こんにちは」と「、」と「みなさん。」を足す。"
-        print("テストパターン: \(input)")
-        let evaluated = try XCTUnwrap(testEvaluator(input))
-        XCTAssertEqual(evaluated.string, "こんにちは、みなさん。")
-        print("テスト(\(evaluated))終了")
+    func testStringBuiltins() throws {
+        let testPatterns: [(input: String, exptected: String?)] = [
+            ("「こんにちは」と「、」と「みなさん。」を足す。","こんにちは、みなさん。"),
+            ("「あいうえお」の先頭", "あ"),
+            ("「あいうえお」の後尾", "お"),
+            ("「あいうえお」の２番目", "う"),
+            ("「あいうえお」の残り", "いうえお"),
+            ("「あいうえお」を逆順にする。", "おえういあ"),
+            ("「」の最初", nil), ("「」の最後", nil), ("「」の２番目", nil), ("「」の残り", nil),
+        ]
+        for test in testPatterns {
+            print("テストパターン: \(test.input)")
+            let evaluated = try XCTUnwrap(testEvaluator(test.input))
+            try testObject(evaluated, with: test.exptected)
+            print("テスト(\(evaluated))終了")
+        }
     }
     func testBuiltinFunctions() throws {
         let testPatterns: [(input: String, exptected: Any)] = [
@@ -299,23 +309,7 @@ final class EvaluatorTests: XCTestCase {
             print("テスト(\(evaluated))終了")
         }
     }
-    func testStringBuiltins() throws {
-        let testPatterns: [(input: String, exptected: String?)] = [
-            ("「あいうえお」の先頭", "あ"),
-            ("「あいうえお」の後尾", "お"),
-            ("「あいうえお」の２番目", "う"),
-            ("「あいうえお」の残り", "いうえお"),
-            ("「あいうえお」を逆順にする。", "おえういあ"),
-            ("「」の最初", nil), ("「」の最後", nil), ("「」の２番目", nil), ("「」の残り", nil), 
-        ]
-        for test in testPatterns {
-            print("テストパターン: \(test.input)")
-            let evaluated = try XCTUnwrap(testEvaluator(test.input))
-            try testObject(evaluated, with: test.exptected)
-            print("テスト(\(evaluated))終了")
-        }
-    }
-    func testArrayLiterals() throws {
+    func testArrayLiteral() throws {
         let input = "配列【1、2と2を掛ける、3と3を足す】。"
         print("テストパターン: \(input)")
         let evaluated = try XCTUnwrap(testEvaluator(input) as? JpfArray)
@@ -323,6 +317,16 @@ final class EvaluatorTests: XCTestCase {
         try testObject(evaluated.elements[0], with: 1)
         try testObject(evaluated.elements[1], with: 4)
         try testObject(evaluated.elements[2], with: 6)
+        print("テスト(\(evaluated.string))終了")
+    }
+    func testArrayInitialization() throws {
+        let input = "配列であって、要素が、3個の３。"
+        print("テストパターン: \(input)")
+        let evaluated = try XCTUnwrap(testEvaluator(input) as? JpfArray)
+        XCTAssertEqual(evaluated.elements.count, 3)
+        try testObject(evaluated.elements[0], with: 3)
+        try testObject(evaluated.elements[1], with: 3)
+        try testObject(evaluated.elements[2], with: 3)
         print("テスト(\(evaluated.string))終了")
     }
     func testArrayIndexExpressions() throws {
@@ -372,7 +376,7 @@ final class EvaluatorTests: XCTestCase {
             print("テスト(\(evaluated))終了")
         }
     }
-    func testDictionaryLiterals() throws {
+    func testDictionaryLiteral() throws {
         let input = """
             辞書【要素が、
                 「その一」が、10から9を引いたもの、
@@ -579,7 +583,7 @@ final class EvaluatorTests: XCTestCase {
             ("1を「甲」に代入する。甲。", 1),
             ("1と2を足す。「甲」に代入する。甲。", 3),
             ("甲は１。乙は２。「甲」と「乙」を入れ替える。甲", 2),
-            ("１と２を入れ替える。入力の最初の格", "を"),
+            ("１と２を入れ替える。入力の最初の値", 2),
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")

@@ -80,6 +80,20 @@ extension Parsable {
         _ = getNext(whenNextIs: .COMMA)                         // (、)
         return parameters
     }
+    func parseSignature(from strings: [String]) -> InputFormat {
+        let threeDots = "…"
+        let formats = strings.map { string in
+            var type = "", particle = ""
+            let lexer = Lexer(string)
+            var token = lexer.getNext()
+            if token.isIdent || token.isKeyword {type = token.literal;token = lexer.getNext()}
+            if token.isParticle {particle = token.literal;token = lexer.getNext()}
+            if token.literal == threeDots {particle += token.literal}
+            return (type, particle)
+        }
+        let number = formats.map({$0.1}).contains {$0.hasSuffix(threeDots)} ? nil : strings.count
+        return InputFormat(numberOfInputs: number, formats: formats)
+    }
     /// 式の解析　(例：1以上→範囲【1以上】)
     /// - Parameter expression: 式(数値、識別子)
     /// - Returns: 上限もしくは下限の範囲リテラル(もしくは元の式)
@@ -196,7 +210,7 @@ extension Parsable {
     }
     private func parseElement<T>(of token: Token) -> T? {
         return token == .keyword(.ARRAY) ?
-            parseExpressionStatement() as! T : parsePairExpression() as! T
+            parseExpressionStatement() as? T : parsePairExpression() as? T
     }
     /// 配列の要素を解析する。
     /// - Returns: 要素を式文として返す。
@@ -410,6 +424,7 @@ struct PrefixExpressionParserFactory {
         case .keyword(.OR),.keyword(.AND):
                                     return LogicalExpressionParser(parser)
         case .keyword(.FUNCTION):   return FunctionLiteralParser(parser)
+        case .keyword(.TYPE):       return TypeLiteralParser(parser)
         case .keyword(.ARRAY):      return ArrayLiteralParser(parser)
         case .keyword(.DICTIONARY): return DictionaryLiteralParser(parser)
         case .keyword(.RANGE):      return RangeLiteralParser(parser)
@@ -512,19 +527,37 @@ struct FunctionLiteralParser : ExpressionParsable {
         }
         return FunctionLiteral(token: token, parameters: identifiers, signature: signature, body: body)
     }
-    private func parseSignature(from strings: [String]) -> InputFormat {
-        let threeDots = "…"
-        let formats = strings.map { string in
-            var type = "", particle = ""
-            let lexer = Lexer(string)
-            var token = lexer.getNext()
-            if token.isIdent || token.isKeyword {type = token.literal;token = lexer.getNext()}
-            if token.isParticle {particle = token.literal;token = lexer.getNext()}
-            if token.literal == threeDots {particle += token.literal}
-            return (type, particle)
+}
+struct TypeLiteralParser : ExpressionParsable {
+    init(_ parser: Parser) {self.parser = parser}
+    let parser: Parser
+    func parse() -> Expression? {
+        if parser.previousToken == .particle(.NO) {return Identifier(from: currentToken)}   // 〜の型：識別子として振る舞う
+        let token = currentToken            // 型であって、(であり、)
+        _ = getNext(whenNextIs: ExpressionStatement.deatte + ExpressionStatement.deari, matchAll: false)
+        // Prameter block 解析
+        let endSymbol: Token.Symbol = getNext(whenNextIs: .LBBRACKET) ? .RBBRACKET : .EOL
+        guard let paramenters = parseParameters(endSymbol: endSymbol) else {
+            error(message: "型で、「入力が〜であり、」の解析に失敗した。")
+            return nil
         }
-        let number = formats.map({$0.1}).contains {$0.hasSuffix(threeDots)} ? nil : strings.count
-        return InputFormat(numberOfInputs: number, formats: formats)
+        let identifiers = paramenters.map {$0.0}
+        let signature = parseSignature(from: paramenters.map {$0.1})
+        // Initialyzer block 解析
+        _ = getNext(whenNextIs: ExpressionStatement.syokikaga + ExpressionStatement.syokikawa, matchAll: false)   // 初期化は、(初期化が、)
+        let endOfInit: Token.Symbol = getNext(whenNextIs: .LBBRACKET) ? .RBBRACKET : .EOL
+        guard let initialyzer = BlockStatementParser(parser, symbol: endOfInit).blockStatement else {
+            error(message: "型で、「初期化は、〜」の解析に失敗した。")
+            return nil
+        }
+        _ = getNext(whenNextIs: .PERIOD)                    // 初期化ブロックの句点を飛ばす
+        // Body block 解析
+        _ = getNext(whenNextIs: ExpressionStatement.hontaiga + ExpressionStatement.hontaiwa, matchAll: false)   // 本体が、(本体は、)
+        guard let body = BlockStatementParser(parser, symbol: endSymbol).blockStatement else {
+            error(message: "型で、「本体が、〜」の解析に失敗した。")
+            return nil
+        }
+        return TypeLiteral(token: token, parameters: identifiers, signature: signature, initializer: initialyzer, body: body)
     }
 }
 struct ArrayLiteralParser : ExpressionParsable {
@@ -740,6 +773,7 @@ struct PhraseExpressionParser : ExpressionParsable {
     let left: Expression?
     func parse() -> Expression? {
         let token = currentToken
+        if token == .particle(.KO) && nextToken.isParticle {getNext()}
         guard let left = left else {
             error(message: "「\(token.literal)」格の左辺(式)の解析に失敗した。")
             return nil

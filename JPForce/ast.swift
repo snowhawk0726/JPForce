@@ -68,6 +68,8 @@ struct ExpressionStatement : Statement {
     static let hontaiwa = "本体は、"
     static let syoriga = "処理が、"
     static let syoriwa = "処理は、"
+    static let syokikaga = "初期化が、"
+    static let syokikawa = "初期化は、"
     static let deatte = "であって、"
     static let deari = "であり、"
     static let soreigai = "それ以外"
@@ -209,6 +211,21 @@ struct FunctionLiteral : Expression {
         token.coloredLiteral + "であって、【" +
         (!parameters.isEmpty ? "入力が" + "、\(zip(parameters, signature.strings).map {$0.string + $1}.joined(separator: "と"))であり、" : "") +
         "本体が" + "、" + body.string + "】"
+    }
+}
+struct TypeLiteral : Expression {
+    var token: Token                // 型トークン
+    var parameters: [Identifier]    // 入力パラメータ
+    var signature: InputFormat      // 入力形式
+    var initializer: BlockStatement?// 初期化
+    var body: BlockStatement
+    //
+    var tokenLiteral: String {token.literal}
+    var string: String {
+        token.coloredLiteral + "であって、【" +
+        (!parameters.isEmpty ? "入力が" + "、\(zip(parameters, signature.strings).map {$0.string + $1}.joined(separator: "と"))であり、" : "") +
+        (initializer.map {"初期化は、" + $0.string} ?? "") +
+        "本体が、" + body.string + "】"
     }
 }
 struct InputFormat {

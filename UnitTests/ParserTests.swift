@@ -289,6 +289,37 @@ final class ParserTests: XCTestCase {
             print("テスト(\(statement.string))終了")
         }
     }
+    func testTypeLiteralParsings() throws {
+        let testPatterns = [
+            "型であって、【入力が、xとyであり、初期化は、【xにyを足し「z」に代入する】。本体が、aは１。】",
+            "型であり、入力が、xとyで、初期化は、【xにyを足し「z」に代入する】。本体が、aは１。",
+            "型【入力がxとy、初期化【xにyを足し「z」に代入する】。aは１】",
+        ]
+        for input in testPatterns {
+            print("テストパターン: \(input)")
+            let program = try XCTUnwrap(parseProgram(with: input))
+            XCTAssertEqual(program.statements.count, 1, "program.statements.count")
+            let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
+            XCTAssertEqual(statement.expressions.count, 1, "statement.expressions.count")
+            let typeLiteral = try XCTUnwrap(statement.expressions.first as? TypeLiteral)
+            XCTAssertEqual(typeLiteral.parameters.count, 2, "typeLiteral.parameters.count")
+            try testLiteralExpression(typeLiteral.parameters[0], with: "x")
+            try testLiteralExpression(typeLiteral.parameters[1], with: "y")
+            XCTAssertEqual(typeLiteral.initializer?.statements.count, 1)
+            let initStatement = try XCTUnwrap(typeLiteral.initializer?.statements.first as? ExpressionStatement)
+            XCTAssertEqual(initStatement.expressions.count, 6)
+            try testPhraseExpression(initStatement.expressions[0], with: "x", "に")
+            try testPhraseExpression(initStatement.expressions[1], with: "y", "を")
+            try testKeywordLiteral(initStatement.expressions[2], "足し")
+            try testPhraseExpression(initStatement.expressions[3], with: "「z」", "に")
+            try testKeywordLiteral(initStatement.expressions[4], "代入")
+            try testKeywordLiteral(initStatement.expressions[5], "する")
+            XCTAssertEqual(typeLiteral.body.statements.count, 1)
+            let bodyStatement = try XCTUnwrap(typeLiteral.body.statements.first as? DefineStatement)
+            try testDefStatement(bodyStatement, name: "a", "は", with: 1)
+            print("テスト終了: \(statement.string)")
+        }
+    }
     func testArrayLiterals() throws {
         let input = "配列であって、【要素が、１と、2に２を掛けたものと、3に３を足したもの】。"
         print("テストパターン: \(input)")
@@ -675,7 +706,7 @@ final class ParserTests: XCTestCase {
         XCTFail()
     }
     //
-    private func testDefStatement(_ statement: Statement?, name: String, _ string: String, with value: Any, flag: Bool) throws {
+    private func testDefStatement(_ statement: Statement?, name: String, _ string: String, with value: Any, flag: Bool = false) throws {
         let defStatement = try XCTUnwrap(statement as? DefineStatement)
         XCTAssertEqual(defStatement.token.literal, string)
         XCTAssertEqual(defStatement.name.value, name)
