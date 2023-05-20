@@ -256,6 +256,32 @@ final class EvaluatorTests: XCTestCase {
         XCTAssertEqual(array.elements[2].string, "いあ")
         print("テスト(\(array.string))終了")
     }
+    func testTypeLiteral() throws {
+        let input = """
+            型であって、【
+                初期化は、【行列は、配列【】】。
+                入れるは、関数で、入力が要素、行列に要素を追加し、「行列」に代入する。
+                出すは、関数で、行列の先頭の値を積み、行列が空でない場合、【行列の残りを「行列」に代入する】。
+            】
+        """
+        print("テストパターン: \(input)")
+        let type = try XCTUnwrap(testEvaluator(input) as? JpfType)
+        XCTAssertEqual(type.parameters.count, 0)
+        XCTAssertEqual(type.signature.numberOfInputs, 0)
+        let initialize = try XCTUnwrap(type.initializer?.statements.first as? DefineStatement)
+        XCTAssertEqual(initialize.name.value, "行列")
+        XCTAssertEqual(initialize.value.expressions.count, 1)
+        let array = try XCTUnwrap(initialize.value.expressions.first as? ArrayLiteral)
+        XCTAssertTrue(array.elements.isEmpty)
+        XCTAssertEqual(type.body.statements.count, 2)
+        let first = try XCTUnwrap(type.body.statements[0] as? DefineStatement)
+        let second = try XCTUnwrap(type.body.statements[1] as? DefineStatement)
+        XCTAssertEqual(first.name.value, "入れる")
+        XCTAssertEqual(second.name.value, "出す")
+        _ = try XCTUnwrap(first.value.expressions.first as? FunctionLiteral)
+        _ = try XCTUnwrap(second.value.expressions.first as? FunctionLiteral)
+        print("テスト(\(type.string))終了")
+   }
     func testStringBuiltins() throws {
         let testPatterns: [(input: String, exptected: String?)] = [
             ("「こんにちは」と「、」と「みなさん。」を足す。","こんにちは、みなさん。"),

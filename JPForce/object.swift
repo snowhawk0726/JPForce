@@ -153,13 +153,29 @@ struct JpfReturnValue : JpfObject {
 struct JpfFunction : JpfObject {
     static let type = "関数"
     var parameters: [Identifier]    // 入力パラメータ
-    var signature: InputFormat  // 入力形式
+    var signature: InputFormat      // 入力形式
     var body: BlockStatement
     var environment: Environment
     var string: String {
         let s = "関数".color(.magenta) + "であって、【" +
         (parameters.isEmpty ? "" :
             "入力が、\(zip(parameters, signature.strings).map {$0.string + $1}.joined(separator: "と"))であり、") +
+         "本体が、" + body.string + "】"
+        return s.replacingOccurrences(of: "。】", with: "】")
+    }
+}
+struct JpfType : JpfObject {
+    static let type = "型"
+    var parameters: [Identifier]    // 入力パラメータ
+    var signature: InputFormat      // 入力形式
+    var initializer: BlockStatement?// 初期化
+    var body: BlockStatement
+    var environment: Environment
+    var string: String {
+        let s = "型".color(.magenta) + "であって、【" +
+        (parameters.isEmpty ? "" :
+            "入力が、\(zip(parameters, signature.strings).map {$0.string + $1}.joined(separator: "と"))であり、") +
+        (initializer.map {"初期化は、" + $0.string} ?? "") +
          "本体が、" + body.string + "】"
         return s.replacingOccurrences(of: "。】", with: "】")
     }

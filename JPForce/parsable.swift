@@ -519,6 +519,7 @@ struct FunctionLiteralParser : ExpressionParsable {
         }
         let identifiers = paramenters.map {$0.0}
         let signature = parseSignature(from: paramenters.map {$0.1})
+        if paramenters.isEmpty {while nextToken.isEol {getNext()}}   // 【とEOLを飛ばす
         // Body block 解析
         _ = getNext(whenNextIs: ExpressionStatement.hontaiga + ExpressionStatement.hontaiwa, matchAll: false)   // 本体が、(本体は、)
         guard let body = BlockStatementParser(parser, symbol: endSymbol).blockStatement else {
@@ -543,6 +544,7 @@ struct TypeLiteralParser : ExpressionParsable {
         }
         let identifiers = paramenters.map {$0.0}
         let signature = parseSignature(from: paramenters.map {$0.1})
+        if paramenters.isEmpty {while nextToken.isEol {getNext()}}   // 【とEOLを飛ばす
         // Initialyzer block 解析
         _ = getNext(whenNextIs: ExpressionStatement.syokikaga + ExpressionStatement.syokikawa, matchAll: false)   // 初期化は、(初期化が、)
         let endOfInit: Token.Symbol = getNext(whenNextIs: .LBBRACKET) ? .RBBRACKET : .EOL

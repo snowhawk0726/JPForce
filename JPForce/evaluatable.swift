@@ -481,3 +481,8 @@ extension JpfArray {
     private var notExecutableObject: JpfError   {JpfError("「関数」以外を実行しようとした。型：")}
     private var functionParameterError: JpfError{JpfError("「関数」の入力が指定形式と一致しない。")}
 }
+extension TypeLiteral : Evaluatable {
+    func evaluated(with environment: Environment) -> JpfObject? {
+        accessed(with: environment) ?? JpfType(parameters: parameters, signature: signature, initializer: initializer, body: body, environment: environment)
+    }
+}
