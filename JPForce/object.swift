@@ -175,7 +175,7 @@ struct JpfType : JpfObject {
         let s = "型".color(.magenta) + "であって、【" +
         (parameters.isEmpty ? "" :
             "入力が、\(zip(parameters, signature.strings).map {$0.string + $1}.joined(separator: "と"))であり、") +
-        (initializer.map {"初期化は、" + $0.string} ?? "") +
+        (initializer.map {"初期化は、【" + $0.string + "】。"} ?? "") +
          "本体が、" + body.string + "】"
         return s.replacingOccurrences(of: "。】", with: "】")
     }
