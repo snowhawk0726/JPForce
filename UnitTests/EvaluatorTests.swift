@@ -256,7 +256,7 @@ final class EvaluatorTests: XCTestCase {
         XCTAssertEqual(array.elements[2].string, "いあ")
         print("テスト(\(array.string))終了")
     }
-    func testTypeLiteral() throws {
+    func testTypeObject() throws {
         let input = """
             型であって、【
                 初期化は、【行列は、配列【】】。
@@ -281,6 +281,24 @@ final class EvaluatorTests: XCTestCase {
         _ = try XCTUnwrap(first.value.expressions.first as? FunctionLiteral)
         _ = try XCTUnwrap(second.value.expressions.first as? FunctionLiteral)
         print("テスト(\(type.string))終了")
+   }
+    func testTypeOperation() throws {
+        let input = """
+            自動車は、型であって、【入力が残量、
+                初期化は、【燃料量は、残量】。
+                給油は、関数であって、【入力が給油量で、
+                    燃料量に給油量を足し、「燃料量」に上書きし、燃料量を返す。
+                】
+                「燃料量」と「給油」は利用可能。
+            】
+            車は、0Lで自動車から生成する。
+            30Lを車に給油する。捨てる。
+            車の燃料量。
+        """
+        print("テストパターン: \(input)")
+        let evaluated = try XCTUnwrap(testEvaluator(input) as? JpfInteger)
+        XCTAssertEqual(evaluated.value, 30)
+        print("テスト(\(evaluated))終了")
    }
     func testStringBuiltins() throws {
         let testPatterns: [(input: String, exptected: String?)] = [
@@ -580,21 +598,23 @@ final class EvaluatorTests: XCTestCase {
     }
     func testStackOperations() throws {
         let testPatterns: [(input: String, expected: Any?)] = [
-            ("1を積む。甲は見たもの。甲と得たものを足す。", 2),
-            ("2を積む。甲は得たもの。甲の値。", 2),
-            ("3を積み、捨てる。甲は見たもの。甲。", nil),
+            ("1を積む。甲は写したもの。甲と得たものを足す。", 2),
+            ("2を積む。「甲」に得る。甲の値。", 2),
+            ("3を積み、捨てる。甲は写したもの。甲。", nil),
             ("4と５を積み、１個捨てる。甲は得たもの。甲の値。", 4),
             ("6と7を積み、２個捨てる。入力が空。", true),
             ("8と9を積み、空にする。入力が空", true),
-            ("10と11と12を積む。甲は３個見たもの。空にする。甲の最後の値。", 12),
-            ("13と14と15を積む。甲は３個得たもの。甲の最初の値。", 13),
+            ("10と11と12を積む。「甲」に３個写す。空にする。甲の最後の値。", 12),
+            ("13と14と15を積む。「甲」に３個得る。甲の最初の値。", 13),
             ("16を積む。甲は3個得たもの。甲", nil),
-            ("17を積む。甲は「数値」を得たもの。甲の値。", 17),
+            ("17を積む。「甲」に「数値」を得る。甲の値。", 17),
             ("「a」を積む。甲は「数値」を得たもの。甲。", nil),
-            ("「b」と「c」と「d」を積む。甲は「数値」を3個得たもの。甲。", nil),
-            ("18と19と20を積む。甲は「数値」を3個得たもの。甲の１番目の値。", 19),
+            ("「b」と「c」と「d」を積む。「甲」に「数値」を3個得る。甲。", nil),
+            ("18と19と20を積む。「甲」に「数値」を3個得る。甲の１番目の値。", 19),
             ("21を積む。甲は1個得たもの。甲の格。", "を"),
             ("22を積む。甲は「値」を1個得たもの。甲の格。", nil),
+            ("23と24を積む。「甲」と「乙」に得る。甲に乙を足す。", 47),
+            ("25と26を積む。「甲」と「乙」に写す。甲から乙を引く。", -1),
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
@@ -617,6 +637,20 @@ final class EvaluatorTests: XCTestCase {
             try testObject(evaluated, with: test.expected)
             print("テスト(\(evaluated))終了")
         }
+    }
+    func testOverwriteOperation() throws {
+        let input = """
+            行列は、配列。
+            入れるは、関数で、入力が要素、行列に要素を追加し、「行列」に上書きする。
+            出すは、関数で、行列の先頭の値を積み、行列が空でない場合、行列の残りを「行列」に上書きする。
+            3を入れる。
+            5を入れる。
+            出す。
+        """
+        print("テストパターン: \(input)")
+        let evaluated = try XCTUnwrap(testEvaluator(input) as? JpfInteger)
+        XCTAssertEqual(evaluated.value, 3)
+        print("テスト(\(evaluated))終了")
     }
     func testLabelExpressions() throws {
         let testPatterns: [(input: String, expected: String)] = [

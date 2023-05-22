@@ -30,10 +30,10 @@ struct PredicateOperableFactory {
         case .keyword(.INPUT):      return StackOperator(environment)
         case .keyword(.DROP):       return DropOperator(environment)
         case .keyword(.EMPTY):      return EmptyOperator(environment, by: token)
-        case .keyword(.PEEK),.keyword(.PULL):
+        case .keyword(.DUPLICATE),.keyword(.PULL):
                                     return PullOperator(environment, by: token)
-        case .keyword(.DUPLICATE):  return DuplicateOperator(environment, by: token)
-        case .keyword(.ASSIGN):     return AssignOperator(environment, by: token)
+        case .keyword(.ASSIGN),.keyword(.OVERWRITE):
+                                    return AssignOperator(environment, by: token)
         case .keyword(.SWAP):       return SwapOperator(environment, by: token)
         case .keyword(.IDENTIFIERS):
                                     return IdentifiersOperator(environment, by: token)
@@ -156,7 +156,9 @@ extension PredicateOperable {
     var reduceUsage: JpfError           {JpfError("仕様：<配列、辞書、範囲>を<初期値>と<関数>でまとめる。")}
     var sortUsage: JpfError             {JpfError("仕様：<配列>を<関数>で並び替える。または、<配列>を（「昇順」に、または「降順」に）並び替える。")}
     var reverseUsage: JpfError          {JpfError("仕様：<配列、文字列>を逆順にする。")}
+    var pullDupUsage: JpfError             {JpfError("仕様：(「<識別子>」と…)(「<識別子>」に）(「数値」または「値」を)(<数値>個)")}
     var assignUsage: JpfError           {JpfError("仕様：〜(を)「<識別子>」に代入する。または、「<識別子>」に〜を代入する。")}
+    var overwriteUsage: JpfError           {JpfError("仕様：〜(を)「<識別子>」に上書きする。または、「<識別子>」に〜を上書きする。")}
     var swapUsage: JpfError             {JpfError("仕様：「<識別子>」と「<識別子>」を入れ替える。または、〜と〜を入れ替える。")}
 }
 // MARK: - 表示/音声
@@ -786,23 +788,41 @@ struct PullOperator : PredicateOperable {
     init(_ environment: Environment, by op: Token) {self.environment = environment; self.op = op}
     let environment: Environment, op: Token
     func operated() -> JpfObject? {
-        var method: String?
-        var number = 0
-        if environment.isPeekParticle(.KO), environment.peek?.isNumber ?? false {  // n個見る(得る)
+        var method: String?, number = 1, identifiers: [String] = []
+        if environment.isPeekParticle(.KO), environment.peek?.isNumber ?? false {  // n個写す(得る)
             number = leftNumber!
         }
-        if environment.isPeekParticle(.WO), let object = environment.peek?.value as? JpfString {
+        if environment.isPeekParticle(.WO), let string = environment.peek?.value as? JpfString {    // 取得方法(「値」or「数値」
             environment.drop()
-            method = object.value
+            method = string.value
         }
-        if number > 1 {
-            guard let values = environment.peek(number) else {return JpfNull.object}
-            if op.type == .keyword(.PULL) {environment.drop(number)}
-            guard check(values, by: method) else {return JpfNull.object}
-            return JpfArray(elements: values.map {getObject(from: $0, by: method)})
+        if environment.isPeekParticle(.NI) {        // 複写or移動先
+            repeat {
+                guard let identifier = environment.peek?.value as? JpfString else {return pullDupUsage + op.literal + "。"}
+                environment.drop()
+                identifiers.append(identifier.value)
+            } while environment.isPeekParticle(.TO)
+        }
+        if identifiers.count == 1 && number > 1 {   // 「<識別子>」にn個
+            environment[identifiers.first!] = getObjects(from: environment, numberOf: number, by: method)
+            return nil
+        }
+        if !identifiers.isEmpty {                   // (「<識別子>」と…)「<識別子>」に (n個は無視)
+            guard let array = getObjects(from: environment, numberOf: identifiers.count, by: method) as? JpfArray else {return JpfNull.object}
+            zip(identifiers.reversed(), array.elements).forEach {environment[$0] = $1}
+            return nil
+        }
+        if number > 1 {                             // n個 → 配列
+            return getObjects(from: environment, numberOf: number, by: method)
         }
         defer {if op.type == .keyword(.PULL) {environment.drop()}}
         return environment.peek.map {getObject(from: $0, by: method)} ?? JpfNull.object
+    }
+    private func getObjects(from environment: Environment, numberOf: Int, by method: String?) -> JpfObject {
+        guard let values = environment.peek(numberOf) else {return JpfNull.object}
+        if op.type == .keyword(.PULL) {environment.drop(numberOf)}
+        guard check(values, by: method) else {return JpfNull.object}
+        return JpfArray(elements: values.map {getObject(from: $0, by: method)})
     }
     private func getObject(from object: JpfObject, by method: String?) -> JpfObject {
         switch method {
@@ -817,17 +837,6 @@ struct PullOperator : PredicateOperable {
         case "数値":  return !objects.contains(where: {!$0.isNumber})
         default:    return true
         }
-    }
-}
-/// 「見る」と同じ。
-/// (結果が入力に返るので、入力が複製されることになる。)
-/// ※：「複写する」の様に「する」を付けると、格がアンラップされる。
-struct DuplicateOperator : PredicateOperable {
-    init(_ environment: Environment, by op: Token) {self.environment = environment; self.op = op}
-    let environment: Environment, op: Token
-    func operated() -> JpfObject? {
-        guard let param = environment.peek else {return "「\(op.literal)」" + oneParamNeeded}
-        return param
     }
 }
 struct DropOperator : PredicateOperable {
@@ -869,20 +878,26 @@ struct AssignOperator : PredicateOperable {
     init(_ environment: Environment, by op: Token) {self.environment = environment; self.op = op}
     let environment: Environment, op: Token
     func operated() -> JpfObject? {
-        guard var params = environment.peek(2) else {return assignUsage}
+        guard var params = environment.peek(2) else {return usage}
         switch (params[0].particle, params[1].particle) {
         case (Token(.NI),Token(.WO)):
             params.swapAt(0, 1)
             fallthrough
         case (Token(.WO),Token(.NI)), (nil,Token(.NI)):
             guard let identifier = params[1].value as? JpfString else {return assignUsage}
+            let name = identifier.value, value = params[0].value
             environment.drop(2)
-            environment[identifier.value] = params[0].value
+            if op == .keyword(.OVERWRITE) && environment.outer?[name] != nil {
+                environment.outer![name] = value
+                return nil
+            }
+            environment[name] = value
             return nil
         default:
-            return assignUsage
+            return usage
         }
     }
+    private var usage: JpfError {op == .keyword(.ASSIGN) ? assignUsage : overwriteUsage}
 }
 struct SwapOperator : PredicateOperable {
     init(_ environment: Environment, by op: Token) {self.environment = environment; self.op = op}

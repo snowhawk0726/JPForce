@@ -106,9 +106,8 @@ enum Token : Equatable {
         case EMPTY      = "空"
         case PUSH       = "積む"
         case DROP       = "捨てる" // remove last from stack
-        case PEEK       = "見る"
         case PULL       = "得る"
-        case DUPLICATE  = "複写"
+        case DUPLICATE  = "写す"
         case ASSIGN     = "代入"
         case SWAP       = "入れ替える"
         case PRINT      = "表示"
@@ -119,6 +118,9 @@ enum Token : Equatable {
         case IDENTIFIERS = "識別子一覧"
         case IDENTIFIER = "識別子"
         case TYPE       = "型"
+        case GENERATE   = "生成"
+        case AVAILABLE  = "利用可能"
+        case OVERWRITE  = "上書き"
     }
     /// 文字列の連想値について識別しないための分類(.IDENT("文字列") → .ident)
     enum TokenType : Hashable {

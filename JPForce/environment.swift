@@ -7,14 +7,21 @@
 import Foundation
 
 class Environment {
-    init(outer: Environment? = nil) {self.outer = outer}
+    init(outer: Environment? = nil, overwrite: Bool = false) {self.outer = outer;self.overwrite = false}
     var outer: Environment?     // 拡張環境
+    var overwrite: Bool
     private var store: [String: JpfObject] = [:]
     private var stack: [JpfObject] = []
     // 辞書操作
     subscript(_ name: String) -> JpfObject? {
-        get {store[name] ?? outer?[name]}   // 外部環境の取得は可(書き込みは不可)
-        set {store[name] = newValue}
+        get {store[name] ?? outer?[name]}           // 外部環境の取得は可
+        set {
+            if overwrite && outer?[name] != nil {   // 外部環境への上書き可
+                outer![name] = newValue
+                return
+            }
+            store[name] = newValue
+        }
     }
     var enumerated: [(key: String, value: JpfObject)] {
         store.map {(key: $0, value: $1)} + (outer?.enumerated ?? [])
