@@ -60,6 +60,10 @@ extension Parsable {
     }
     /// エラー出力
     func error(message: String) {parser.errors.append(message + "(解析位置:\(currentToken.literal))")}
+    /// ブロックカウンター制御
+    func counter(_ symbol: Token.Symbol) -> Int {parser.counters[symbol]!}
+    func countUp(_ symbol: Token.Symbol) {parser.counters[symbol]! += 1}
+    func countDown(_ symbol: Token.Symbol) {parser.counters[symbol]! -= 1}
     /// 入力部の解析
     /// - 形式: 入力が、識別子1（「型格」）と 識別子2（「型格」）と...、であり、
     func parseParameters(endSymbol: Token.Symbol) -> [(Identifier, String)]? {
@@ -341,7 +345,11 @@ struct ExpressionStatementParser : StatementParsable {
     }
     private var isEndOfStatement: Bool {currentToken.isPeriod || currentToken.isEol || isEndOfBlock}
     /// 文の終わりを検出する。(例えば、「】。」の場合、isBreakFactorによるbreakを抑止する)
-    private var getNextWhenNextIsEndOfStatement: Bool {getNext(whenNextIs: .PERIOD) || getNext(whenNextIs: .EOL) || getNext(whenNextIs: .RBBRACKET)}
+    private var getNextWhenNextIsEndOfStatement: Bool {
+        getNext(whenNextIs: .PERIOD) ||
+        getNext(whenNextIs: .RBBRACKET) ||
+        getNext(whenNextIs: .EOL)
+    }
 }
 /// ブロック(【】)内で式を解析したstatementを、statementsに格納
 /// ブロッックの終わり: endSymbolを.EOLとすることで、【】を省略し行末までをブロックとして扱うことができる。
@@ -352,6 +360,7 @@ struct BlockStatementParser : StatementParsable {
     func parse() -> Statement? {blockStatement}
     var blockStatement: BlockStatement? {
         var blockStatements: [Statement] = []
+        countUp(endBlockSymbol)
         let token = currentToken
         getNext()
         while !isEndOfBlock && !currentToken.isEof {
@@ -361,13 +370,15 @@ struct BlockStatementParser : StatementParsable {
                 return nil
             }
             blockStatements.append(statement)
-            if isEndOfBlock || currentToken.isEof {break}   // 文で、】を検出（句点が検出できなかった。）
+            if (counter(.EOL) > 1 && nextToken == .symbol(.EOL)) ||
+                isEndOfBlock || currentToken.isEof {break}   // 文で、】を検出（句点が検出できなかった。）
             if currentToken == .symbol(.RBBRACKET) && endBlockSymbol == .EOL {
                 error(message: "ブロック(【】)の「【」と「】」が矛盾(過不足)している。")
                 return nil
             }
             getNext()                                       // 句点等を読み飛ばす。
         }
+        countDown(endBlockSymbol)
         return BlockStatement(token: token, statements: blockStatements)
     }
     private var isEndOfBlock: Bool {currentToken == .symbol(endBlockSymbol)}
