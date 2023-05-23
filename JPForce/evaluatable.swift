@@ -95,6 +95,7 @@ extension DefineStatement : Evaluatable {
             elements.append(function)                   // 配列に関数を追加
             object = JpfArray(elements: elements)
         }
+        object?.name = name.value
         environment[name.value] = object
         return nil
     }

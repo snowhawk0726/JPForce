@@ -11,6 +11,7 @@ import Foundation
 protocol JpfObject : JpfObjectAccessible {
     static var type: String {get}
     var type: String {get}
+    var name: String {get set}
     var string: String {get}
     // 値を取り出す
     var number: Int? {get}
@@ -68,6 +69,7 @@ extension JpfObject {
 }
 struct JpfInteger : JpfObject, JpfHashable, Comparable {
     static let type = "数値"
+    var name: String = ""
     var value: Int
     var string: String {String(value).color(.blue)}
     //
@@ -83,6 +85,7 @@ struct JpfInteger : JpfObject, JpfHashable, Comparable {
 }
 struct JpfBoolean : JpfObject, JpfHashable {
     static let type = "真偽値"
+    var name: String = ""
     var value: Bool
     var string: String {(value ? Token.Keyword.TRUE.rawValue : Token.Keyword.FALSE.rawValue).color(.magenta)}
     //
@@ -97,6 +100,7 @@ struct JpfBoolean : JpfObject, JpfHashable {
 }
 struct JpfString : JpfObject, JpfHashable, Comparable {
     static let type = "文字列"
+    var name: String = ""
     var value: String
     var string: String {value.color(.red)}
     //
@@ -110,6 +114,7 @@ struct JpfString : JpfObject, JpfHashable, Comparable {
 }
 struct JpfRange : JpfObject {
     static let type = "範囲"
+    var name: String = ""
     var lowerBound: (JpfInteger, Token)?
     var upperBound: (JpfInteger, Token)?
     var string: String {"範囲".color(.magenta) + "【" +
@@ -119,6 +124,7 @@ struct JpfRange : JpfObject {
 }
 struct JpfNull : JpfObject {
     static let type = "無"
+    var name: String = ""
     var string: String {type.color(.magenta)}
     //
     static let object = JpfNull()
@@ -130,6 +136,7 @@ struct JpfNull : JpfObject {
 }
 struct JpfPhrase : JpfObject {
     static let type = "句"
+    var name: String = ""
     var value: JpfObject?
     var particle: Token?
     var string: String {(value?.string ?? "") + (particle?.literal.color(.magenta) ?? "")}
@@ -145,6 +152,7 @@ struct JpfPhrase : JpfObject {
 }
 struct JpfReturnValue : JpfObject {
     static let type = "返り値"
+    var name: String = ""
     var value: JpfObject?       // 中止するの場合、nil
     var string: String {value?.string ?? ""}
     //
@@ -152,6 +160,7 @@ struct JpfReturnValue : JpfObject {
 }
 struct JpfFunction : JpfObject {
     static let type = "関数"
+    var name: String = ""
     var parameters: [Identifier]    // 入力パラメータ
     var signature: InputFormat      // 入力形式
     var body: BlockStatement
@@ -166,6 +175,7 @@ struct JpfFunction : JpfObject {
 }
 struct JpfType : JpfObject {
     static let type = "型"
+    var name: String = ""
     var parameters: [Identifier]    // 入力パラメータ
     var signature: InputFormat      // 入力形式
     var initializer: BlockStatement?// 初期化
@@ -182,6 +192,7 @@ struct JpfType : JpfObject {
 }
 struct JpfArray : JpfObject {
     static let type = "配列"
+    var name: String = ""
     var elements: [JpfObject]
     var string: String {"配列".color(.magenta) + "であって、【" +
         (elements.isEmpty ? "" :
@@ -190,6 +201,7 @@ struct JpfArray : JpfObject {
 }
 struct JpfInput : JpfObject {
     static let type = "入力"
+    var name: String = ""
     var stack: [JpfObject]
     var string: String {
         "(" + (stack.isEmpty ? "" : "\(stack.map {$0.string}.joined(separator: " "))") + ")"
@@ -197,12 +209,14 @@ struct JpfInput : JpfObject {
 }
 struct JpfHashKey : JpfObject, Hashable {
     static let type = "ハッシュ索引"
+    var name: String = ""
     var type: String
     var value: Int
     var string: String {"\(type): \(value)"}
 }
 struct JpfDictionary : JpfObject {
     static let type = "辞書"
+    var name: String = ""
     /// キーがハッシュ化されているため、元のキーも値として保持しておく｀
     var pairs: [JpfHashKey: (key: JpfObject, value: JpfObject)]
     var string: String {"辞書".color(.magenta) + "であって、【" +
@@ -226,6 +240,7 @@ struct JpfDictionary : JpfObject {
 }
 struct JpfError : JpfObject {
     static let type = "エラー"
+    var name: String = ""
     var message: String
     var string: String {"\(Self.type)：\(message.color(.red))"}
     var error: JpfError? {self}

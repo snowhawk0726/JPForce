@@ -37,7 +37,8 @@ struct PredicateOperableFactory {
         case .keyword(.SWAP):       return SwapOperator(environment, by: token)
         case .keyword(.IDENTIFIERS):
                                     return IdentifiersOperator(environment, by: token)
-        case .keyword(.EXECUTE):    return ExecuteOperator(environment) // 〜を実行
+        case .keyword(.EXECUTE):    return ExecuteOperator(environment) // (関数)を実行
+        case .keyword(.GENERATE):   return GenerateOperator(environment)// (型)から生成
         case .keyword(.SURU):       return PerformOperator(environment) // 〜にする、〜をする
         case .keyword(.APPEND):     return AppendOperator(environment, by: token)
         case .keyword(.REMOVE):     return RemoveOperator(environment, by: token)
@@ -158,8 +159,9 @@ extension PredicateOperable {
     var reverseUsage: JpfError          {JpfError("仕様：<配列、文字列>を逆順にする。")}
     var pullDupUsage: JpfError             {JpfError("仕様：(「<識別子>」と…)(「<識別子>」に）(「数値」または「値」を)(<数値>個)")}
     var assignUsage: JpfError           {JpfError("仕様：〜(を)「<識別子>」に代入する。または、「<識別子>」に〜を代入する。")}
-    var overwriteUsage: JpfError           {JpfError("仕様：〜(を)「<識別子>」に上書きする。または、「<識別子>」に〜を上書きする。")}
+    var overwriteUsage: JpfError           {JpfError("仕様：〜(を)<識別子>に上書きする。または、<識別子>に〜を上書きする。")}
     var swapUsage: JpfError             {JpfError("仕様：「<識別子>」と「<識別子>」を入れ替える。または、〜と〜を入れ替える。")}
+    var generateUsage: JpfError         {JpfError("仕様：<識別子(型)>から生成する。")}
 }
 // MARK: - 表示/音声
 struct PrintOperator : PredicateOperable {
@@ -562,6 +564,26 @@ struct BreakOperator : PredicateOperable {
     /// 処理を中止する。
     func operated() -> JpfObject? {JpfReturnValue(value: nil)}
 }
+struct GenerateOperator : PredicateOperable {
+    init(_ environment: Environment) {self.environment = environment}
+    let environment: Environment
+    func operated() -> JpfObject? {
+        guard environment.isPeekParticle(.KARA), let type = environment.peek?.value as? JpfType else {return generateUsage}
+        let local = Environment(outer: self.environment)    // 型の環境を拡張
+        let stackEnv = environment.outer != nil ? environment : self.environment
+        let result = local.apply(type.parameters, with: type.signature, from: stackEnv)
+        guard !result.isError else {return result}
+        defer {environment.push(local.pullAll())}           // スタックを戻す
+        if let initial = type.initializer,                  // 初期化ブロック
+           let result = Evaluator(from: initial, with: local).object {
+            guard !result.isError else {return result}      // 初期化失敗
+        }
+        if let result = Evaluator(from: type.body, with: local).object {
+            guard !result.isError else {return result}      // メンバ登録
+        }
+        return nil
+    }
+}
 // MARK: - 要素アクセス
 struct AppendOperator : PredicateOperable {
     init(_ environment: Environment, by op: Token) {self.environment = environment; self.op = op}
@@ -884,8 +906,10 @@ struct AssignOperator : PredicateOperable {
             params.swapAt(0, 1)
             fallthrough
         case (Token(.WO),Token(.NI)), (nil,Token(.NI)):
-            guard let identifier = params[1].value as? JpfString else {return assignUsage}
-            let name = identifier.value, value = params[0].value
+            let name = environment.getName(from: params[1])
+            guard !name.isEmpty else {return usage}
+            var value = params[0].value
+            value?.name = name
             environment.drop(2)
             if op == .keyword(.OVERWRITE) && environment.outer?[name] != nil {
                 environment.outer![name] = value
@@ -906,10 +930,11 @@ struct SwapOperator : PredicateOperable {
         guard let params = environment.peek(2) else {return swapUsage}
         switch (params[0].particle, params[1].particle) {
         case (Token(.TO),Token(.WO)),(Token(.WO),Token(.TO)):
-            guard let first = params[0].value as? JpfString, let second = params[1].value as? JpfString,
-                  environment[first.value] != nil && environment[second.value] != nil else {fallthrough}
+            let name1 = environment.getName(from: params[0]), name2 = environment.getName(from: params[1])
+            guard environment[name1] != nil && environment[name2] != nil else {fallthrough}
             environment.drop(2)
-            swap(&environment[first.value], &environment[second.value])
+            swap(&environment[name1]!.name, &environment[name2]!.name)
+            swap(&environment[name1], &environment[name2])
             return nil
         case (nil,nil):
             environment.swap()
