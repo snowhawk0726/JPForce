@@ -24,7 +24,7 @@ class Environment {
         }
     }
     var enumerated: [(key: String, value: JpfObject)] {
-        store.map {(key: $0, value: $1)} + (outer?.enumerated ?? [])
+        store.map {(key: $0, value: $1)}
     }
     var enumeratedStringArray: JpfArray {
         return JpfArray(elements: enumerated.map {

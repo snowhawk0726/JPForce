@@ -53,6 +53,7 @@ extension JpfObject {
     var cannotSortByFunc: String{"「\(type)」を並び替えることはできない。仕様：<配列>を<関数>で並び替える。"}
     var cannotSortByOrder: String{"「\(type)」を並び替えることはできない。仕様：<配列>を(「昇順」に、または「降順」に)並び替える。"}
     var cannotReverse: String   {"「\(type)」は逆順にすることはできない。仕様：<配列、文字列>を逆順にする。"}
+    var identifierNotAvailable: String {"(識別子)は利用可能でない。"}
 }
 extension JpfInteger {
     func add(_ object: JpfObject) -> JpfObject {
@@ -482,5 +483,24 @@ extension JpfPhrase {
     func add(_ object: JpfObject) -> JpfObject {
         guard let lhs = value, let rhs = object.value else {return JpfError("「\(string)」と「\(object.string)」" + cannotAdd)}
         return lhs.add(rhs)
+    }
+}
+extension JpfInstance {
+    var count: JpfObject {JpfInteger(value: available.count)}   // 利用可能メンバー数
+    subscript(_ name: String) -> JpfObject? {
+        // nameが利用可能なメンバー名であれば、オブジェクトを返す。
+        let canditate = environment[name] != nil ? name : ContinuativeForm(name).plainForm ?? ""
+        if let member = environment[canditate] {
+            guard available.contains(canditate) else {return JpfError("『\(name)』" + identifierNotAvailable)}
+            if member is JpfFunction {                          // メンバー関数の入力処理
+                environment.outer?.drop()                       //  自身(インスタンス)の句を捨てる
+                if let inputs = environment.outer?.pullAll() {  // 引数をインスタンスに移動
+                    environment.push(inputs)
+                }
+            }
+            return member                                       // メンバーを返す
+        }
+        // 利用可能な名前でないなら、デフォルト
+        return getObject(from: name)
     }
 }

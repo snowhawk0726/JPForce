@@ -40,6 +40,7 @@ struct PredicateOperableFactory {
         case .keyword(.EXECUTE):    return ExecuteOperator(environment) // (関数)を実行
         case .keyword(.GENERATE):   return GenerateOperator(environment)// (型)から生成
         case .keyword(.SURU):       return PerformOperator(environment) // 〜にする、〜をする
+        case .keyword(.AVAILABLE):  return AvailableOperator(environment)
         case .keyword(.APPEND):     return AppendOperator(environment, by: token)
         case .keyword(.REMOVE):     return RemoveOperator(environment, by: token)
         case .keyword(.CONTAINS):   return ContainsOperator(environment, by: token)
@@ -133,6 +134,7 @@ extension PredicateOperable {
     var functionObjectNotFound: JpfError{JpfError("実行すべき関数が見つからない。")}
     var cannotJudgeGenuineness: JpfError{JpfError("で、正負を判定できる対象は、数値型のみ。")}
     var fileReadError: JpfError         {JpfError("ファイルの読み込みに失敗した。")}
+    var availableError: JpfError        {JpfError("「利用可能」なメンバー名でなかった。")}
     var detectParserError: JpfError     {JpfError("構文解析器がエラーを検出した。")}
     // メッセージ(使い方)
     var printUsage: JpfError            {JpfError("仕様：(〜と…)〜を表示する。")}
@@ -567,8 +569,11 @@ struct BreakOperator : PredicateOperable {
 struct GenerateOperator : PredicateOperable {
     init(_ environment: Environment) {self.environment = environment}
     let environment: Environment
+    /// インスタンス(オブジェクト)を生成する。
+    /// - Returns: インスタンス
     func operated() -> JpfObject? {
         guard environment.isPeekParticle(.KARA), let type = environment.peek?.value as? JpfType else {return generateUsage}
+        environment.drop()
         let local = Environment(outer: self.environment)    // 型の環境を拡張
         let stackEnv = environment.outer != nil ? environment : self.environment
         let result = local.apply(type.parameters, with: type.signature, from: stackEnv)
@@ -581,7 +586,22 @@ struct GenerateOperator : PredicateOperable {
         if let result = Evaluator(from: type.body, with: local).object {
             guard !result.isError else {return result}      // メンバ登録
         }
-        return nil
+        let members = (local.peek as? JpfArray).map {$0.elements.compactMap {$0 as? JpfString}.map {$0.value}} ?? []  // 利用可能なメンバーリスト
+        local.drop()
+        return JpfInstance(type: type.name, environment: local, available: members)
+    }
+}
+struct AvailableOperator : PredicateOperable {
+    init(_ environment: Environment) {self.environment = environment}
+    let environment: Environment
+    func operated() -> JpfObject? {
+        var objects: [JpfObject] = []
+        for object in environment.getAll() {
+            guard let ident = object.value as? JpfString else {return availableError + "(\(object.string))"}
+            objects.append(ident)
+            environment.drop()
+        }
+        return JpfArray(elements: objects)
     }
 }
 // MARK: - 要素アクセス

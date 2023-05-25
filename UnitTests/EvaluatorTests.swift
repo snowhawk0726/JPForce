@@ -286,19 +286,35 @@ final class EvaluatorTests: XCTestCase {
         let input = """
             自動車は、型であって、【入力が残量、
                 初期化は、【燃料量は、残量】。
+                「燃料量」と「給油」は利用可能。
                 給油は、関数であって、【入力が給油量で、
                     燃料量に給油量を足し、「燃料量」に上書きし、燃料量を返す。
                 】
-                「燃料量」と「給油」は利用可能。
             】
-            車は、0Lで自動車から生成する。
-            30Lを車に給油する。捨てる。
-            車の燃料量。
+            車は、10Lで自動車から生成する。
+            30Lを車に給油する。
         """
+        let testPatterns: [(input: String, expected: Any)] = [
+            ("自動車の型。", "型"),
+            ("車の型。", "自動車"),
+            ("車の(利用可能メンバー)数", 2),
+            ("車の燃料量。", 40),
+        ]
         print("テストパターン: \(input)")
-        let evaluated = try XCTUnwrap(testEvaluator(input) as? JpfInteger)
-        XCTAssertEqual(evaluated.value, 30)
-        print("テスト(\(evaluated))終了")
+        let environment = Environment()
+        let parser = Parser(Lexer(input))
+        let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+        let result = eval.object ?? environment.pull()
+        XCTAssertFalse(result?.isError ?? false, result?.error?.message ?? "")
+        for test in testPatterns {
+            print("テストパターン: \(test.input)")
+            let parser = Parser(Lexer(test.input))
+            let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+            let expected = eval.object ?? environment.pull()!
+            try testObject(expected, with: test.expected)
+            print("テスト(\(expected))終了")
+        }
+        print("テスト終了")
    }
     func testStringBuiltins() throws {
         let testPatterns: [(input: String, exptected: String?)] = [

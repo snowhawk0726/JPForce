@@ -190,6 +190,14 @@ struct JpfType : JpfObject {
         return s.replacingOccurrences(of: "。】", with: "】")
     }
 }
+struct JpfInstance : JpfObject {
+    static let type = "インスタンス"
+    var type: String = ""
+    var name: String = ""
+    var environment: Environment    // メンバーを含む環境
+    var available: [String]         // 外部から利用可能なメンバー
+    var string: String {"型が、\(type)で、メンバーが、\(environment.enumerated.map {$0.key}.joined(separator: "と、"))" + "。" + available.map {"「\($0)」"}.joined(separator: "と") + "は利用可能。"}
+}
 struct JpfArray : JpfObject {
     static let type = "配列"
     var name: String = ""

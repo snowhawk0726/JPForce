@@ -153,15 +153,14 @@ extension Identifier : Evaluatable {
         guard let object = getObject(from: environment, with: value) else {return "『\(value)』" + identifierNotFound}
         return object.accessed(by: value, with: environment)
     }
-    ///　ノ格の句のオブジェクトにnameで問い合わせ、結果のオブジェクトを得る。
+    ///　前句のオブジェクトにnameで問い合わせ、結果のオブジェクトを得る。
     ///　または、識別名でオブジェクトを取得（できなければ識別名の終止形のでオブジェクトを取得）
     /// - Parameters:
     ///   - environment: 識別子の辞書、およびスタック
     ///   - name: キーとなる識別名
     /// - Returns: 対応するオブジェクト
     private func getObject(from environment: Environment, with name: String) -> JpfObject? {
-        if environment.isPeekParticle(.NO) || !environment.isPeekParticle,
-            let object = environment.unwrappedPeek?[name] { // nameでオブジェクトにアクセス
+        if let object = environment.unwrappedPeek?[name] { // JpfObjectにsubscriptアクセス
             environment.drop()
             return object
         }
