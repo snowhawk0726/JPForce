@@ -557,13 +557,18 @@ struct TypeLiteralParser : ExpressionParsable {
         let signature = parseSignature(from: paramenters.map {$0.1})
         while nextToken.isEol {getNext()}   // 【とEOLを飛ばす
         // Initialyzer block 解析
-        _ = getNext(whenNextIs: ExpressionStatement.syokikaga + ExpressionStatement.syokikawa, matchAll: false)   // 初期化は、(初期化が、)
-        let endOfInit: Token.Symbol = getNext(whenNextIs: .LBBRACKET) ? .RBBRACKET : .EOL
-        guard let initialyzer = BlockStatementParser(parser, symbol: endOfInit).blockStatement else {
-            error(message: "型で、「初期化は、〜」の解析に失敗した。")
-            return nil
+        var initialyzer: BlockStatement?
+        if getNext(whenNextIs: ExpressionStatement.syokika) {// 初期化は、(初期化が、)
+            _ = getNext(whenNextIs: ExpressionStatement.wa + ExpressionStatement.ga, matchAll: false)
+            _ = getNext(whenNextIs: .COMMA)
+            let endOfInit: Token.Symbol = getNext(whenNextIs: .LBBRACKET) ? .RBBRACKET : .EOL
+            guard let block = BlockStatementParser(parser, symbol: endOfInit).blockStatement else {
+                error(message: "型で、「初期化は、〜」の解析に失敗した。")
+                return nil
+            }
+            initialyzer = block
+            _ = getNext(whenNextIs: .PERIOD)                    // 初期化ブロックの句点を飛ばす
         }
-        _ = getNext(whenNextIs: .PERIOD)                    // 初期化ブロックの句点を飛ばす
         // Body block 解析
         _ = getNext(whenNextIs: ExpressionStatement.hontaiga + ExpressionStatement.hontaiwa, matchAll: false)   // 本体が、(本体は、)
         guard let body = BlockStatementParser(parser, symbol: endSymbol).blockStatement else {
