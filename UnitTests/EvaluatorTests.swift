@@ -669,6 +669,20 @@ final class EvaluatorTests: XCTestCase {
         XCTAssertEqual(evaluated.value, 3)
         print("テスト(\(evaluated))終了")
     }
+    func testAssignElements() throws {
+        let testPatterns: [(input: String, expected: Any?)] = [
+            ("配列【１、２、３】の位置１に５を代入したものの１。", 5),
+            ("甲は、配列【１、２、３】。乙は０。甲の位置乙に５を代入する。甲の最初", 5),
+            ("甲は、配列【１、２、３】。関数【５を甲の位置２に上書きする。】を実行する。甲の最後", 5),
+            ("甲は、配列【１、２、３】。乙は２。関数【５を甲の位置乙に上書きする。】を実行する。甲の最後", 5),
+        ]
+        for test in testPatterns {
+            print("テストパターン: \(test.input)")
+            let evaluated = try XCTUnwrap(testEvaluator(test.input))
+            try testObject(evaluated, with: test.expected)
+            print("テスト(\(evaluated))終了")
+        }
+    }
     func testLabelExpressions() throws {
         let testPatterns: [(input: String, expected: String)] = [
             ("二倍は２。識別子「二倍」。『識別子』。", "二倍"),

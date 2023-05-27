@@ -9,20 +9,29 @@ import Foundation
 
 extension JpfObject {
     /// オブジェクトへのアクセス
-    subscript(name: String) -> JpfObject? {
-        get {getObject(from: name)}
+    subscript(name: String, particle: Token?) -> JpfObject? {
+        get {getObject(from: name, with: particle)}
     }
-    func getObject(from name: String) -> JpfObject? {
-        switch name {
-        case "型":   return JpfString(value: type)
-        case "格":   return particle.map {JpfString(value: $0.literal)} ?? JpfNull.object
-        case "値":   return value ?? JpfNull.object
-        case "数値":  return number.map {JpfInteger(value: $0)} ?? JpfNull.object
-        case "文字列":return JpfString(value: string)
-        case "名前":  return JpfString(value: self.name)
-        case "数":   return count        // オブジェクトの要素数
-        case "空":   return isEmpty      // オブジェクトの要素が空？
-        default:    return nil
+    func getObject(from name: String, with particle: Token?) -> JpfObject? {
+        switch (particle, name) {
+        case (Token(.NO),"型"),(nil,"型"):
+            return JpfString(value: self.type)
+        case (Token(.NO),"格"),(nil,"格"):
+            return self.particle.map {JpfString(value: $0.literal)} ?? JpfNull.object
+        case (Token(.NO),"値"),(nil,"値"):
+            return self.value ?? JpfNull.object
+        case (Token(.NO),"数値"),(nil,"数値"):
+            return self.number.map {JpfInteger(value: $0)} ?? JpfNull.object
+        case (Token(.NO),"文字列"),(nil,"文字列"):
+            return JpfString(value: self.string)
+        case (Token(.NO),"名前"),(nil,"名前"):
+            return JpfString(value: self.name)
+        case (Token(.NO),"数"),(nil,"数"):
+            return count        // オブジェクトの要素数
+        case (Token(.GA),"空"),(nil,"空"):
+            return isEmpty      // オブジェクトの要素が空？
+        default:
+            return nil
         }
     }
     var count: JpfObject {JpfError(cannotCount)}
@@ -54,17 +63,18 @@ extension JpfObject {
     var cannotSortByOrder: String{"「\(type)」を並び替えることはできない。仕様：<配列>を(「昇順」に、または「降順」に)並び替える。"}
     var cannotReverse: String   {"「\(type)」は逆順にすることはできない。仕様：<配列、文字列>を逆順にする。"}
     var identifierNotAvailable: String {"(識別子)は利用可能でない。"}
+    var positionUnavailable: String {"位置を判定できない。"}
 }
 extension JpfInteger {
     func add(_ object: JpfObject) -> JpfObject {
         guard let number = object.number else {return JpfError("「\(type)」と「\(object.type)」" + cannotAdd)}
         return JpfInteger(value: value + number)
     }
-    subscript(name: String) -> JpfObject? {
-        switch name {
-        case "正":   return JpfBoolean(value: value > 0)
-        case "負":   return JpfBoolean(value: value < 0)
-        default:    return getObject(from: name)
+    subscript(name: String, particle: Token?) -> JpfObject? {
+        switch (particle, name) {
+        case (Token(.GA),"正"),(nil,"正"):    return JpfBoolean(value: value > 0)
+        case (Token(.GA),"負"),(nil,"負"):    return JpfBoolean(value: value < 0)
+        default:                            return getObject(from: name, with: particle)
         }
     }
 }
@@ -211,14 +221,17 @@ extension JpfString {
         let i = value.index(value.startIndex, offsetBy: index)
         return JpfString(value: String(value[i]))
     }
-    subscript(name: String) -> JpfObject? {
-        switch name {
-        case "最初","先頭": return value.first.map {JpfString(value: String($0))} ?? JpfNull.object
-        case "最後","後尾": return value.last.map {JpfString(value: String($0))} ?? JpfNull.object
-        case "残り":
+    subscript(name: String, particle: Token?) -> JpfObject? {
+        switch (particle, name) {
+        case (Token(.NO),"最初"),(nil,"最初"),(Token(.NO),"先頭"),(nil,"先頭"):
+            return value.first.map {JpfString(value: String($0))} ?? JpfNull.object
+        case (Token(.NO),"最後"),(nil,"最後"),(Token(.NO),"後尾"),(nil,"後尾"):
+            return value.last.map {JpfString(value: String($0))} ?? JpfNull.object
+        case (Token(.NO),"残り"),(nil,"残り"):
             guard !value.isEmpty else {return JpfNull.object}
             return JpfString(value: String(value.dropFirst()))
-        default:        return getObject(from: name)
+        default:
+            return getObject(from: name, with: particle)
         }
     }
 }
@@ -230,11 +243,14 @@ extension JpfInput {
         guard case 0..<stack.count = index else {return JpfNull.object}
         return stack[index]
     }
-    subscript(name: String) -> JpfObject? {
-        switch name {
-        case "最初","先頭": return stack.first ?? JpfNull.object
-        case "最後","後尾": return stack.last ?? JpfNull.object
-        default:        return getObject(from: name)
+    subscript(name: String, particle: Token?) -> JpfObject? {
+        switch (particle, name) {
+        case (Token(.NO),"最初"),(nil,"最初"),(Token(.NO),"先頭"),(nil,"先頭"):
+            return stack.first ?? JpfNull.object
+        case (Token(.NO),"最後"),(nil,"最後"),(Token(.NO),"後尾"),(nil,"後尾"):
+            return stack.last ?? JpfNull.object
+        default:
+            return getObject(from: name, with: particle)
         }
     }
 }
@@ -255,16 +271,32 @@ extension JpfArray {
         guard case 0..<elements.count = index else {return JpfNull.object}
         return elements[index]
     }
-    subscript(name: String) -> JpfObject? {
-        switch name {
-        case "最初", "先頭":    return elements.first ?? JpfNull.object
-        case "最後", "後尾":    return elements.last ?? JpfNull.object
-        case "残り":
+    subscript(name: String, particle: Token?) -> JpfObject? {
+        if particle == Token(.NO) && name.hasPrefix("位置") {return getPosition(from: name)}
+        switch (particle, name) {
+        case (Token(.NO),"最初"),(nil,"最初"),(Token(.NO),"先頭"),(nil,"先頭"):
+            return elements.first ?? JpfNull.object
+        case (Token(.NO),"最後"),(nil,"最後"),(Token(.NO),"後尾"),(nil,"後尾"):
+            return elements.last ?? JpfNull.object
+        case (Token(.NO),"残り"),(nil,"残り"):
             guard !elements.isEmpty else {return JpfNull.object}
             return JpfArray(elements: [JpfObject](elements.dropFirst()))
         default:
-            return getObject(from: name)
+            break
         }
+        return getObject(from: name, with: particle)
+    }
+    /// 配列にアクセスする位置を判別する。
+    /// - Parameter s:  位置x → xは、数値または識別子
+    /// - Returns: 判別した位置を数値または文字列として返す。
+    private func getPosition(from s: String) -> JpfObject? {
+        let keyword = "位置"
+        guard keyword.count < s.count else {return JpfError(positionUnavailable)}
+        let position = String(s.dropFirst(keyword.count))
+        if let number = Int(position) {
+            return JpfInteger(name: keyword, value: number) // 数値として返す。
+        }
+        return JpfString(name: keyword, value: position)    // 識別子を文字列として返す。
     }
     subscript(range: JpfRange) -> JpfObject? {
         switch (range.lowerBound?.0.number, range.lowerBound?.1,
@@ -487,7 +519,7 @@ extension JpfPhrase {
 }
 extension JpfInstance {
     var count: JpfObject {JpfInteger(value: available.count)}   // 利用可能メンバー数
-    subscript(_ name: String) -> JpfObject? {
+    subscript(name: String, particle: Token?) -> JpfObject? {
         // nameが利用可能なメンバー名であれば、オブジェクトを返す。
         let canditate = environment[name] != nil ? name : ContinuativeForm(name).plainForm ?? ""
         if let member = environment[canditate] {
@@ -501,6 +533,6 @@ extension JpfInstance {
             return member                                       // メンバーを返す
         }
         // 利用可能な名前でないなら、デフォルト
-        return getObject(from: name)
+        return getObject(from: name, with: particle)
     }
 }

@@ -160,8 +160,17 @@ extension Identifier : Evaluatable {
     ///   - name: キーとなる識別名
     /// - Returns: 対応するオブジェクト
     private func getObject(from environment: Environment, with name: String) -> JpfObject? {
-        if let object = environment.unwrappedPeek?[name] { // JpfObjectにsubscriptアクセス
-            environment.drop()
+        let particle = environment.peek?.particle
+        if let object = environment.unwrappedPeek?[name, particle] { // JpfObjectにsubscriptアクセス
+            if object.name == "位置" {    // 配列のアクセス位置を処理(配列はそのまま入力に)
+                if let ident = object as? JpfString {   // 識別子を取り出し、辞書を引き数値オブジェクトに変換
+                    guard var integer = environment[ident.value] else {return nil}
+                    integer.name = object.name
+                    return integer
+                }
+            } else {
+                environment.drop()
+            }
             return object
         }
         return environment[name] ?? ContinuativeForm(name).plainForm.flatMap {environment[$0]}

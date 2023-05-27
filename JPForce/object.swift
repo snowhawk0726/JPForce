@@ -18,8 +18,8 @@ protocol JpfObject : JpfObjectAccessible {
     var particle: Token? {get}
     var value: JpfObject? {get}
     var error: JpfError? {get}
-    /// nameをキーに、関連する値を取り出す(あるいは計算する)。
-    subscript(name: String) -> JpfObject? {get}
+    /// nameと格をキーに、関連する値を取り出す(あるいは計算する)。
+    subscript(name: String, particle: Token?) -> JpfObject? {get}
     // 判定
     var isTrue: Bool {get}
     var isNull: Bool {get}

@@ -117,7 +117,10 @@ extension JpfObject {
     func accessed(by name: String, with environment: Environment) -> JpfObject? {accessed(type: type, with: environment) ?? self}
 }
 extension JpfInteger : JpfObjectAccessible {
-    func accessed(by neme: String, with environment: Environment) -> JpfObject? {accessed(by: value, with: environment) ?? self}
+    func accessed(by neme: String, with environment: Environment) -> JpfObject? {
+        if self.name == "位置" {return self}
+        return accessed(by: value, with: environment) ?? self
+    }
 }
 extension JpfString : JpfObjectAccessible {
     func accessed(by neme: String, with environment: Environment) -> JpfObject? {accessed(by: self.hashKey, with: environment) ?? self}
