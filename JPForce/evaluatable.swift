@@ -162,15 +162,7 @@ extension Identifier : Evaluatable {
     private func getObject(from environment: Environment, with name: String) -> JpfObject? {
         let particle = environment.peek?.particle
         if let object = environment.unwrappedPeek?[name, particle] { // JpfObjectにsubscriptアクセス
-            if object.name == "位置" {    // 配列のアクセス位置を処理(配列はそのまま入力に)
-                if let ident = object as? JpfString {   // 識別子を取り出し、辞書を引き数値オブジェクトに変換
-                    guard var integer = environment[ident.value] else {return nil}
-                    integer.name = object.name
-                    return integer
-                }
-            } else {
-                environment.drop()
-            }
+            environment.drop()
             return object
         }
         return environment[name] ?? ContinuativeForm(name).plainForm.flatMap {environment[$0]}
@@ -384,10 +376,19 @@ extension LoopExpression : Evaluatable {
     private func isTerminated(by evaluated: JpfObject) -> Bool {evaluated.isReturnValue && !evaluated.hasValue}
 }
 extension Label : Evaluatable {
-    /// ラベルに割り当てられた識別子を辞書に格納する。
+    /// 1. ラベルに割り当てられた識別子を辞書に格納する。
+    /// 2. ラベルが「位置」である場合は、数値、または識別子から数値を取り出し、返す。
     /// - Parameter environment: 格納先
-    /// - Returns: ラベル
+    /// - Returns: ラベルの文字列、または位置の数値
     func evaluated(with environment: Environment) -> JpfObject? {
+        if token == .keyword(.POSITION) {
+            if let integer = Int(value) {
+                return JpfInteger(name: tokenLiteral, value: integer)
+            }
+            guard var integer = environment[value] as? JpfInteger else {return "『\(value)』" + identifierNotFound}
+            integer.name = tokenLiteral
+            return integer
+        }
         environment[tokenLiteral] = JpfString(value: value)
         return JpfString(value: tokenLiteral)
     }

@@ -272,7 +272,6 @@ extension JpfArray {
         return elements[index]
     }
     subscript(name: String, particle: Token?) -> JpfObject? {
-        if particle == Token(.NO) && name.hasPrefix("位置") {return getPosition(from: name)}
         switch (particle, name) {
         case (Token(.NO),"最初"),(nil,"最初"),(Token(.NO),"先頭"),(nil,"先頭"):
             return elements.first ?? JpfNull.object
@@ -285,18 +284,6 @@ extension JpfArray {
             break
         }
         return getObject(from: name, with: particle)
-    }
-    /// 配列にアクセスする位置を判別する。
-    /// - Parameter s:  位置x → xは、数値または識別子
-    /// - Returns: 判別した位置を数値または文字列として返す。
-    private func getPosition(from s: String) -> JpfObject? {
-        let keyword = "位置"
-        guard keyword.count < s.count else {return JpfError(positionUnavailable)}
-        let position = String(s.dropFirst(keyword.count))
-        if let number = Int(position) {
-            return JpfInteger(name: keyword, value: number) // 数値として返す。
-        }
-        return JpfString(name: keyword, value: position)    // 識別子を文字列として返す。
     }
     subscript(range: JpfRange) -> JpfObject? {
         switch (range.lowerBound?.0.number, range.lowerBound?.1,

@@ -121,6 +121,7 @@ enum Token : Equatable {
         case GENERATE   = "生成"
         case AVAILABLE  = "利用可能"
         case OVERWRITE  = "上書き"
+        case POSITION   = "位置"
     }
     /// 文字列の連想値について識別しないための分類(.IDENT("文字列") → .ident)
     enum TokenType : Hashable {

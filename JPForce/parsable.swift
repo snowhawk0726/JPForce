@@ -441,7 +441,7 @@ struct PrefixExpressionParserFactory {
         case .keyword(.RANGE):      return RangeLiteralParser(parser)
         case .keyword(.CASE):       return CaseExpressionParser(parser)
         case .keyword(.LOOP):       return LoopExpressionParser(parser)
-        case .keyword(.IDENTIFIER),.keyword(.FILE):
+        case .keyword(.IDENTIFIER),.keyword(.FILE),.keyword(.POSITION):
                                     return LabelExpressionParser(parser)
         case .keyword(_):           return PredicateExpressionParser(parser)
         default:                    return nil
@@ -482,7 +482,7 @@ struct LabelExpressionParser : ExpressionParsable {
     let parser: Parser
     func parse() -> Expression? {
         let token = currentToken           // Token.Keyword
-        guard nextToken.type == .string || nextToken.type == .ident else {
+        guard nextToken.type == .string || nextToken.type == .ident || nextToken.type == .int else {
             error(message: "「\(token.literal)」の後続が「文字列」(または「識別子」)でなかった。)")
             return nil
         }
@@ -558,7 +558,7 @@ struct TypeLiteralParser : ExpressionParsable {
         while nextToken.isEol {getNext()}   // 【とEOLを飛ばす
         // Initialyzer block 解析
         var initialyzer: BlockStatement?
-        if getNext(whenNextIs: ExpressionStatement.syokika) {// 初期化は、(初期化が、)
+        if getNext(whenNextIs: ExpressionStatement.syokika) {   // 初期化は、(初期化が、)
             _ = getNext(whenNextIs: ExpressionStatement.wa + ExpressionStatement.ga, matchAll: false)
             _ = getNext(whenNextIs: .COMMA)
             let endOfInit: Token.Symbol = getNext(whenNextIs: .LBBRACKET) ? .RBBRACKET : .EOL
