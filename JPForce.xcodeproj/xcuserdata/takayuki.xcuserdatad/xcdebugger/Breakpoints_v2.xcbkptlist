@@ -628,8 +628,8 @@
             filePath = "JPForce/environment.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "129"
-            endingLineNumber = "129"
+            startingLineNumber = "130"
+            endingLineNumber = "130"
             landmarkName = "getValues(from:with:)"
             landmarkType = "7">
             <Locations>
@@ -1265,6 +1265,21 @@
                   startingLineNumber = "492"
                   endingLineNumber = "492"
                   offsetFromSymbolStart = "80">
+               </Location>
+               <Location
+                  uuid = "8D3B28B6-9037-4DE7-A652-DDBF0422376A - 84317a0185bff0e0"
+                  shouldBeEnabled = "Yes"
+                  ignoreCount = "0"
+                  continueAfterRunningActions = "No"
+                  symbolName = "JPForce.JpfInstance.subscript.getter : (Swift.String, Swift.Optional&lt;JPForce.Token&gt;) -&gt; Swift.Optional&lt;JPForce.JpfObject&gt;"
+                  moduleName = "JPForce"
+                  usesParentBreakpointCondition = "Yes"
+                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/builtin.swift"
+                  startingColumnNumber = "9223372036854775807"
+                  endingColumnNumber = "9223372036854775807"
+                  startingLineNumber = "511"
+                  endingLineNumber = "511"
+                  offsetFromSymbolStart = "128">
                </Location>
             </Locations>
          </BreakpointContent>

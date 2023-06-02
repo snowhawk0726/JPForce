@@ -509,10 +509,10 @@ extension JpfInstance {
     subscript(name: String, particle: Token?) -> JpfObject? {
         // nameが利用可能なメンバー名であれば、オブジェクトを返す。
         let canditate = environment[name] != nil ? name : ContinuativeForm(name).plainForm ?? ""
-        if let member = environment[canditate] {
+        if environment.contains(canditate), let member = environment[canditate] {   // outer除く
             guard available.contains(canditate) else {return JpfError("『\(name)』" + identifierNotAvailable)}
             if member is JpfFunction {                          // メンバー関数の入力処理
-                environment.outer?.drop()                       //  自身(インスタンス)の句を捨てる
+                environment.outer?.drop()                       // 自身(インスタンス)の句を捨てる
                 if let inputs = environment.outer?.pullAll() {  // 引数をインスタンスに移動
                     environment.push(inputs)
                 }

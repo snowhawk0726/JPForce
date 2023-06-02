@@ -31,7 +31,8 @@ class Environment {
         return JpfArray(elements: enumerated.map {
             JpfString(value: $0.key + " = " + $0.value.string)
         })
-     }
+    }
+    func contains(_ name: String) -> Bool {store.keys.contains(name)}
     // スタック操作
     func push(_ object: JpfObject)  {stack.append(object)}
     func push(_ objects: [JpfObject])   {stack += objects}
