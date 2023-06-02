@@ -26,6 +26,7 @@ class Environment {
     var enumerated: [(key: String, value: JpfObject)] {
         store.map {(key: $0, value: $1)}
     }
+    var values: [JpfObject] {Array(store.values)}
     var enumeratedStringArray: JpfArray {
         return JpfArray(elements: enumerated.map {
             JpfString(value: $0.key + " = " + $0.value.string)
@@ -59,7 +60,10 @@ class Environment {
     func isPeekParticle(_ particle: Token.Particle) -> Bool {
         peek?.particle.map {$0.type} == Token.particle(particle).type
     }
-    var unwrappedPeek: JpfObject? {peek?.value}
+    var unwrappedPeek: JpfObject? {
+        if peek is JpfPhrase {return peek?.value}
+        return peek
+    }
     func unwrapPhrase() -> JpfObject? {
         guard let object = peek as? JpfPhrase else {return nil}
         defer {drop()}

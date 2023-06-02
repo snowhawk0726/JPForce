@@ -320,6 +320,27 @@ final class ParserTests: XCTestCase {
             print("テスト終了: \(statement.string)")
         }
     }
+    func testEnumLiteralParsings() throws {
+        let testPatterns = [
+            "列挙であって、【晴は「sunny」と、曇は「cloudy」と、雨は「rainy」と、雪は「snowy」】。",
+            "列挙であり、要素が、晴は「sunny」、曇は「cloudy」、雨は「rainy」、雪は「snowy」。",
+            "列挙【晴は「sunny」、曇は「cloudy」、雨は「rainy」、雪は「snowy」】",
+        ]
+        for input in testPatterns {
+            print("テストパターン: \(input)")
+            let program = try XCTUnwrap(parseProgram(with: input))
+            XCTAssertEqual(program.statements.count, 1, "program.statements.count")
+            let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
+            XCTAssertEqual(statement.expressions.count, 1, "statement.expressions.count")
+            let enumLiteral = try XCTUnwrap(statement.expressions.first as? EnumLiteral)
+            XCTAssertEqual(enumLiteral.elements.count, 4, "enumLiteral.elements.count")
+            XCTAssertEqual(enumLiteral.elements[0].string.withoutPeriod, "晴は、「sunny」")
+            XCTAssertEqual(enumLiteral.elements[1].string.withoutPeriod, "曇は、「cloudy」")
+            XCTAssertEqual(enumLiteral.elements[2].string.withoutPeriod, "雨は、「rainy」")
+            XCTAssertEqual(enumLiteral.elements[3].string.withoutPeriod, "雪は、「snowy」")
+            print("テスト終了: \(statement.string)")
+        }
+    }
     func testArrayLiterals() throws {
         let input = "配列であって、【要素が、１と、2に２を掛けたものと、3に３を足したもの】。"
         print("テストパターン: \(input)")

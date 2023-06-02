@@ -239,7 +239,7 @@ struct ArrayLiteral : Expression {
     var tokenLiteral: String {token.literal}
     var string: String {
         token.coloredLiteral + "であって、【" +
-        (!elements.isEmpty ? "要素が" + "、\(elements.map {$0.string}.joined(separator: "と"))" : "") +
+        (!elements.isEmpty ? "要素が、\(elements.map {$0.string}.joined(separator: "と、"))".withoutPeriod : "") +
         "】"
     }
 }
@@ -250,11 +250,22 @@ struct DictionaryLiteral : Expression {
     var tokenLiteral: String {token.literal}
     var string: String {
         token.coloredLiteral + "であって、【" +
-        (!pairs.isEmpty ? "要素が" + "、\(pairs.map {$0.string}.joined(separator: "と"))" : "") +
+        (!pairs.isEmpty ? "要素が、\(pairs.map {$0.string}.joined(separator: "と、"))" : "") +
         "】"
     }
 }
 struct PairExpression {
     var pair: (key: ExpressionStatement, value: ExpressionStatement)
-    var string: String {pair.key.string + "が" + pair.value.string}
+    var string: String {pair.key.string.withoutPeriod + "が" + pair.value.string.withoutPeriod}
+}
+struct EnumLiteral : Expression {
+    var token: Token                // 列挙トークン
+    var elements: [Statement]       // 列挙子(定義文または列挙子)
+    //
+    var tokenLiteral: String {token.literal}
+    var string: String {
+        token.coloredLiteral + "であって、【" +
+        (!elements.isEmpty ? "要素が、\(elements.map {$0.string}.joined(separator: "と、"))".withoutPeriod : "") +
+        "】"
+    }
 }

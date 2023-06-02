@@ -673,7 +673,7 @@ final class EvaluatorTests: XCTestCase {
         let testPatterns: [(input: String, expected: Any?)] = [
             ("配列【１、２、３】の位置１に５を代入したものの１。", 5),
             ("甲は、配列【１、２、３】。乙は０。甲の位置「乙」に５を代入する。甲の最初", 5),
-            ("甲は、配列【１、２、３】。関数【５を甲の位置「２」に上書きする。】を実行する。甲の最後", 5),
+            ("甲は、配列【１、２、３】。関数【５を甲の位置２に上書きする。】を実行する。甲の最後", 5),
             ("甲は、配列【１、２、３】。乙は２。関数【５を甲の位置『乙』に上書きする。】を実行する。甲の最後", 5),
         ]
         for test in testPatterns {
@@ -684,10 +684,14 @@ final class EvaluatorTests: XCTestCase {
         }
     }
     func testLabelExpressions() throws {
-        let testPatterns: [(input: String, expected: String)] = [
+        let testPatterns: [(input: String, expected: Any)] = [
             ("二倍は２。識別子「二倍」。『識別子』。", "二倍"),
             ("『割った余り』は１。識別子『割った余り』。『識別子』。", "割った余り"),
             ("ファイル「サンプル」。『ファイル』。", "サンプル"),
+            ("位置１。", 1), ("位置「１」。", 1),
+            ("甲は１。位置「甲」。", 1),
+            ("甲は１。位置『甲』。", 1),
+            ("甲は１。位置 甲。", 1),
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
@@ -695,6 +699,47 @@ final class EvaluatorTests: XCTestCase {
             try testObject(evaluated, with: test.expected)
             print("テスト(\(evaluated))終了")
         }
+    }
+    func testEnumOperations() throws {
+        let input = """
+            オプションは、列挙【無し、一、二と、未定義は999】。
+            曜日は、列挙であって、【
+                要素が、
+                    月は「月曜」と、火は「火曜」、水は「水曜」、木は「木曜」、金は「金曜」、土は「土曜」、日は「日曜」。
+            】。
+        """
+        let testPatterns: [(input: String, expected: Any)] = [
+            ("オプションの型。", "列挙"),
+            ("オプションの数。", 4),
+            ("オプションの無しの値。", 0),
+            ("オプションの二の列挙子。", "二"),
+            ("オプションの二の値。", 2),
+            ("オプションの未定義の値。", 999),
+            ("曜日の型。", "列挙"),
+            ("曜日の数。", 7),
+            ("日曜日は、曜日の日。日曜日の列挙子。", "日"),
+            ("日曜日は、曜日の日。日曜日の型。", "曜日"),
+            ("日曜日は、曜日・日。日曜日の値。", "日曜"),
+            ("月曜日は、曜日・月。月曜日が・月である。", true),
+            ("今日は、曜日・火。今日が、・火の場合、【１】、それ以外は、【２】。", 1),
+            ("「水曜」で曜日を生成し、「予定日」に代入する。予定日の列挙子。", "水"),
+            ("木曜日は、「Thursday」を・木に代入したもの。木曜日の値。", "Thursday"),
+        ]
+        print("テストパターン: \(input)")
+        let environment = Environment()
+        let parser = Parser(Lexer(input))
+        let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+        let result = eval.object ?? environment.pull()
+        XCTAssertFalse(result?.isError ?? false, result?.error?.message ?? "")
+        for test in testPatterns {
+            print("テストパターン: \(test.input)")
+            let parser = Parser(Lexer(test.input))
+            let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+            let expected = eval.object ?? environment.pull()!
+            try testObject(expected, with: test.expected)
+            print("テスト(\(expected))終了")
+        }
+        print("テスト終了")
     }
 }
 // MARK: - ヘルパー

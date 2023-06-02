@@ -136,6 +136,7 @@ extension PredicateOperable {
     var cannotJudgeGenuineness: JpfError{JpfError("で、正負を判定できる対象は、数値型のみ。")}
     var fileReadError: JpfError         {JpfError("ファイルの読み込みに失敗した。")}
     var availableError: JpfError        {JpfError("利用可能なメンバー名でなかった。")}
+    var valueOfEnumeratorNotFound: JpfError {JpfError("指定の値が見つからない。指定値：")}
     var detectParserError: JpfError     {JpfError("構文解析器がエラーを検出した。")}
     // メッセージ(使い方)
     var printUsage: JpfError            {JpfError("仕様：(〜と…)〜を表示する。")}
@@ -166,6 +167,7 @@ extension PredicateOperable {
     var assignArrayUsage: JpfError      {JpfError("仕様：〜(を)<配列>の位置<数値>に代入(または上書き)する。または、<配列>の位置<数値>に〜を代入(または上書き)する。")}
     var swapUsage: JpfError             {JpfError("仕様：<識別子>と<識別子>を入れ替える。または、〜と〜を入れ替える。")}
     var generateUsage: JpfError         {JpfError("仕様：<識別子(型)>から生成する。")}
+    var generateEnumeratorUsage: JpfError {JpfError("仕様：<値>で<列挙型>から生成する。または<値>から<列挙型>を生成する。")}
 }
 // MARK: - 表示/音声
 struct PrintOperator : PredicateOperable {
@@ -572,14 +574,25 @@ struct BreakOperator : PredicateOperable {
 struct GenerateOperator : PredicateOperable {
     init(_ environment: Environment) {self.environment = environment}
     let environment: Environment
-    /// インスタンス(オブジェクト)を生成する。
-    /// - Returns: インスタンス
+    /// 1. インスタンス(オブジェクト)を生成する。
+    /// 2. 値から列挙子を生成
+    /// - Returns: インスタンスまたは列挙子
     func operated() -> JpfObject? {
-        guard environment.isPeekParticle(.KARA), let type = environment.peek?.value as? JpfType else {return generateUsage}
-        environment.drop()
+        guard environment.isPeekParticle(.KARA) || environment.isPeekParticle(.WO) else {return generateUsage}
+        switch environment.peek?.value {
+        case let instanceType as JpfType:   // 型からインスタンスを生成
+            environment.drop()
+            return generateInstance(from: instanceType)
+        case let enumType as JpfEnum:       // 列挙型の値から列挙子を生成
+            environment.drop()
+            return generateEnumerator(from: enumType)
+        default:
+            return generateUsage
+        }
+    }
+    private func generateInstance(from type: JpfType) -> JpfObject? {
         let local = Environment(outer: self.environment)    // 型の環境を拡張
-        let stackEnv = environment.outer != nil ? environment : self.environment
-        let result = local.apply(type.parameters, with: type.signature, from: stackEnv)
+        let result = local.apply(type.parameters, with: type.signature, from: self.environment)
         guard !result.isError else {return result}
         defer {environment.push(local.pullAll())}           // スタックを戻す
         if let initial = type.initializer,                  // 初期化ブロック
@@ -592,6 +605,14 @@ struct GenerateOperator : PredicateOperable {
         let members = (local.peek as? JpfArray).map {$0.elements.compactMap {$0 as? JpfString}.map {$0.value}} ?? []  // 利用可能なメンバーリスト
         local.drop()
         return JpfInstance(type: type.name, environment: local, available: members)
+    }
+    private func generateEnumerator(from type: JpfEnum) -> JpfObject? {
+        guard environment.isPeekParticle(.DE) || environment.isPeekParticle(.KARA), let object = environment.unwrappedPeek else {return generateEnumeratorUsage}
+        environment.drop()
+        for pairs in type.environment.enumerated {
+            if object.isEqual(to: pairs.value) {return JpfEnumerator(type: type.name, identifier: pairs.key, value: pairs.value)}
+        }
+        return valueOfEnumeratorNotFound + object.string
     }
 }
 struct AvailableOperator : PredicateOperable {
@@ -949,9 +970,13 @@ struct AssignOperator : PredicateOperable {
             params.swapAt(0, 1)
             fallthrough
         case (Token(.WO),Token(.NI)), (nil,Token(.NI)):
+            guard var value = getValue(from: params[0]) else {break}
+            if let enumerator = params[1].value as? JpfEnumerator {
+                environment.drop(2)
+                return assign(value, to: enumerator)// 列挙子に値を代入し返す。
+            }
             let name = environment.getName(from: params[1])
             guard !name.isEmpty else {break}
-            guard var value = params[0].value else {break}
             value.name = name
             environment.drop(2)
             assign(value, to: environment, by: name, with: op)
@@ -962,11 +987,17 @@ struct AssignOperator : PredicateOperable {
         return usage
     }
     private var usage: JpfError {op == .keyword(.ASSIGN) ? assignUsage : overwriteUsage}
+    private func getValue(from object: JpfObject) -> JpfObject? {
+        object is JpfPhrase ? object.value : object
+    }
     private func assign(_ value: JpfObject, to position: Int, in array: JpfArray) -> JpfObject {
         var elements = array.elements
         guard case 0..<elements.count = position else {return arrayPositionError}
         elements[position] = value
         return JpfArray(elements: elements)
+    }
+    private func assign(_ value: JpfObject, to enumerator: JpfEnumerator) -> JpfObject {
+        return JpfEnumerator(type: enumerator.type, name: enumerator.name, identifier: enumerator.identifier, value: value)
     }
     private func assign(_ value: JpfObject, to environment: Environment, by name: String, with op: Token) {
         if op == .keyword(.OVERWRITE) && environment.outer?[name] != nil {

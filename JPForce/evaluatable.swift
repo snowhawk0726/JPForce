@@ -35,6 +35,7 @@ extension Node {
     var loopParameterError: JpfError        {JpfError("「反復」の入力が正しくない。")}
     var rangeTypeError: JpfError            {JpfError("「範囲」の上下限が、数値でない。：")}
     var overloadNeedFuncDefinition: JpfError{JpfError("「関数」以外を「さらに」で拡張している。")}
+    var enumuratorError: JpfError           {JpfError("「列挙」の列挙子(識別子)が正しくない。：")}
     // 仕様表示
     var strideLoopUsage: JpfError           {JpfError("仕様：<数値>から<数値>まで（<数値>ずつ）反復【入力が<識別子(カウント値)>、<処理>】。")}
     var rangeLoopUsage: JpfError            {JpfError("仕様：範囲【<下限><上限>】を反復【入力が<識別子(カウント値)>、<処理>】。")}
@@ -160,12 +161,37 @@ extension Identifier : Evaluatable {
     ///   - name: キーとなる識別名
     /// - Returns: 対応するオブジェクト
     private func getObject(from environment: Environment, with name: String) -> JpfObject? {
+        if let object = getEnumerator(from: environment, with: name) {
+            return object
+        }
         let particle = environment.peek?.particle
         if let object = environment.unwrappedPeek?[name, particle] { // JpfObjectにsubscriptアクセス
             environment.drop()
             return object
         }
         return environment[name] ?? ContinuativeForm(name).plainForm.flatMap {environment[$0]}
+    }
+    private func getEnumerator(from environment: Environment, with name: String) -> JpfObject? {
+        let dot = "・"
+        if name.contains(dot) {
+            let strings = name.components(separatedBy: dot)
+            if strings.count == 2 {         // (列挙型)・列挙子
+                guard let enumObject = getEnumObject(from: environment, with: strings) else {
+                    return "『\(strings.first!)』" + identifierNotFound
+                }
+                return JpfEnumerator(type: enumObject.name, identifier: strings.last!, value: enumObject.environment[strings.last!])
+            }
+        }
+        return nil
+    }
+    private func getEnumObject(from environment: Environment, with names: [String]) -> JpfEnum? {
+        if !names[0].isEmpty, let object = environment[names[0]] as? JpfEnum {return object}
+        for value in environment.values {
+            if let object = value as? JpfEnum, object.elements.contains(names[1]) {
+                return object
+            }
+        }
+        return nil
     }
 }
 extension PredicateExpression : Evaluatable {
@@ -493,6 +519,30 @@ extension JpfArray {
 }
 extension TypeLiteral : Evaluatable {
     func evaluated(with environment: Environment) -> JpfObject? {
-        accessed(with: environment) ?? JpfType(parameters: parameters, signature: signature, initializer: initializer, body: body, environment: environment)
+        accessed(with: environment) ?? JpfType(parameters: parameters, signature: signature, initializer: initializer, body: body)
+    }
+}
+extension EnumLiteral : Evaluatable {
+    func evaluated(with environment: Environment) -> JpfObject? {
+        let local = Environment(outer: environment)             // 型の環境を拡張
+        var ident: String = ""
+        var identifiers: [String] = []
+        var number = 0
+        for element in elements {
+            if let statement = element as? ExpressionStatement, let expression = statement.expressions.first {  // 値無し(数値を値として設定)
+                guard expression is Identifier else {return enumuratorError + element.string}
+                ident = expression.tokenLiteral
+                local[ident] = JpfInteger(name: ident, value: number)
+                number += 1
+            } else
+            if let statement = element as? DefineStatement {    // 値有り(値をlocalに設定)
+                ident = statement.name.value
+                if let result = element.evaluated(with: local), result.isError {return result}
+            } else {
+                return enumuratorError + element.string
+            }
+            identifiers.append(ident)
+        }
+        return JpfEnum(elements: identifiers, environment: local)
     }
 }

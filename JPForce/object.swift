@@ -173,6 +173,30 @@ struct JpfFunction : JpfObject {
         return s.replacingOccurrences(of: "。】", with: "】")
     }
 }
+struct JpfEnum : JpfObject {
+    static let type = "列挙"
+    var name: String = ""
+    var elements: [String]
+    var environment: Environment
+    var string: String {"列挙".color(.magenta) + "であって、【" +
+        (elements.isEmpty ? "" :
+         "要素が、\(elements.map {$0}.joined(separator: "と、"))") + "】"
+    }
+}
+struct JpfEnumerator : JpfObject {
+    static let type = "列挙子"
+    var type: String
+    var name: String = ""
+    var identifier: String
+    var value: JpfObject?
+    var string: String {"型が、\(type)で、列挙子は、\(identifier)" + (value.map {"、値は、\($0.string)。"} ?? "。")}
+    //
+    func isEqual(to object: JpfObject) -> Bool {
+        guard let rhs = object as? JpfEnumerator else {return false}
+        return type == rhs.type && identifier == rhs.identifier &&
+        (rhs.hasValue ? value?.isEqual(to: rhs.value!) ?? false : value == nil)
+    }
+}
 struct JpfType : JpfObject {
     static let type = "型"
     var name: String = ""
@@ -180,7 +204,6 @@ struct JpfType : JpfObject {
     var signature: InputFormat      // 入力形式
     var initializer: BlockStatement?// 初期化
     var body: BlockStatement
-    var environment: Environment
     var string: String {
         let s = "型".color(.magenta) + "であって、【" +
         (parameters.isEmpty ? "" :

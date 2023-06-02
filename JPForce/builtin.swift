@@ -523,3 +523,20 @@ extension JpfInstance {
         return getObject(from: name, with: particle)
     }
 }
+extension JpfEnum {
+    var count: JpfObject {JpfInteger(value: elements.count)}
+    subscript(name: String, particle: Token?) -> JpfObject? {
+        if particle == .particle(.NO), elements.contains(name) {
+            return JpfEnumerator(type: self.name, identifier: name, value: environment[name])
+        }
+        return getObject(from: name, with: particle)
+    }
+}
+extension JpfEnumerator {
+    subscript(name: String, particle: Token?) -> JpfObject? {
+        if particle == .particle(.NO), name == "列挙子" {
+            return JpfString(value: identifier)
+        }
+        return getObject(from: name, with: particle)
+    }
+}
