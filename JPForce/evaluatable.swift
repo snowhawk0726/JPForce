@@ -524,20 +524,24 @@ extension TypeLiteral : Evaluatable {
 }
 extension EnumLiteral : Evaluatable {
     func evaluated(with environment: Environment) -> JpfObject? {
-        let local = Environment(outer: environment)             // 型の環境を拡張
+        let local = Environment(outer: environment)             // 列挙型の環境を拡張
         var ident: String = ""
         var identifiers: [String] = []
-        var number = 0
+        var number = 0                  // デフォルトの連番
         for element in elements {
-            if let statement = element as? ExpressionStatement, let expression = statement.expressions.first {  // 値無し(数値を値として設定)
+            if let statement = element as? ExpressionStatement,
+               let expression = statement.expressions.first {   // 値無し(数値を値として設定)
                 guard expression is Identifier else {return enumuratorError + element.string}
                 ident = expression.tokenLiteral
-                local[ident] = JpfInteger(name: ident, value: number)
+                local[ident] = JpfInteger(name: ident, value: number)   // 値として連番を登録
                 number += 1
             } else
             if let statement = element as? DefineStatement {    // 値有り(値をlocalに設定)
                 ident = statement.name.value
                 if let result = element.evaluated(with: local), result.isError {return result}
+                if let value = local[ident] as? JpfInteger {    // 設定値が<数値>の場合、
+                    number = value.value + 1                    // 値+1を連番に振り直す。
+                }
             } else {
                 return enumuratorError + element.string
             }

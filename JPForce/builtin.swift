@@ -528,6 +528,9 @@ extension JpfEnum {
     subscript(name: String, particle: Token?) -> JpfObject? {
         if particle == .particle(.NO), elements.contains(name) {
             return JpfEnumerator(type: self.name, identifier: name, value: environment[name])
+        } else
+        if particle == .particle(.NO), name == "列挙子" {
+            return JpfArray(elements: elements.map {JpfString(value: $0)})
         }
         return getObject(from: name, with: particle)
     }
