@@ -289,6 +289,26 @@ final class ParserTests: XCTestCase {
             print("テスト(\(statement.string))終了")
         }
     }
+    func testProtocolLiteralParsings() throws {
+        let testPatterns = [
+            "規約であって、【数値は「数値」。文字列は「文字列」。数値化は関数で、入力が文字列「文字列を」。】",
+            "規約であり、数値は「数値」。文字列は「文字列」。数値化は関数で、入力が文字列「文字列を」。",
+            "規約【数値は「数値」。文字列は「文字列」。数値化は関数で、入力が文字列「文字列を」】",
+        ]
+        for input in testPatterns {
+            print("テストパターン: \(input)")
+            let program = try XCTUnwrap(parseProgram(with: input))
+            XCTAssertEqual(program.statements.count, 1, "program.statements.count")
+            let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
+            XCTAssertEqual(statement.expressions.count, 1, "statement.expressions.count")
+            let protocolLiteral = try XCTUnwrap(statement.expressions.first as? ProtocolLiteral)
+            XCTAssertEqual(protocolLiteral.clauses.count, 3, "protocolLiteral.clauses.count")
+            XCTAssertEqual(protocolLiteral.clauses[0].string.withoutPeriod, "数値は、「数値」")
+            XCTAssertEqual(protocolLiteral.clauses[1].string.withoutPeriod, "文字列は、「文字列」")
+            XCTAssertEqual(protocolLiteral.clauses[2].string.withoutPeriod, "数値化は、関数であって、【入力が、文字列「文字列を」】")
+            print("テスト終了: \(statement.string)")
+        }
+    }
     func testTypeLiteralParsings() throws {
         let testPatterns = [
             "型であって、【入力が、xとyであり、初期化は、【xにyを足し「z」に代入する】。本体が、aは１。】",

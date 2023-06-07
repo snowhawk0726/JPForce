@@ -68,6 +68,8 @@ struct ExpressionStatement : Statement {
     static let hontaiwa = "本体は、"
     static let syoriga = "処理が、"
     static let syoriwa = "処理は、"
+    static let joukouga = "条項が、"
+    static let joukouwa = "条項は、"
     static let syokika = "初期化"
     static let deatte = "であって、"
     static let deari = "であり、"
@@ -210,6 +212,26 @@ struct FunctionLiteral : Expression {
         token.coloredLiteral + "であって、【" +
         (!parameters.isEmpty ? "入力が" + "、\(zip(parameters, signature.strings).map {$0.string + $1}.joined(separator: "と"))であり、" : "") +
         "本体が" + "、" + body.string + "】"
+    }
+}
+struct ProtocolLiteral : Expression {
+    var token: Token                // 規約トークン
+    var clauses: [ClauseLiteral]    // 規約条項
+    //
+    var tokenLiteral: String {token.literal}
+    var string: String {
+        token.coloredLiteral + "であって、【条項が、\n" +
+        clauses.map {"\t" + $0.string}.joined(separator: "\n") + "\n】"
+    }
+}
+struct ClauseLiteral {
+    var identifier: Identifier      // 識別子
+    var type: String                // 型の文字列
+    var parameters: [Identifier]    // 関数のパラメータ
+    var signature: InputFormat?     // 関数の入力
+    //
+    var string: String {identifier.string + DefineStatement.wa + "、" +
+        ((signature.map {"関数であって、【入力が、" + zip(parameters, $0.strings).map {$0.string + $1}.joined(separator: "と") + "】"}) ?? "「\(type)」") + "。"
     }
 }
 struct TypeLiteral : Expression {

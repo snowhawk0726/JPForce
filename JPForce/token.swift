@@ -118,9 +118,11 @@ enum Token : Equatable {
         case FILE       = "ファイル"
         case IDENTIFIERS = "識別子一覧"
         case IDENTIFIER = "識別子"
+        case PROTOCOL   = "規約"
         case TYPE       = "型"
         case GENERATE   = "生成"
         case AVAILABLE  = "利用可能"
+        case COMPLY     = "準拠"
         case OVERWRITE  = "上書き"
         case POSITION   = "位置"
     }
