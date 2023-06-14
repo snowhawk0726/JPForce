@@ -34,7 +34,8 @@ extension Node {
     var conditionEvaluationError: JpfError  {JpfError("「反復」の条件が正しくない。")}
     var loopParameterError: JpfError        {JpfError("「反復」の入力が正しくない。")}
     var rangeTypeError: JpfError            {JpfError("「範囲」の上下限が、数値でない。：")}
-    var overloadNeedFuncDefinition: JpfError{JpfError("「関数」以外を「さらに」で拡張している。")}
+    var overloadExtentionError: JpfError    {JpfError("「関数」で拡張している。")}
+    var protocolExtentionError: JpfError    {JpfError("「型」以外を「さらに」で拡張している。")}
     var enumuratorError: JpfError           {JpfError("「列挙」の列挙子(識別子)が正しくない。：")}
     // 仕様表示
     var strideLoopUsage: JpfError           {JpfError("仕様：<数値>から<数値>まで（<数値>ずつ）反復【入力が<識別子(カウント値)>、<処理>】。")}
@@ -80,25 +81,35 @@ extension DefineStatement : Evaluatable {
     func evaluated(with environment: Environment) -> JpfObject? {
         if let result = value.evaluated(with: environment), result.isError {return result}
         var object = environment.pull()
-        if isExtended {                                 // 多重定義
-            guard let function = object as? JpfFunction else {return overloadNeedFuncDefinition + "(拡張先が\(object?.type ?? "無い"))"}
-            var elements: [JpfObject] = []
-            if let original = environment[name.value] { // 既存定義
-                switch original {
-                case let f as JpfFunction:              // 関数定義
-                    elements.append(f)
-                case let a as JpfArray:                 // 多重定義
-                    elements = a.elements
-                default:
-                    return overloadNeedFuncDefinition + "(拡張元が\(original.type))"
-                }
+        if isExtended {                             // 多重定義
+            if let function = object as? JpfFunction {                  // 関数多重定義
+                let result = overload(function, with: environment)
+                guard !result.isError else {return result}
+                object = result
+            } else
+            if let orignal = environment[name.value] as? JpfProtocol {  // 規約デフォルト実装
+                guard let extended = object as? JpfType else {return protocolExtentionError + "(拡張先が\(object?.type ?? "無い"))"}
+                object = JpfProtocol(clauses: orignal.clauses, body: extended.body)
             }
-            elements.append(function)                   // 配列に関数を追加
-            object = JpfArray(elements: elements)
         }
         object?.name = name.value
         environment[name.value] = object
         return nil
+    }
+    private func overload(_ function: JpfObject, with environment: Environment) -> JpfObject {
+        var elements: [JpfObject] = []
+        if let original = environment[name.value] { // 既存定義
+            switch original {
+            case let f as JpfFunction:              // 関数定義
+                elements.append(f)
+            case let a as JpfArray:                 // 多重定義
+                elements = a.elements
+            default:
+                return "拡張元(\(original.type))を" + overloadExtentionError
+            }
+        }
+        elements.append(function)                   // 多重定義(配列)に関数を追加
+        return JpfArray(elements: elements)
     }
 }
 // MARK: Expression evaluators
@@ -519,7 +530,12 @@ extension JpfArray {
 }
 extension TypeLiteral : Evaluatable {
     func evaluated(with environment: Environment) -> JpfObject? {
-        accessed(with: environment) ?? JpfType(parameters: parameters, signature: signature, initializer: initializer, body: body)
+        accessed(with: environment) ?? JpfType(parameters: parameters, signature: signature, initializer: initializer, protocols: protocols, body: body)
+    }
+}
+extension ProtocolLiteral : Evaluatable {
+    func evaluated(with environment: Environment) -> JpfObject? {
+        accessed(with: environment) ?? JpfProtocol(clauses: clauses)
     }
 }
 extension EnumLiteral : Evaluatable {

@@ -26,7 +26,7 @@ class Environment {
     var enumerated: [(key: String, value: JpfObject)] {
         store.map {(key: $0, value: $1)}
     }
-    var values: [JpfObject] {Array(store.values)}
+    var values: [JpfObject] {Array(store.values) + (outer?.values ?? [])}
     var enumeratedStringArray: JpfArray {
         return JpfArray(elements: enumerated.map {
             JpfString(value: $0.key + " = " + $0.value.string)
@@ -135,7 +135,7 @@ class Environment {
     }
     /// 対象のオブジェクトの型をチェック
     func isSameType(of object: JpfObject, as type: String) -> Bool {
-        return type.isEmpty || object.value?.type == type
+        return type.isEmpty || object.value?.contains(type: type) ?? false
     }
     /// 対象のオブジェクトの格をチェック
     func isSameParticle(of object: JpfObject, as particle: String) -> Bool {

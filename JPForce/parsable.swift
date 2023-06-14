@@ -627,6 +627,7 @@ struct ProtocolLiteralParser : ExpressionParsable {
                     error(message: "規約で、条項の解析に失敗した。")
                     return nil
                 }
+                propertyType = currentToken.literal
                 _ = getNext(whenNextIs: ExpressionStatement.deatte + ExpressionStatement.deari, matchAll: false)
                 // Prameter block 解析
                 guard let paramenters = parseParameters() else {
@@ -638,6 +639,7 @@ struct ProtocolLiteralParser : ExpressionParsable {
             }
             clauses.append(ClauseLiteral(identifier: ident, type: propertyType, parameters: params, signature: signature))
             _ = getNext(whenNextIs: .PERIOD)
+            skipNextEols()
             if getNext(whenNextIs: symbol) || getNext(whenNextIs: .EOF) {break}
         }
         return clauses
@@ -661,7 +663,7 @@ struct TypeLiteralParser : ExpressionParsable {
         }
         let identifiers = paramenters.map {$0.0}
         let signature = parseSignature(from: paramenters.map {$0.1})
-        while nextToken.isEol {getNext()}   // 【とEOLを飛ばす
+        skipNextEols()
         // Initialyzer block 解析
         var initialyzer: BlockStatement?
         if getNext(whenNextIs: ExpressionStatement.syokika) {   // 初期化は、(初期化が、)
@@ -674,14 +676,37 @@ struct TypeLiteralParser : ExpressionParsable {
             }
             initialyzer = block
             _ = getNext(whenNextIs: .PERIOD)                    // 初期化ブロックの句点を飛ばす
+            skipNextEols()
         }
-        // Body block 解析
-        _ = getNext(whenNextIs: ExpressionStatement.hontaiga + ExpressionStatement.hontaiwa, matchAll: false)   // 本体が、(本体は、)
-        guard let body = BlockStatementParser(parser, symbol: endSymbol).blockStatement else {
-            error(message: "型で、「本体が、〜」の解析に失敗した。")
-            return nil
+        // Protocols Block
+        var protocols: [String] = []
+        _ = getNext(whenNextIs: ExpressionStatement.junkyosuru) // 準拠する
+        if getNext(whenNextIs: ExpressionStatement.kiyaku) {    // 規約は、(規約が、)
+            _ = getNext(whenNextIs: ExpressionStatement.wa + ExpressionStatement.ga, matchAll: false)
+            _ = getNext(whenNextIs: .COMMA)
+            repeat {
+                guard nextToken.isIdent || nextToken.isString else {
+                    error(message: "型で、規約が識別子以外で定義されている。")
+                    return nil
+                }
+                protocols.append(nextToken.literal)
+                getNext()
+                _ = getNext(whenNextIs: .TO)
+            } while getNext(whenNextIs: .COMMA)
+            _ = getNext(whenNextIs: .PERIOD)
+            skipNextEols()
         }
-        return TypeLiteral(token: token, parameters: identifiers, signature: signature, initializer: initialyzer, body: body)
+        var body: BlockStatement?
+        if currentToken != .symbol(endSymbol) {
+            // Body block 解析
+            _ = getNext(whenNextIs: ExpressionStatement.hontaiga + ExpressionStatement.hontaiwa, matchAll: false)   // 本体が、(本体は、)
+            body = BlockStatementParser(parser, symbol: endSymbol).blockStatement
+            if body == nil {
+                error(message: "型で、「本体が、〜」の解析に失敗した。")
+                return nil
+            }
+        }
+        return TypeLiteral(token: token, parameters: identifiers, signature: signature, initializer: initialyzer, protocols: protocols, body: body)
     }
 }
 struct EnumLiteralParser : ExpressionParsable {

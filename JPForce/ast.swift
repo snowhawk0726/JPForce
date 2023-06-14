@@ -71,6 +71,8 @@ struct ExpressionStatement : Statement {
     static let joukouga = "条項が、"
     static let joukouwa = "条項は、"
     static let syokika = "初期化"
+    static let kiyaku = "規約"
+    static let junkyosuru = "準拠する"
     static let deatte = "であって、"
     static let deari = "であり、"
     static let soreigai = "それ以外"
@@ -239,14 +241,16 @@ struct TypeLiteral : Expression {
     var parameters: [Identifier]    // 入力パラメータ
     var signature: InputFormat      // 入力形式
     var initializer: BlockStatement?// 初期化
-    var body: BlockStatement
+    var protocols: [String]         // 準拠する規約
+    var body: BlockStatement?
     //
     var tokenLiteral: String {token.literal}
     var string: String {
         token.coloredLiteral + "であって、【" +
         (!parameters.isEmpty ? "入力が" + "、\(zip(parameters, signature.strings).map {$0.string + $1}.joined(separator: "と"))であり、" : "") +
         (initializer.map {"初期化は、" + $0.string} ?? "") +
-        "本体が、" + body.string + "】"
+        (body.map {"本体が、" + $0.string} ?? "") +
+        "】"
     }
 }
 struct InputFormat {

@@ -29,6 +29,7 @@ protocol JpfObject : JpfObjectAccessible {
     var isError: Bool {get}
     func isParticle(_ particle: Token.Particle) -> Bool
     func isEqual(to object: JpfObject) -> Bool
+    func contains(type: String) -> Bool
     // 演算
     func add(_ object: JpfObject) -> JpfObject
     func remove(_ object: JpfObject) -> JpfObject
@@ -64,6 +65,7 @@ extension JpfObject {
     var isBreakFactor: Bool {isReturnValue || isError}
     func isParticle(_ particle: Token.Particle) -> Bool {false}
     func isEqual(to object: JpfObject) -> Bool {isTrue == object.isTrue}
+    func contains(type: String) -> Bool {type == self.type}
     var hasValue: Bool {value != nil}
 
 }
@@ -203,13 +205,14 @@ struct JpfType : JpfObject {
     var parameters: [Identifier]    // 入力パラメータ
     var signature: InputFormat      // 入力形式
     var initializer: BlockStatement?// 初期化
-    var body: BlockStatement
+    var protocols: [String]         // 準拠する規約
+    var body: BlockStatement?
     var string: String {
         let s = "型".color(.magenta) + "であって、【" +
-        (parameters.isEmpty ? "" :
-            "入力が、\(zip(parameters, signature.strings).map {$0.string + $1}.joined(separator: "と"))であり、") +
+        (parameters.isEmpty ? "" : ("入力が、\(zip(parameters, signature.strings).map {$0.string + $1}.joined(separator: "と"))であり、")) +
         (initializer.map {"初期化は、【" + $0.string + "】。"} ?? "") +
-         "本体が、" + body.string + "】"
+        (body.map {"本体が、" + $0.string} ?? "") +
+        "】"
         return s.replacingOccurrences(of: "。】", with: "】")
     }
 }
@@ -218,8 +221,21 @@ struct JpfInstance : JpfObject {
     var type: String = ""
     var name: String = ""
     var environment: Environment    // メンバーを含む環境
+    var protocols: [String]         // 準拠する規約
     var available: [String]         // 外部から利用可能なメンバー
     var string: String {"型が、\(type)で、メンバーが、\(environment.enumerated.map {$0.key}.joined(separator: "と、"))" + "。" + available.map {"「\($0)」"}.joined(separator: "と") + "は利用可能。"}
+}
+struct JpfProtocol : JpfObject {
+    static let type = "規約"
+    var name: String = ""
+    var clauses: [ClauseLiteral]    // 条項
+    var body: BlockStatement?       // 規約のデフォルト実装
+    //
+    var string: String {
+        let s = "規約".color(.magenta) + "であって、【条項が、\n" +
+            clauses.map {"\t" + $0.string}.joined(separator: "\n") + "\n】"
+        return s.replacingOccurrences(of: "。】", with: "】")
+    }
 }
 struct JpfArray : JpfObject {
     static let type = "配列"

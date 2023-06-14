@@ -14,8 +14,8 @@
             filePath = "JPForce/evaluatable.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "240"
-            endingLineNumber = "240"
+            startingLineNumber = "251"
+            endingLineNumber = "251"
             landmarkName = "evaluated(with:)"
             landmarkType = "7">
             <Locations>
@@ -62,8 +62,8 @@
             filePath = "JPForce/evaluatable.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "247"
-            endingLineNumber = "247"
+            startingLineNumber = "258"
+            endingLineNumber = "258"
             landmarkName = "evaluated(with:)"
             landmarkType = "7">
          </BreakpointContent>
@@ -78,8 +78,8 @@
             filePath = "JPForce/predicateOperable.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "706"
-            endingLineNumber = "706"
+            startingLineNumber = "753"
+            endingLineNumber = "753"
             landmarkName = "operated()"
             landmarkType = "7">
          </BreakpointContent>
@@ -94,8 +94,8 @@
             filePath = "JPForce/parsable.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "888"
-            endingLineNumber = "888"
+            startingLineNumber = "913"
+            endingLineNumber = "913"
             landmarkName = "parse()"
             landmarkType = "7">
             <Locations>
@@ -202,8 +202,8 @@
             filePath = "JPForce/evaluatable.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "256"
-            endingLineNumber = "256"
+            startingLineNumber = "267"
+            endingLineNumber = "267"
             landmarkName = "getCondition(from:)"
             landmarkType = "7">
             <Locations>
@@ -325,8 +325,8 @@
             filePath = "JPForce/evaluatable.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "269"
-            endingLineNumber = "269"
+            startingLineNumber = "280"
+            endingLineNumber = "280"
             landmarkName = "getCondition(from:)"
             landmarkType = "7">
          </BreakpointContent>
@@ -341,8 +341,8 @@
             filePath = "JPForce/parsable.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "855"
-            endingLineNumber = "855"
+            startingLineNumber = "880"
+            endingLineNumber = "880"
             landmarkName = "parseCondition(endSymbol:)"
             landmarkType = "7">
          </BreakpointContent>
@@ -357,8 +357,8 @@
             filePath = "JPForce/predicateOperable.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "446"
-            endingLineNumber = "446"
+            startingLineNumber = "453"
+            endingLineNumber = "453"
             landmarkName = "determined(_:_:_:)"
             landmarkType = "7">
          </BreakpointContent>
@@ -564,8 +564,8 @@
             filePath = "JPForce/predicateOperable.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "302"
-            endingLineNumber = "302"
+            startingLineNumber = "309"
+            endingLineNumber = "309"
             landmarkName = "operated()"
             landmarkType = "7">
          </BreakpointContent>
@@ -691,8 +691,8 @@
             filePath = "JPForce/predicateOperable.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "386"
-            endingLineNumber = "386"
+            startingLineNumber = "393"
+            endingLineNumber = "393"
             landmarkName = "operated()"
             landmarkType = "7">
             <Locations>
@@ -1040,8 +1040,8 @@
             filePath = "JPForce/parsable.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "831"
-            endingLineNumber = "831"
+            startingLineNumber = "856"
+            endingLineNumber = "856"
             landmarkName = "parse()"
             landmarkType = "7">
             <Locations>
@@ -1120,8 +1120,8 @@
             filePath = "JPForce/parsable.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "752"
-            endingLineNumber = "752"
+            startingLineNumber = "777"
+            endingLineNumber = "777"
             landmarkName = "parse()"
             landmarkType = "7">
             <Locations>
@@ -1199,8 +1199,8 @@
             filePath = "JPForce/evaluatable.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "100"
-            endingLineNumber = "100"
+            startingLineNumber = "96"
+            endingLineNumber = "96"
             landmarkName = "evaluated(with:)"
             landmarkType = "7">
          </BreakpointContent>
@@ -1215,8 +1215,8 @@
             filePath = "JPForce/evaluatable.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "471"
-            endingLineNumber = "471"
+            startingLineNumber = "482"
+            endingLineNumber = "482"
             landmarkName = "executed(with:)"
             landmarkType = "7">
          </BreakpointContent>
@@ -1231,8 +1231,8 @@
             filePath = "JPForce/builtin.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "511"
-            endingLineNumber = "511"
+            startingLineNumber = "512"
+            endingLineNumber = "512"
             landmarkName = "subscript(name:particle:)"
             landmarkType = "7">
             <Locations>
@@ -1342,8 +1342,8 @@
             filePath = "JPForce/evaluatable.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "155"
-            endingLineNumber = "155"
+            startingLineNumber = "166"
+            endingLineNumber = "166"
             landmarkName = "evaluated(with:)"
             landmarkType = "7">
             <Locations>

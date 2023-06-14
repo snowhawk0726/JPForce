@@ -273,15 +273,16 @@ final class EvaluatorTests: XCTestCase {
         XCTAssertEqual(initialize.value.expressions.count, 1)
         let array = try XCTUnwrap(initialize.value.expressions.first as? ArrayLiteral)
         XCTAssertTrue(array.elements.isEmpty)
-        XCTAssertEqual(type.body.statements.count, 2)
-        let first = try XCTUnwrap(type.body.statements[0] as? DefineStatement)
-        let second = try XCTUnwrap(type.body.statements[1] as? DefineStatement)
+        XCTAssertNotNil(type.body)
+        XCTAssertEqual(type.body!.statements.count, 2)
+        let first = try XCTUnwrap(type.body!.statements[0] as? DefineStatement)
+        let second = try XCTUnwrap(type.body!.statements[1] as? DefineStatement)
         XCTAssertEqual(first.name.value, "入れる")
         XCTAssertEqual(second.name.value, "出す")
         _ = try XCTUnwrap(first.value.expressions.first as? FunctionLiteral)
         _ = try XCTUnwrap(second.value.expressions.first as? FunctionLiteral)
         print("テスト(\(type.string))終了")
-   }
+    }
     func testTypeOperation() throws {
         let input = """
             自動車は、型であって、【入力が残量、
@@ -315,7 +316,36 @@ final class EvaluatorTests: XCTestCase {
             print("テスト(\(expected))終了")
         }
         print("テスト終了")
-   }
+    }
+    func testProtocolOperation() throws {
+        let input = """
+            挨拶ルールは、規約であって、挨拶は「関数」。
+            挨拶ルールは、さらに、型であって、挨拶は関数で、「こんにちは。」。
+            日中挨拶は、型であって、準拠する規約は、挨拶ルール。
+            朝挨拶は、型であって、規約は、挨拶ルール。挨拶は関数【「おはよう。」】。
+        """
+        let testPatterns: [(input: String, expected: Any)] = [
+            ("挨拶ルールの型。", "規約"),
+            ("日中挨拶の型。", "型"),
+            ("日中挨拶を生成し、挨拶する。", "こんにちは。"),
+            ("朝挨拶を生成し、挨拶する。", "おはよう。"),
+        ]
+        print("テストパターン: \(input)")
+        let environment = Environment()
+        let parser = Parser(Lexer(input))
+        let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+        let result = eval.object ?? environment.pull()
+        XCTAssertFalse(result?.isError ?? false, result?.error?.message ?? "")
+        for test in testPatterns {
+            print("テストパターン: \(test.input)")
+            let parser = Parser(Lexer(test.input))
+            let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+            let expected = eval.object ?? environment.pull()!
+            try testObject(expected, with: test.expected)
+            print("テスト(\(expected))終了")
+        }
+        print("テスト終了")
+    }
     func testStringBuiltins() throws {
         let testPatterns: [(input: String, exptected: String?)] = [
             ("「こんにちは」と「、」と「みなさん。」を足す。","こんにちは、みなさん。"),

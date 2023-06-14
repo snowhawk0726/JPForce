@@ -334,8 +334,9 @@ final class ParserTests: XCTestCase {
             try testPhraseExpression(initStatement.expressions[3], with: "「z」", "に")
             try testKeywordLiteral(initStatement.expressions[4], "代入")
             try testKeywordLiteral(initStatement.expressions[5], "する")
-            XCTAssertEqual(typeLiteral.body.statements.count, 1)
-            let bodyStatement = try XCTUnwrap(typeLiteral.body.statements.first as? DefineStatement)
+            XCTAssertNotNil(typeLiteral.body)
+            XCTAssertEqual(typeLiteral.body!.statements.count, 1)
+            let bodyStatement = try XCTUnwrap(typeLiteral.body!.statements.first as? DefineStatement)
             try testDefStatement(bodyStatement, name: "a", "は", with: 1)
             print("テスト終了: \(statement.string)")
         }
@@ -395,13 +396,15 @@ final class ParserTests: XCTestCase {
         print("テスト(\(statement.string))終了")
     }
     func testParsingEmptyDictionaryLiteral() throws {
-        let input = "辞書【】"
-        print("テストパターン: \(input)")
-        let program = try XCTUnwrap(parseProgram(with: input))
-        let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
-        let dictionary = try XCTUnwrap(statement.expressions.first as? DictionaryLiteral)
-        XCTAssertEqual(dictionary.pairs.count, 0)
-        print("テスト(\(statement.string))終了")
+        let inputs = ["辞書【】", "辞書。"]
+        for input in inputs {
+            print("テストパターン: \(input)")
+            let program = try XCTUnwrap(parseProgram(with: input))
+            let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
+            let dictionary = try XCTUnwrap(statement.expressions.first as? DictionaryLiteral)
+            XCTAssertEqual(dictionary.pairs.count, 0)
+            print("テスト(\(statement.string))終了")
+        }
    }
     func testParsingDictionaryLiteralWithExpressions() throws {
         let input = "辞書【「一」が0と1を足す、「二」が10から8を引く、「三」が15を5で割る】"

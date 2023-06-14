@@ -136,7 +136,14 @@ extension PredicateOperable {
     var cannotJudgeGenuineness: JpfError{JpfError("で、正負を判定できる対象は、数値型のみ。")}
     var fileReadError: JpfError         {JpfError("ファイルの読み込みに失敗した。")}
     var availableError: JpfError        {JpfError("利用可能なメンバー名でなかった。")}
+    var cannotConform: JpfError         {JpfError("には準拠できない。")}
     var valueOfEnumeratorNotFound: JpfError {JpfError("指定の値が見つからない。指定値：")}
+    var cannotGenerateFromProtocol: JpfError {JpfError("規約からインスタンスは生成できない。")}
+    var designatedObjectNotFound: JpfError {JpfError("指定した識別子のメンバーが見つからない。")}
+    var designatedTypeNotMatch: JpfError{JpfError("メンバーの型が規約に準拠していない。")}
+    var numberOfParamsNotMatch: JpfError{JpfError("メンバー関数の引数の数が規約に準拠していない。")}
+    var nameOfParamsNotMatch: JpfError  {JpfError("メンバー関数の引数の名前が規約に準拠していない。")}
+    var formatOfParamsNotMatch: JpfError{JpfError("メンバー関数の引数の形式が規約に準拠していない。")}
     var detectParserError: JpfError     {JpfError("構文解析器がエラーを検出した。")}
     // メッセージ(使い方)
     var printUsage: JpfError            {JpfError("仕様：(〜と…)〜を表示する。")}
@@ -586,6 +593,8 @@ struct GenerateOperator : PredicateOperable {
         case let enumType as JpfEnum:       // 列挙型の値から列挙子を生成
             environment.drop()
             return generateEnumerator(from: enumType)
+        case is JpfProtocol:
+            return cannotGenerateFromProtocol
         default:
             return generateUsage
         }
@@ -596,15 +605,53 @@ struct GenerateOperator : PredicateOperable {
         guard !result.isError else {return result}
         defer {environment.push(local.pullAll())}           // スタックを戻す
         if let initial = type.initializer,                  // 初期化ブロック
-           let result = Evaluator(from: initial, with: local).object {
-            guard !result.isError else {return result}      // 初期化失敗
+           let result = Evaluator(from: initial, with: local).object, result.isError {return result}    // 初期化
+        var protocols: [JpfProtocol] = []
+        for ident in type.protocols {
+            if let rule = environment[ident] as? JpfProtocol {
+                protocols.append(rule)
+                if let implements = rule.body {             // 規約のデフォルト実装をlocalに登録
+                    if let result = Evaluator(from: implements, with: local).object, result.isError {return result}
+                }
+            }
         }
-        if let result = Evaluator(from: type.body, with: local).object {
-            guard !result.isError else {return result}      // メンバ登録
-        }
-        let members = (local.peek as? JpfArray).map {$0.elements.compactMap {$0 as? JpfString}.map {$0.value}} ?? []  // 利用可能なメンバーリスト
+        if let body = type.body,                            // 定義ブロック
+           let result = Evaluator(from: body, with: local).object, result.isError {return result}       // メンバ登録
+        if let result = conform(to: protocols, with: local), result.isError {return result}             // 規約チェック
+        var members = (local.peek as? JpfArray).map {$0.elements.compactMap {$0 as? JpfString}.map {$0.value}} ?? []  // 利用可能なメンバーリスト
         local.drop()
-        return JpfInstance(type: type.name, environment: local, available: members)
+        for p in protocols {    // 規約条項のメンバーリストを利用可能なメンバーリストに追加
+            p.clauses.forEach {members.append($0.identifier.value)}
+        }
+        return JpfInstance(type: type.name, environment: local, protocols: type.protocols, available: members)
+    }
+    private func conform(to protocols: [JpfProtocol], with environment: Environment) -> JpfObject? {
+        for p in protocols {
+            if let result = conform(to: p.clauses, with: environment), result.isError {return result}  // 準拠エラー
+        }
+        return nil
+    }
+    private func conform(to clauses: [ClauseLiteral], with environment: Environment) -> JpfObject? {
+        for clause in clauses {
+            guard let target = environment[clause.identifier.value] else {return designatedObjectNotFound + "指定値：\(clause.identifier.value)(\(clause.type))"}  // 対象のオブジェクト
+            guard clause.type == target.type else {return designatedTypeNotMatch + "(指定型：\(clause.type)"}
+            if let function = target as? JpfFunction {  // メンバー関数パラメタチェック
+                guard clause.parameters.count == function.parameters.count else {return numberOfParamsNotMatch + "(指定数：\(clause.parameters.count)"}
+                for pairs in zip(clause.parameters, function.parameters) {
+                    guard pairs.0.value == pairs.1.value else {return nameOfParamsNotMatch + "(指定値：\(pairs.0.value)"}
+                }
+                if let result = compareSignature(clause.signature, with: function.signature), result.isError {return result}
+            }
+        }
+        return nil
+    }
+    private func compareSignature(_ lhs: InputFormat?, with rhs: InputFormat) -> JpfObject? {
+        guard let left = lhs else {return nil}          // チェックするシグネチャーが無い
+        guard left.numberOfInputs == rhs.numberOfInputs else {return formatOfParamsNotMatch + "(指定入力数：\(left.numberOfInputs.map {"\($0)"} ?? "無し"))"}
+        for pairs in zip(left.formats, rhs.formats) {
+            guard pairs.0.type == pairs.1.type && pairs.0.particle == pairs.1.particle else {return formatOfParamsNotMatch + "(指定形式：「\(pairs.0.type)\(pairs.0.particle)」)"}
+        }
+        return nil
     }
     private func generateEnumerator(from type: JpfEnum) -> JpfObject? {
         guard environment.isPeekParticle(.DE) || environment.isPeekParticle(.KARA), let object = environment.unwrappedPeek else {return generateEnumeratorUsage}
@@ -619,13 +666,13 @@ struct AvailableOperator : PredicateOperable {
     init(_ environment: Environment) {self.environment = environment}
     let environment: Environment
     func operated() -> JpfObject? {
-        var objects: [JpfObject] = []
-        for object in environment.getAll() {
-            guard let ident = object.value as? JpfString else {return availableError + "(\(object.string))"}
-            objects.append(ident)
+        var members: [JpfObject] = []   // アクセス可能なメンバー(識別子)
+        repeat {
+            guard let member = environment.peek?.value as? JpfString else {return availableError}
+            members.append(member)
             environment.drop()
-        }
-        return JpfArray(elements: objects)
+        } while isPeekParticle(.TO)
+        return JpfArray(elements: members)
     }
 }
 // MARK: - 要素アクセス

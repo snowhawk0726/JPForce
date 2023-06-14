@@ -506,6 +506,7 @@ extension JpfPhrase {
 }
 extension JpfInstance {
     var count: JpfObject {JpfInteger(value: available.count)}   // 利用可能メンバー数
+    func contains(type: String) -> Bool {return type == self.type || protocols.contains(type)}
     subscript(name: String, particle: Token?) -> JpfObject? {
         // nameが利用可能なメンバー名であれば、オブジェクトを返す。
         let canditate = environment[name] != nil ? name : ContinuativeForm(name).plainForm ?? ""
