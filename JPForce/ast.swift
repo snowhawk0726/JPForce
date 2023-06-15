@@ -218,12 +218,14 @@ struct FunctionLiteral : Expression {
 }
 struct ProtocolLiteral : Expression {
     var token: Token                // 規約トークン
+    var protocols: [String]         // 準拠する規約
     var clauses: [ClauseLiteral]    // 規約条項
     //
     var tokenLiteral: String {token.literal}
     var string: String {
-        token.coloredLiteral + "であって、【条項が、\n" +
-        clauses.map {"\t" + $0.string}.joined(separator: "\n") + "\n】"
+        token.coloredLiteral + "であって、【\n" +
+        (protocols.isEmpty ? "" : "準拠する規約は、\(protocols.map {$0}.joined(separator: "と、"))。\n") +
+        "条項が、" + clauses.map {$0.string}.joined(separator: "") + "\n】"
     }
 }
 struct ClauseLiteral {

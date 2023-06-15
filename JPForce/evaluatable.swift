@@ -89,7 +89,7 @@ extension DefineStatement : Evaluatable {
             } else
             if let orignal = environment[name.value] as? JpfProtocol {  // 規約デフォルト実装
                 guard let extended = object as? JpfType else {return protocolExtentionError + "(拡張先が\(object?.type ?? "無い"))"}
-                object = JpfProtocol(clauses: orignal.clauses, body: extended.body)
+                object = JpfProtocol(protocols: orignal.protocols, clauses: orignal.clauses, body: extended.body)
             }
         }
         object?.name = name.value
@@ -407,6 +407,7 @@ extension LoopExpression : Evaluatable {
             if let object = result, object.isBreakFactor {break}
             result.map {environment.push($0)}
         }
+        environment.drop()                              // 真偽値を捨てる
         return result ?? conditionEvaluationError
     }
     // ループが「中止する」で中止されたか判定
@@ -535,7 +536,7 @@ extension TypeLiteral : Evaluatable {
 }
 extension ProtocolLiteral : Evaluatable {
     func evaluated(with environment: Environment) -> JpfObject? {
-        accessed(with: environment) ?? JpfProtocol(clauses: clauses)
+        accessed(with: environment) ?? JpfProtocol(protocols: protocols, clauses: clauses)
     }
 }
 extension EnumLiteral : Evaluatable {

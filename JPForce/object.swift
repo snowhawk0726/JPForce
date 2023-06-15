@@ -209,9 +209,10 @@ struct JpfType : JpfObject {
     var body: BlockStatement?
     var string: String {
         let s = "型".color(.magenta) + "であって、【" +
-        (parameters.isEmpty ? "" : ("入力が、\(zip(parameters, signature.strings).map {$0.string + $1}.joined(separator: "と"))であり、")) +
-        (initializer.map {"初期化は、【" + $0.string + "】。"} ?? "") +
-        (body.map {"本体が、" + $0.string} ?? "") +
+        (parameters.isEmpty ? "" : "入力が、\(zip(parameters, signature.strings).map {$0.string + $1}.joined(separator: "と"))であり、") +
+        (protocols.isEmpty ? "" : "準拠する規約は、\(protocols.map {$0}.joined(separator: "と、"))。") +
+        (initializer.map {"初期化は、【\($0.string)】。"} ?? "") +
+        (body.map {"本体が、\($0.string)"} ?? "") +
         "】"
         return s.replacingOccurrences(of: "。】", with: "】")
     }
@@ -223,17 +224,20 @@ struct JpfInstance : JpfObject {
     var environment: Environment    // メンバーを含む環境
     var protocols: [String]         // 準拠する規約
     var available: [String]         // 外部から利用可能なメンバー
-    var string: String {"型が、\(type)で、メンバーが、\(environment.enumerated.map {$0.key}.joined(separator: "と、"))" + "。" + available.map {"「\($0)」"}.joined(separator: "と") + "は利用可能。"}
+    var string: String {"型が、\(type)で、メンバーが、\(environment.enumerated.map {$0.key}.joined(separator: "と、"))。" + available.map {"「\($0)」"}.joined(separator: "と") + "は利用可能。"}
 }
 struct JpfProtocol : JpfObject {
     static let type = "規約"
     var name: String = ""
+    var protocols: [String]         // 準拠する規約
     var clauses: [ClauseLiteral]    // 条項
     var body: BlockStatement?       // 規約のデフォルト実装
     //
     var string: String {
-        let s = "規約".color(.magenta) + "であって、【条項が、\n" +
-            clauses.map {"\t" + $0.string}.joined(separator: "\n") + "\n】"
+        let s = "規約".color(.magenta) + "であって、【\n" +
+        (protocols.isEmpty ? "" : "準拠する規約は、\(protocols.map {$0}.joined(separator: "と"))。\n") +
+        "条項が、" + clauses.map {$0.string}.joined(separator: " ") +
+        "\n】"
         return s.replacingOccurrences(of: "。】", with: "】")
     }
 }

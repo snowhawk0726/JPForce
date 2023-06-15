@@ -103,6 +103,26 @@ extension Parsable {
         let number = formats.map({$0.1}).contains {$0.hasSuffix(threeDots)} ? nil : strings.count
         return InputFormat(numberOfInputs: number, formats: formats)
     }
+    func parseProtocols() -> [String]? {
+        var protocols: [String] = []
+        _ = getNext(whenNextIs: ExpressionStatement.junkyosuru) // 準拠する
+        if getNext(whenNextIs: ExpressionStatement.kiyaku) {    // 規約は、(規約が、)
+            _ = getNext(whenNextIs: ExpressionStatement.wa + ExpressionStatement.ga, matchAll: false)
+            _ = getNext(whenNextIs: .COMMA)
+            repeat {
+                guard nextToken.isIdent || nextToken.isString else {
+                    error(message: "型で、規約が識別子以外で定義されている。")
+                    return nil
+                }
+                protocols.append(nextToken.literal)
+                getNext()
+                _ = getNext(whenNextIs: .TO)
+            } while getNext(whenNextIs: .COMMA)
+            _ = getNext(whenNextIs: .PERIOD)
+            skipNextEols()
+        }
+        return protocols
+    }
     /// 式の解析　(例：1以上→範囲【1以上】)
     /// - Parameter expression: 式(数値、識別子)
     /// - Returns: 上限もしくは下限の範囲リテラル(もしくは元の式)
@@ -597,13 +617,15 @@ struct ProtocolLiteralParser : ExpressionParsable {
         let token = currentToken            // 規約であって、(であり、)
         _ = getNext(whenNextIs: ExpressionStatement.deatte + ExpressionStatement.deari, matchAll: false)
         let endSymbol: Token.Symbol = getNext(whenNextIs: .LBBRACKET) ? .RBBRACKET : .EOL
+        // Protocols Block
+        guard let protocols = parseProtocols() else {return nil}
         // clauses block 解析
         _ = getNext(whenNextIs: ExpressionStatement.joukouga + ExpressionStatement.joukouwa, matchAll: false)   // 条項が、(条項は、)
         guard let clauses = parseClauses(until: endSymbol) else {
             error(message: "規約で、「条項が、〜」の解析に失敗した。")
             return nil
         }
-        return ProtocolLiteral(token: token, clauses: clauses)
+        return ProtocolLiteral(token: token, protocols: protocols, clauses: clauses)
     }
     private func parseClauses(until symbol: Token.Symbol) -> [ClauseLiteral]? {
         var clauses: [ClauseLiteral] = []
@@ -630,12 +652,15 @@ struct ProtocolLiteralParser : ExpressionParsable {
                 propertyType = currentToken.literal
                 _ = getNext(whenNextIs: ExpressionStatement.deatte + ExpressionStatement.deari, matchAll: false)
                 // Prameter block 解析
+                let endSymbol: Token.Symbol = getNext(whenNextIs: .LBBRACKET) ? .RBBRACKET : .PERIOD
                 guard let paramenters = parseParameters() else {
-                    error(message: "規約で、関数の「入力が〜であり、」の解析に失敗した。")
+                    error(message: "規約で、関数の「入力が〜」の解析に失敗した。")
                     return nil
                 }
                 params = paramenters.map {$0.0}
                 signature = parseSignature(from: paramenters.map {$0.1})
+                _ = getNext(whenNextIs: .PERIOD)
+                if endSymbol == .RBBRACKET {_ = getNext(whenNextIs: endSymbol)}
             }
             clauses.append(ClauseLiteral(identifier: ident, type: propertyType, parameters: params, signature: signature))
             _ = getNext(whenNextIs: .PERIOD)
@@ -678,27 +703,11 @@ struct TypeLiteralParser : ExpressionParsable {
             _ = getNext(whenNextIs: .PERIOD)                    // 初期化ブロックの句点を飛ばす
             skipNextEols()
         }
-        // Protocols Block
-        var protocols: [String] = []
-        _ = getNext(whenNextIs: ExpressionStatement.junkyosuru) // 準拠する
-        if getNext(whenNextIs: ExpressionStatement.kiyaku) {    // 規約は、(規約が、)
-            _ = getNext(whenNextIs: ExpressionStatement.wa + ExpressionStatement.ga, matchAll: false)
-            _ = getNext(whenNextIs: .COMMA)
-            repeat {
-                guard nextToken.isIdent || nextToken.isString else {
-                    error(message: "型で、規約が識別子以外で定義されている。")
-                    return nil
-                }
-                protocols.append(nextToken.literal)
-                getNext()
-                _ = getNext(whenNextIs: .TO)
-            } while getNext(whenNextIs: .COMMA)
-            _ = getNext(whenNextIs: .PERIOD)
-            skipNextEols()
-        }
+        // Protocols Block 解析
+        guard let protocols = parseProtocols() else {return nil}
+        // Body Block 解析
         var body: BlockStatement?
         if currentToken != .symbol(endSymbol) {
-            // Body block 解析
             _ = getNext(whenNextIs: ExpressionStatement.hontaiga + ExpressionStatement.hontaiwa, matchAll: false)   // 本体が、(本体は、)
             body = BlockStatementParser(parser, symbol: endSymbol).blockStatement
             if body == nil {

@@ -294,6 +294,7 @@ final class ParserTests: XCTestCase {
             "規約であって、【数値は「数値」。文字列は「文字列」。数値化は関数で、入力が文字列「文字列を」。】",
             "規約であり、数値は「数値」。文字列は「文字列」。数値化は関数で、入力が文字列「文字列を」。",
             "規約【数値は「数値」。文字列は「文字列」。数値化は関数で、入力が文字列「文字列を」】",
+            "規約【数値は「数値」。文字列は「文字列」。数値化は関数【入力が文字列「文字列を」】】",
         ]
         for input in testPatterns {
             print("テストパターン: \(input)")
@@ -340,6 +341,23 @@ final class ParserTests: XCTestCase {
             try testDefStatement(bodyStatement, name: "a", "は", with: 1)
             print("テスト終了: \(statement.string)")
         }
+    }
+    func testProtocolComformingProtocols() throws {
+        let input = "規約であって、準拠する規約は、甲、乙、丙。条項は、丁は、「数値」。"
+        print("テストパターン: \(input)")
+        let program = try XCTUnwrap(parseProgram(with: input))
+        XCTAssertEqual(program.statements.count, 1, "program.statements.count")
+        let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
+        XCTAssertEqual(statement.expressions.count, 1, "statement.expressions.count")
+        let literal = try XCTUnwrap(statement.expressions.first as? ProtocolLiteral)
+        XCTAssertEqual(literal.protocols.count, 3)
+        XCTAssertEqual(literal.protocols[0], "甲")
+        XCTAssertEqual(literal.protocols[1], "乙")
+        XCTAssertEqual(literal.protocols[2], "丙")
+        XCTAssertEqual(literal.clauses.count, 1)
+        XCTAssertEqual(literal.clauses[0].identifier.value, "丁")
+        XCTAssertEqual(literal.clauses[0].type, "数値")
+        print("テスト終了: \(statement.string)")
     }
     func testEnumLiteralParsings() throws {
         let testPatterns = [
