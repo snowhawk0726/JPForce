@@ -531,12 +531,45 @@ extension JpfArray {
 }
 extension TypeLiteral : Evaluatable {
     func evaluated(with environment: Environment) -> JpfObject? {
-        accessed(with: environment) ?? JpfType(parameters: parameters, signature: signature, initializer: initializer, protocols: protocols, body: body)
+        if let error = accessed(with: environment) {return error}
+        switch derivedProtocols(from: protocols, with: environment) {
+        case .success(let all):
+            return JpfType(parameters: parameters, signature: signature, initializer: initializer, protocols: all, body: body)
+        case .failure(let error):
+            return error.message
+        }
     }
 }
 extension ProtocolLiteral : Evaluatable {
     func evaluated(with environment: Environment) -> JpfObject? {
-        accessed(with: environment) ?? JpfProtocol(protocols: protocols, clauses: clauses)
+        if let error = accessed(with: environment) {return error}
+        switch derivedProtocols(from: protocols, with: environment) {
+        case .success(let all):
+            return JpfProtocol(protocols: all, clauses: clauses)
+        case .failure(let error):
+            return error.message
+        }
+    }
+}
+func derivedProtocols(from protocols: [String], with environment: Environment) -> Result<[String], ConformityError> {
+    var results: [String] = protocols
+    for s in protocols {
+        guard let p = environment[s] as? JpfProtocol else {return .failure(.notFound(protocol: s))}
+        for d in p.protocols {
+            guard !protocols.contains(d) else {return .failure(.duplicated(protocol: d))}
+            results.append(d)
+        }
+    }
+    return .success(results)
+}
+enum ConformityError : Error {
+    case notFound(protocol: String)
+    case duplicated(protocol: String)
+    var message: JpfError {
+        switch self {
+        case .notFound(let s):      return JpfError("準拠する規約の識別子が見つからない。：" + s)
+        case .duplicated(let s):    return JpfError("準拠する規約の識別子が重複している。：" + s)
+        }
     }
 }
 extension EnumLiteral : Evaluatable {

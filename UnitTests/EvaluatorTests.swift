@@ -346,6 +346,34 @@ final class EvaluatorTests: XCTestCase {
         }
         print("テスト終了")
     }
+    func testProtocolConfomity() throws {
+        let input = """
+            甲は、規約であって、己は「数値」。
+            乙は、規約であって、準拠する規約が、甲。
+            丙は、規約であって、準拠する規約が、乙。条項が、庚は「文字列」。
+            丁は、型であって、準拠する規約が、丙。本体が、己は１。庚は「い」。
+            戊は、丁を生成したもの。
+        """
+        let testPatterns: [(input: String, expected: Any)] = [
+            ("戊の己。", 1),
+            ("戊の庚。", "い"),
+        ]
+        print("テストパターン: \(input)")
+        let environment = Environment()
+        let parser = Parser(Lexer(input))
+        let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+        let result = eval.object ?? environment.pull()
+        XCTAssertFalse(result?.isError ?? false, result?.error?.message ?? "")
+        for test in testPatterns {
+            print("テストパターン: \(test.input)")
+            let parser = Parser(Lexer(test.input))
+            let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+            let result = eval.object ?? environment.pull()!
+            try testObject(result, with: test.expected)
+            print("テスト(\(result))終了")
+        }
+        print("テスト終了")
+    }
     func testStringBuiltins() throws {
         let testPatterns: [(input: String, exptected: String?)] = [
             ("「こんにちは」と「、」と「みなさん。」を足す。","こんにちは、みなさん。"),
