@@ -206,6 +206,7 @@ extension JpfRange {
 extension JpfString {
     var count: JpfObject {JpfInteger(value: value.count)}
     var isEmpty: JpfObject {JpfBoolean.object(of: value.isEmpty)}
+    var number: Int? {Int(value)}
     func add(_ object: JpfObject) -> JpfObject {
         guard let string = object as? Self else {return JpfError("「\(type)」と「\(object.type)」" + cannotAdd)}
         return JpfString(value: value + string.value)
