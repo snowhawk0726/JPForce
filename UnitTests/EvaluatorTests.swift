@@ -586,6 +586,13 @@ final class EvaluatorTests: XCTestCase {
         }
         print("テスト(\(evaluated))終了")
     }
+    func testAsWellAsPredicate() throws {
+        let input = "１を2から引いたもの、および3と4と５を足したもので、関数【入力がaとb、bからaを引く】を実行。"
+        print("テストパターン: \(input)")
+        let evaluated = try XCTUnwrap(testEvaluator(input))
+        XCTAssertEqual(evaluated.number, 11)
+        print("テスト(\(evaluated))終了")
+    }
     func testSelectiveOrEvaluations() throws {
          let testPatterns: [(input: String, expected: Bool)] = [
              ("指定値は、「その二」。指定値が「その一」または「その二」または「その三」である", true),

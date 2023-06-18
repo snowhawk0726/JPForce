@@ -76,6 +76,7 @@ enum Token : Equatable {
         case AND        = "かつ"
         case OR         = "または"
         case MATA       = "また"  // workaround for 1または -> 1(また) .WA
+        case ASWELLAS   = "および"
         case RETURN     = "返す"
         case CASE       = "場合"
         case LOOP       = "反復"
