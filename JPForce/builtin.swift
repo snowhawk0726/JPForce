@@ -48,6 +48,7 @@ extension JpfObject {
     func sorted(by string: JpfString) -> JpfObject {JpfError(cannotSortByOrder)}
     func sorted(by function: JpfFunction, with environment: Environment) -> JpfObject {JpfError(cannotSortByFunc)}
     func reversed() -> JpfObject {JpfError(cannotReverse)}
+    func assign(_ value: JpfObject, to target: JpfObject) -> JpfObject {JpfError(cannotAssign)}
     // エラー
     var cannotCount: String     {"「\(type)」型の値は、数えることができない。"}
     var cannotAdd: String       {"を足すことはできない。"}
@@ -62,8 +63,11 @@ extension JpfObject {
     var cannotSortByFunc: String{"「\(type)」を並び替えることはできない。仕様：<配列>を<関数>で並び替える。"}
     var cannotSortByOrder: String{"「\(type)」を並び替えることはできない。仕様：<配列>を(「昇順」に、または「降順」に)並び替える。"}
     var cannotReverse: String   {"「\(type)」は逆順にすることはできない。仕様：<配列、文字列>を逆順にする。"}
-    var identifierNotAvailable: String {"(識別子)は利用可能でない。"}
-    var positionUnavailable: String {"位置を判定できない。"}
+    var cannotAssign: String    {"「\(type)に代入することはできない。"}
+    var identifierNotAvailable: String  {"(識別子)は利用可能でない。"}
+    var arrayPositionError: String      {"指定位置が、配列内に無い。"}
+    var identifierNotFound: String      {"指定した識別子のメンバーが見つからない。"}
+
 }
 extension JpfInteger {
     func add(_ object: JpfObject) -> JpfObject {
@@ -307,6 +311,13 @@ extension JpfArray {
         }
         return JpfError(rangeFormatError)
     }
+    func assign(_ value: JpfObject, to target: JpfObject) -> JpfObject {
+        guard let position = target.number else {return JpfError(arrayPositionError)}
+        var elements = elements
+        guard case 0..<elements.count = position else {return JpfError(arrayPositionError)}
+        elements[position] = value
+        return JpfArray(elements: elements)
+    }
     func remove(_ object: JpfObject) -> JpfObject {
         var objects = elements
         let error = JpfError("「\(type)」から「\(object.string)」" + cannotRemove)
@@ -505,6 +516,18 @@ extension JpfPhrase {
         return lhs.add(rhs)
     }
 }
+extension JpfType {
+    subscript(name: String, particle: Token?) -> JpfObject? {
+        if environment.contains(name), let object = environment[name] {return object}
+        // 利用可能な名前でないなら、デフォルト
+        return getObject(from: name, with: particle)
+    }
+    func assign(_ value: JpfObject, to target: JpfObject) -> JpfObject {
+        guard let name = target as? JpfString, environment.contains(name.value) else {return JpfError(identifierNotFound + ":\(target.string)")}
+        environment[name.value] = value
+        return self
+    }
+}
 extension JpfInstance {
     var count: JpfObject {JpfInteger(value: available.count)}   // 利用可能メンバー数
     func contains(type: String) -> Bool {return type == self.type || protocols.contains(type)}
@@ -524,12 +547,17 @@ extension JpfInstance {
         // 利用可能な名前でないなら、デフォルト
         return getObject(from: name, with: particle)
     }
+    func assign(_ value: JpfObject, to target: JpfObject) -> JpfObject {
+        guard let name = target as? JpfString, environment.contains(name.value) else {return JpfError(identifierNotFound + ":\(target.string)")}
+        environment[name.value] = value
+        return self
+    }
 }
 extension JpfEnum {
     var count: JpfObject {JpfInteger(value: elements.count)}
     subscript(name: String, particle: Token?) -> JpfObject? {
         if particle == .particle(.NO), elements.contains(name) {
-            return JpfEnumerator(type: self.name, identifier: name, value: environment[name])
+            return JpfEnumerator(type: self.name, identifier: name, rawValue: environment[name])
         } else
         if particle == .particle(.NO), name == "列挙子" {
             return JpfArray(elements: elements.map {JpfString(value: $0)})
@@ -539,8 +567,13 @@ extension JpfEnum {
 }
 extension JpfEnumerator {
     subscript(name: String, particle: Token?) -> JpfObject? {
-        if particle == .particle(.NO), name == "列挙子" {
-            return JpfString(value: identifier)
+        if particle == .particle(.NO) {
+            switch name {
+            case "列挙子": return JpfString(value: identifier)
+            case "値":   return rawValue
+            default:
+                break
+            }
         }
         return getObject(from: name, with: particle)
     }

@@ -190,7 +190,7 @@ extension Identifier : Evaluatable {
                 guard let enumObject = getEnumObject(from: environment, with: strings) else {
                     return "『\(strings.first!)』" + identifierNotFound
                 }
-                return JpfEnumerator(type: enumObject.name, identifier: strings.last!, value: enumObject.environment[strings.last!])
+                return JpfEnumerator(type: enumObject.name, identifier: strings.last!, rawValue: enumObject.environment[strings.last!])
             }
         }
         return nil
@@ -534,7 +534,10 @@ extension TypeLiteral : Evaluatable {
         if let error = accessed(with: environment) {return error}
         switch derivedProtocols(from: protocols, with: environment) {
         case .success(let all):
-            return JpfType(parameters: parameters, signature: signature, initializer: initializer, protocols: all, body: body)
+            let local = Environment(outer: environment)
+            if let members = typeMembers,
+               let result = Evaluator(from: members, with: local).object, result.isError {return result}
+            return JpfType(parameters: parameters, signature: signature, initializer: initializer, environment: local, protocols: all, body: body)
         case .failure(let error):
             return error.message
         }

@@ -5,7 +5,7 @@
 //  Created by 佐藤貴之 on 2023/03/06.
 //
 import Foundation
-import AVFoundation
+import AVFAudio
 
 // MARK: - intefaces for operation
 protocol PredicateOperable {
@@ -50,6 +50,7 @@ struct PredicateOperableFactory {
         case .keyword(.REDUCE):     return ReduceOperator(environment, by: token)
         case .keyword(.SORT):       return SortOperator(environment, by: token)
         case .keyword(.REVERSE):    return ReverseOperator(environment, by: token)
+        case .keyword(.SET):        return SetOperator(environment, by: token)
         case .keyword(.PRINT):      return PrintOperator(environment, by: token)
         case .keyword(.NEWLINE):    return NewlineOperator(environment)
         case .keyword(.READ):       return ReadOperator(environment, by: token)
@@ -128,7 +129,6 @@ extension PredicateOperable {
     var valueNotFound: JpfError         {JpfError("で判定すべき値が無かった。")}
     var determineError: JpfError        {JpfError("判定の述語が間違っている。述語：「ある」「ない」「等しい」")}
     var rangeFormatError: JpfError      {JpfError("範囲の判定対象は数値のみ。")}
-    var arrayPositionError: JpfError    {JpfError("指定位置が、配列内に無い。")}
     var returnParamError: JpfError      {JpfError("返すべき値がない。")}
     var cannotDivideByZero: JpfError    {JpfError("0で割ることはできない。")}
     var cannotCompare: JpfError         {JpfError("では比較できない。")}
@@ -175,6 +175,7 @@ extension PredicateOperable {
     var swapUsage: JpfError             {JpfError("仕様：<識別子>と<識別子>を入れ替える。または、〜と〜を入れ替える。")}
     var generateUsage: JpfError         {JpfError("仕様：<識別子(型)>から生成する。")}
     var generateEnumeratorUsage: JpfError {JpfError("仕様：<値>で<列挙型>から生成する。または<値>から<列挙型>を生成する。")}
+    var setUsage: JpfError      {JpfError("仕様：<値>(を)<オブジェクト>のメンバー「<識別子>」に設定する。または、<オブジェクト>のメンバー「<識別子>」に<値>を設定する。")}
 }
 // MARK: - 表示/音声
 struct PrintOperator : PredicateOperable {
@@ -315,8 +316,7 @@ struct AddOperator : PredicateOperable {
     let environment: Environment, op: Token
     func operated() -> JpfObject? {
         guard let params = environment.peek(2)  else {return "「\(op.literal)」" + additionParamError + additionUsage}
-        let left = params[0]; let right = params[1]
-        var added = left.add(right)
+        var added = params[0].add(params[1])
         if !added.isError {environment.drop(2)}
         while isPeekParticle(.TO) && !added.isError {   // スタックにト格があれば、中身を足す
             added = leftOperand!.add(added)
@@ -657,7 +657,7 @@ struct GenerateOperator : PredicateOperable {
         guard environment.isPeekParticle(.DE) || environment.isPeekParticle(.KARA), let object = environment.unwrappedPeek else {return generateEnumeratorUsage}
         environment.drop()
         for pairs in type.environment.enumerated {
-            if object.isEqual(to: pairs.value) {return JpfEnumerator(type: type.name, identifier: pairs.key, value: pairs.value)}
+            if object.isEqual(to: pairs.value) {return JpfEnumerator(type: type.name, identifier: pairs.key, rawValue: pairs.value)}
         }
         return valueOfEnumeratorNotFound + object.string
     }
@@ -867,6 +867,29 @@ struct ReverseOperator : PredicateOperable {
         return left.reversed()
     }
 }
+struct SetOperator : PredicateOperable {
+    init(_ environment: Environment, by op: Token) {self.environment = environment; self.op = op}
+    let environment: Environment, op: Token
+    func operated() -> JpfObject? {
+        if var params = environment.peek(3) {       // 対象のメンバー「m」に値を設定
+            switch (params[0].particle, params[1].particle, params[2].particle) {
+            case (Token(.NO),Token(.NI),Token(.WO)):
+                params.swapAt(0, 1)
+                params.swapAt(0, 2)
+                fallthrough
+            case (Token(.WO),Token(.NO),Token(.NI)):
+                guard let value = params[0].value, let object = params[1].value else {break}
+                let result = object.assign(value, to: params[2].value!)
+                guard !result.isError else {return result}
+                environment.drop(3)
+                return nil
+            default:
+                break
+            }
+        }
+        return setUsage
+    }
+}
 // MARK: - 補助演算
 /// <式>たもの → <式>
 /// 「もの」(Keyword(.MONO))は、入力から値(式)を取り出す。
@@ -1000,8 +1023,7 @@ struct AssignOperator : PredicateOperable {
             case (Token(.WO),Token(.NO),Token(.NI)):
                 guard let value = params[0].value else {break}
                 guard let array = params[1].value as? JpfArray else {break}
-                guard let position = params[2].number else {break}
-                let result = assign(value, to: position, in: array)
+                let result = array.assign(value, to: params[2])
                 guard !result.isError else {return result}
                 environment.drop(3)
                 if array.name.isEmpty {return result}// 辞書にない場合、代入した配列を返す。
@@ -1017,10 +1039,10 @@ struct AssignOperator : PredicateOperable {
             params.swapAt(0, 1)
             fallthrough
         case (Token(.WO),Token(.NI)), (nil,Token(.NI)):
-            guard var value = getValue(from: params[0]) else {break}
+            guard var value = params[0].value else {break}
             if let enumerator = params[1].value as? JpfEnumerator {
                 environment.drop(2)
-                return assign(value, to: enumerator)// 列挙子に値を代入し返す。
+                return JpfEnumerator(type: enumerator.type, name: enumerator.name, identifier: enumerator.identifier, rawValue: value)  // 列挙子に値を代入し返す。
             }
             let name = environment.getName(from: params[1])
             guard !name.isEmpty else {break}
@@ -1034,18 +1056,6 @@ struct AssignOperator : PredicateOperable {
         return usage
     }
     private var usage: JpfError {op == .keyword(.ASSIGN) ? assignUsage : overwriteUsage}
-    private func getValue(from object: JpfObject) -> JpfObject? {
-        object is JpfPhrase ? object.value : object
-    }
-    private func assign(_ value: JpfObject, to position: Int, in array: JpfArray) -> JpfObject {
-        var elements = array.elements
-        guard case 0..<elements.count = position else {return arrayPositionError}
-        elements[position] = value
-        return JpfArray(elements: elements)
-    }
-    private func assign(_ value: JpfObject, to enumerator: JpfEnumerator) -> JpfObject {
-        return JpfEnumerator(type: enumerator.type, name: enumerator.name, identifier: enumerator.identifier, value: value)
-    }
     private func assign(_ value: JpfObject, to environment: Environment, by name: String, with op: Token) {
         if op == .keyword(.OVERWRITE) && environment.outer?[name] != nil {
             environment.outer![name] = value
