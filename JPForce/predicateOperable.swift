@@ -381,6 +381,7 @@ struct NegateOperator : PredicateOperable {
     let environment: Environment, op: Token
     func operated() -> JpfObject? {
         guard let number = environment.peek?.number else {return "「\(op.literal)」" + numerationParamError3 + negateUsage}
+        environment.drop()
         return JpfInteger(value: -number)
     }
 }
@@ -871,13 +872,14 @@ struct SetOperator : PredicateOperable {
     init(_ environment: Environment, by op: Token) {self.environment = environment; self.op = op}
     let environment: Environment, op: Token
     func operated() -> JpfObject? {
-        if var params = environment.peek(3) {       // 対象のメンバー「m」に値を設定
+        if var params = environment.peek(3) {
             switch (params[0].particle, params[1].particle, params[2].particle) {
-            case (Token(.NO),Token(.NI),Token(.WO)):
+            case (Token(.NO),Token(.NI),Token(.WO)),    // 対象のメンバー「m」に値を設定
+                 (Token(.NO),Token(.WO),Token(.NI)):    // 対象のメンバー「m」を値に設定
                 params.swapAt(0, 1)
                 params.swapAt(0, 2)
                 fallthrough
-            case (Token(.WO),Token(.NO),Token(.NI)):
+            case (Token(.WO),Token(.NO),Token(.NI)):    // 値を、対象のメンバー「m」に設定
                 guard let value = params[0].value, let object = params[1].value else {break}
                 let result = object.assign(value, to: params[2].value!)
                 guard !result.isError else {return result}

@@ -490,13 +490,6 @@ extension JpfFunction {
         }
         return nil
     }
-    /// 関数で返す値がラップされていたら、アンラップして返す。
-    /// (アンラップしないと、呼び出し元の処理が止まってしまう)
-    /// - Parameter object: 返す値
-    /// - Returns: アンラップされた値、またはnil (すでにスタックに積まれているはので値は返さない)
-    private func unwrappedReturnValue(of object: JpfObject) -> JpfObject? {
-        object.isReturnValue ? object.value! : nil
-    }
 }
 extension JpfArray {
     func executed(with environment: Environment) -> JpfObject? {
@@ -526,8 +519,48 @@ extension JpfArray {
             environment.isSameType(of: object, as: designated.0) && environment.isSameParticle(of: object, as: particle)
         }
     }
-    private var notExecutableObject: JpfError   {JpfError("「関数」以外を実行しようとした。型：")}
-    private var functionParameterError: JpfError{JpfError("「関数」の入力が指定形式と一致しない。")}
+}
+extension ComputationLiteral : Evaluatable {
+    func evaluated(with environment: Environment) -> JpfObject? {
+        accessed(with: environment) ?? JpfComputation(parameters: parameters, signature: signature, setter: setter, getter: getter, environment: environment)
+    }
+}
+extension JpfComputation {
+    /// 算出(取得)を行う。
+    /// 入力は、算出に「設定」がない場合、評価される。
+    /// - Parameter environment: 実行中の(通常もしくは算出の)環境
+    /// - Returns: エラーかアンラップされた返り値、なければnil
+    func retrieved(with environment: Environment) -> JpfObject? {
+        guard let body = getter else {return getterNotFound}
+        let local = Environment(outer: self.environment)    // 環境を拡張
+        if setter == nil {                                  // 「設定」がない場合、入力を評価
+            let stackEnv = environment.outer != nil ? environment : self.environment
+            let result = local.apply(parameters, with: signature, from: stackEnv)
+            guard !result.isError else {return result}
+        }
+        defer {environment.push(local.pullAll())}           // スタックを戻す
+        if let evaluated = Evaluator(from: body, with: local).object {
+            guard !evaluated.isError else {return evaluated}
+            return unwrappedReturnValue(of: evaluated)
+        }
+        return nil
+    }
+    /// 算出(設定)を行う。
+    /// - Parameter environment: 実行中の(通常もしくは算出の)環境
+    /// - Returns: エラーかアンラップされた返り値、なければnil
+    func set(with environment: Environment) -> JpfObject? {
+        guard let body = setter else {return setterNotFound}
+        let local = Environment(outer: self.environment)    // 環境を拡張
+        let stackEnv = environment.outer != nil ? environment : self.environment
+        let result = local.apply(parameters, with: signature, from: stackEnv)
+        guard !result.isError else {return result}
+        defer {environment.push(local.pullAll())}           // スタックを戻す
+        if let evaluated = Evaluator(from: body, with: local).object {
+            guard !evaluated.isError else {return evaluated}
+            return unwrappedReturnValue(of: evaluated)
+        }
+        return nil
+    }
 }
 extension TypeLiteral : Evaluatable {
     func evaluated(with environment: Environment) -> JpfObject? {
@@ -554,7 +587,7 @@ extension ProtocolLiteral : Evaluatable {
         }
     }
 }
-func derivedProtocols(from protocols: [String], with environment: Environment) -> Result<[String], ConformityError> {
+private func derivedProtocols(from protocols: [String], with environment: Environment) -> Result<[String], ConformityError> {
     var results: [String] = protocols
     for s in protocols {
         guard let p = environment[s] as? JpfProtocol else {return .failure(.notFound(protocol: s))}

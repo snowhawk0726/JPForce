@@ -127,6 +127,7 @@ enum Token : Equatable {
         case POSITION   = "位置"
         case MEMBER     = "メンバー"
         case SET        = "設定"
+        case COMPUTATION = "算出"
     }
     /// 文字列の連想値について識別しないための分類(.IDENT("文字列") → .ident)
     enum TokenType : Hashable {

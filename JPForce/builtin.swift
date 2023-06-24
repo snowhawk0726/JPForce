@@ -34,6 +34,30 @@ extension JpfObject {
             return nil
         }
     }
+    /// 関数で返す値がラップされていたら、アンラップして返す。
+    /// (アンラップしないと、呼び出し元の処理が止まってしまう)
+    /// - Parameter object: 返す値
+    /// - Returns: アンラップされた値、またはnil (すでにスタックに積まれているはので値は返さない)
+    func unwrappedReturnValue(of object: JpfObject) -> JpfObject? {
+        object.isReturnValue ? object.value! : nil
+    }
+    /// オブジェクト自身の対象に、値を設定する。対象が算出である場合は、算出の設定処理を行う。
+    /// - Parameters:
+    ///   - value: 設定する値
+    ///   - target: 設定する対象識別子
+    ///   - environment: オブジェクトの環境
+    /// - Returns: エラーまたはオブジェクト自身
+    func assign(_ value: JpfObject, to target: JpfObject, with environment: Environment) -> JpfObject {
+        guard let name = target as? JpfString, environment.contains(name.value) else {return JpfError(identifierNotFound + ":\(target.string)")}
+        if let computation = environment[name.value] as? JpfComputation {   // 算出の設定を行う
+            environment.push(value)                                         // 設定値
+            if let result = computation.set(with: environment), result.isError {return result}
+        } else {
+            environment[name.value] = value
+        }
+        return self
+    }
+    // デフォルト実装(エラー)
     var count: JpfObject {JpfError(cannotCount)}
     var isEmpty: JpfObject {JpfError(cannotCount)}
     func add(_ object: JpfObject) -> JpfObject {JpfError("「\(type)」と「\(object.type)」" + cannotAdd)}
@@ -49,7 +73,7 @@ extension JpfObject {
     func sorted(by function: JpfFunction, with environment: Environment) -> JpfObject {JpfError(cannotSortByFunc)}
     func reversed() -> JpfObject {JpfError(cannotReverse)}
     func assign(_ value: JpfObject, to target: JpfObject) -> JpfObject {JpfError(cannotAssign)}
-    // エラー
+    // エラーメッセージ
     var cannotCount: String     {"「\(type)」型の値は、数えることができない。"}
     var cannotAdd: String       {"を足すことはできない。"}
     var cannotRemove: String    {"を削除することはできない。"}
@@ -67,7 +91,10 @@ extension JpfObject {
     var identifierNotAvailable: String  {"(識別子)は利用可能でない。"}
     var arrayPositionError: String      {"指定位置が、配列内に無い。"}
     var identifierNotFound: String      {"指定した識別子のメンバーが見つからない。"}
-
+    var notExecutableObject: JpfError   {JpfError("「関数」以外を実行しようとした。型：")}
+    var functionParameterError: JpfError{JpfError("「関数」の入力が指定形式と一致しない。")}
+    var getterNotFound: JpfError        {JpfError("「算出」の取得定義が見つからなかった。")}
+    var setterNotFound: JpfError        {JpfError("「算出」の設定定義が見つからなかった。")}
 }
 extension JpfInteger {
     func add(_ object: JpfObject) -> JpfObject {
@@ -523,9 +550,7 @@ extension JpfType {
         return getObject(from: name, with: particle)
     }
     func assign(_ value: JpfObject, to target: JpfObject) -> JpfObject {
-        guard let name = target as? JpfString, environment.contains(name.value) else {return JpfError(identifierNotFound + ":\(target.string)")}
-        environment[name.value] = value
-        return self
+        return assign(value, to: target, with: environment)
     }
 }
 extension JpfInstance {
@@ -548,9 +573,7 @@ extension JpfInstance {
         return getObject(from: name, with: particle)
     }
     func assign(_ value: JpfObject, to target: JpfObject) -> JpfObject {
-        guard let name = target as? JpfString, environment.contains(name.value) else {return JpfError(identifierNotFound + ":\(target.string)")}
-        environment[name.value] = value
-        return self
+        return assign(value, to: target, with: environment)
     }
 }
 extension JpfEnum {

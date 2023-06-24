@@ -811,6 +811,48 @@ final class EvaluatorTests: XCTestCase {
         }
         print("テスト終了")
     }
+    func testComputations() throws {
+        let input = """
+            挨拶は、型であって、【
+                型のメンバーが、【宛名は、「田中」。本文は、算出【「こんにちは、」と宛名と「さん。」を足す】】。
+            】。
+            温度は、型であって、【
+                摂氏は、0。
+                華氏は、算出【入力が設定値、
+                    設定は、【設定値から３２を引いたものに５を掛け、９で割り、「摂氏」に上書きする。】
+                    取得は、【９に摂氏を掛け５で割ったものに、３２を足す。】
+                】。
+                「摂氏」と「華氏」は利用可能。
+            】。
+            気温は、温度から生成する。
+            税込は、算出であって、入力が金額、金額を10で割って、金額を足す。
+        """
+        let testPatterns: [(input: String, expected: Any)] = [
+            ("挨拶の本文。", "こんにちは、田中さん。"),
+            ("気温の摂氏。", 0),
+            ("気温の華氏。", 32),
+            ("気温のメンバー「摂氏」に20度を設定する。気温の摂氏。", 20),
+            ("気温の華氏。", 68),
+            ("気温のメンバー「華氏」を32度に設定する。気温の摂氏。", 0),
+            ("気温の華氏。", 32),
+            ("100円の税込。", 110),
+        ]
+        print("テストパターン: \(input)")
+        let environment = Environment()
+        let parser = Parser(Lexer(input))
+        let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+        let result = eval.object ?? environment.pull()
+        XCTAssertFalse(result?.isError ?? false, result?.error?.message ?? "")
+        for test in testPatterns {
+            print("テストパターン: \(test.input)")
+            let parser = Parser(Lexer(test.input))
+            let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+            let expected = eval.object ?? environment.pull()!
+            try testObject(expected, with: test.expected)
+            print("テスト(\(expected))終了")
+        }
+        print("テスト終了")
+    }
 }
 // MARK: - ヘルパー
 private func testObject(_ object: JpfObject, with exptected: Int) throws {

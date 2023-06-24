@@ -144,3 +144,9 @@ extension JpfArray : JpfObjectAccessible {
     }
     private func isExecutable(by name: String) -> Bool {name.isExecutable && elements.first is JpfFunction}
 }
+extension JpfComputation : JpfObjectAccessible {
+    func accessed(by name: String, with environment: Environment) -> JpfObject? {
+        accessed(type: type, with: environment) ??  // 算出でオブジェクトにアクセスしている？→ Yesならエラー
+        retrieved(with: environment)
+    }
+}

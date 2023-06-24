@@ -176,6 +176,24 @@ struct JpfFunction : JpfObject {
         return s.replacingOccurrences(of: "。】", with: "】")
     }
 }
+struct JpfComputation : JpfObject {
+    static let type = "算出"
+    var name: String = ""
+    var parameters: [Identifier]    // 入力パラメータ
+    var signature: InputFormat      // 入力形式
+    var setter: BlockStatement?     // 設定ブロック
+    var getter: BlockStatement?     // 取得ブロック
+    var environment: Environment
+    var string: String {
+        let s = "算出".color(.magenta) + "であって、【" +
+        (parameters.isEmpty ? "" : "入力が、\(zip(parameters, signature.strings).map {$0.string + $1}.joined(separator: "と"))であり、") +
+        (setter.map {"設定は、【\($0.string)】。"} ?? "") +
+        (getter.map {"取得は、【\($0.string)】。"} ?? "") +
+        "】"
+        return s.replacingOccurrences(of: "。】", with: "】")
+    }
+
+}
 struct JpfEnum : JpfObject {
     static let type = "列挙"
     var name: String = ""
@@ -214,8 +232,8 @@ struct JpfType : JpfObject {
         (parameters.isEmpty ? "" : "入力が、\(zip(parameters, signature.strings).map {$0.string + $1}.joined(separator: "と"))であり、") +
         (protocols.isEmpty ? "" : "準拠する規約は、\(protocols.map {$0}.joined(separator: "と、"))。") +
         (initializer.map {"初期化は、【\($0.string)】。"} ?? "") +
-        (environment.enumerated.isEmpty ? "" : "型のメンバーが、\(environment.enumerated.map {$0.key}.joined(separator: "と、"))") +
-        (body.map {"インスタンスのメンバーが、\($0.string)"} ?? "") +
+        (environment.enumerated.isEmpty ? "" : "型のメンバーは、\(environment.enumerated.map {$0.key}.joined(separator: "と、"))。") +
+        (body.map {"本体は、\($0.string)"} ?? "") +
         "】"
         return s.replacingOccurrences(of: "。】", with: "】")
     }

@@ -503,6 +503,8 @@ struct PrefixExpressionParserFactory {
         case .keyword(.OR),.keyword(.AND):
                                     return LogicalExpressionParser(parser)
         case .keyword(.FUNCTION):   return FunctionLiteralParser(parser)
+        case .keyword(.COMPUTATION):
+                                    return ComputationLiteralParser(parser)
         case .keyword(.PROTOCOL):   return ProtocolLiteralParser(parser)
         case .keyword(.TYPE):       return TypeLiteralParser(parser)
         case .keyword(.ARRAY):      return ArrayLiteralParser(parser)
@@ -610,6 +612,59 @@ struct FunctionLiteralParser : ExpressionParsable {
         return FunctionLiteral(token: token, parameters: identifiers, signature: signature, body: body)
     }
 }
+struct ComputationLiteralParser : ExpressionParsable {
+    init(_ parser: Parser) {self.parser = parser}
+    let parser: Parser
+    func parse() -> Expression? {
+        let token = currentToken            // 算出であって、(であり、)
+        _ = getNext(whenNextIs: ExpressionStatement.deatte + ExpressionStatement.deari, matchAll: false)
+        let endOfType: Token.Symbol = getNext(whenNextIs: .LBBRACKET) ? .RBBRACKET : .EOL
+        // Prameter block 解析
+        guard let paramenters = parseParameters() else {
+            error(message: "算出で、「入力が〜であり、」の解析に失敗した。")
+            return nil
+        }
+        let identifiers = paramenters.map {$0.0}
+        let signature = parseSignature(from: paramenters.map {$0.1})
+        skipNextEols()
+        // Setter block 解析
+        var setter: BlockStatement?
+        if getNext(whenNextIs: ExpressionStatement.settei) {    // 設定が(は)、
+            _ = getNext(whenNextIs: ExpressionStatement.ga + ExpressionStatement.wa, matchAll: false)
+            _ = getNext(whenNextIs: .COMMA)
+            let endSymbol: Token.Symbol = getNext(whenNextIs: .LBBRACKET) ? .RBBRACKET : .EOL
+            setter = BlockStatementParser(parser, symbol: endSymbol).blockStatement
+            if setter == nil {
+                error(message: "算出で、「設定が、〜」の解析に失敗した。")
+                return nil
+            }
+            _ = getNext(whenNextIs: .PERIOD)    // ブロックの句点を飛ばす
+            skipNextEols()
+        }
+        // Getter block 解析
+        var getter: BlockStatement?
+        if currentToken != .symbol(endOfType) {
+            if getNext(whenNextIs: ExpressionStatement.syutoku) {   // 取得が(は)、
+                _ = getNext(whenNextIs: ExpressionStatement.ga + ExpressionStatement.wa, matchAll: false)
+                _ = getNext(whenNextIs: .COMMA)
+                let endSymbol: Token.Symbol = getNext(whenNextIs: .LBBRACKET) ? .RBBRACKET : .PERIOD
+                getter = BlockStatementParser(parser, symbol: endSymbol).blockStatement
+            } else {
+                getter = BlockStatementParser(parser, symbol: endOfType).blockStatement
+            }
+            if getter == nil {
+                error(message: "算出で、「取得が、〜」の解析に失敗した。")
+                return nil
+            }
+            _ = getNext(whenNextIs: .PERIOD)    // 取得ブロックの句点を飛ばす
+            skipNextEols()
+        }
+        if currentToken != .symbol(endOfType) {
+            _ = getNext(whenNextIs: endOfType)  // 算出ブロックの終わりを読み飛ばす。
+        }
+        return ComputationLiteral(token: token, parameters: identifiers, signature: signature, setter: setter, getter: getter)
+    }
+}
 struct ProtocolLiteralParser : ExpressionParsable {
     init(_ parser: Parser) {self.parser = parser}
     let parser: Parser
@@ -681,6 +736,7 @@ struct TypeLiteralParser : ExpressionParsable {
         let token = currentToken            // 型であって、(であり、)
         _ = getNext(whenNextIs: ExpressionStatement.deatte + ExpressionStatement.deari, matchAll: false)
         let endOfType: Token.Symbol = getNext(whenNextIs: .LBBRACKET) ? .RBBRACKET : .EOL
+        countUp(endOfType)
         // Prameter block 解析
         guard let paramenters = parseParameters() else {
             error(message: "型で、「入力が〜であり、」の解析に失敗した。")
@@ -728,6 +784,7 @@ struct TypeLiteralParser : ExpressionParsable {
                 error(message: "型で、「本体が、〜」の解析に失敗した。")
                 return nil
             }
+            if body!.statements.isEmpty {body = nil}            // ブロックの終わりが空文
         }
         return TypeLiteral(token: token, parameters: identifiers, signature: signature, initializer: initialyzer, protocols: protocols, typeMembers: members, body: body)
     }

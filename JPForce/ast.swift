@@ -74,6 +74,8 @@ struct ExpressionStatement : Statement {
     static let kiyaku = "規約"
     static let typemembers = "型のメンバー"
     static let junkyosuru = "準拠する"
+    static let settei = "設定"
+    static let syutoku = "取得"
     static let deatte = "であって、"
     static let deari = "であり、"
     static let soreigai = "それ以外"
@@ -208,13 +210,29 @@ struct FunctionLiteral : Expression {
     var token: Token                // 関数トークン
     var parameters: [Identifier]    // 入力パラメータ
     var signature: InputFormat      // 入力形式
-    var body: BlockStatement
+    var body: BlockStatement        // 本体ブロック
     //
     var tokenLiteral: String {token.literal}
     var string: String {
         token.coloredLiteral + "であって、【" +
         (!parameters.isEmpty ? "入力が" + "、\(zip(parameters, signature.strings).map {$0.string + $1}.joined(separator: "と"))であり、" : "") +
         "本体が" + "、" + body.string + "】"
+    }
+}
+struct ComputationLiteral : Expression {
+    var token: Token                // 算出トークン
+    var parameters: [Identifier]    // 入力パラメータ
+    var signature: InputFormat      // 入力形式
+    var setter: BlockStatement?     // 設定ブロック
+    var getter: BlockStatement?     // 取得ブロック
+    //
+    var tokenLiteral: String {token.literal}
+    var string: String {
+        token.coloredLiteral + "であって、【" +
+        (parameters.isEmpty ? "" : "入力が" + "、\(zip(parameters, signature.strings).map {$0.string + $1}.joined(separator: "と"))であり、") +
+        (setter.map {"設定は、【\($0.string)】。"} ?? "") +
+        (getter.map {"取得は、【\($0.string)】。"} ?? "") +
+        "】"
     }
 }
 struct ProtocolLiteral : Expression {
@@ -253,9 +271,9 @@ struct TypeLiteral : Expression {
         token.coloredLiteral + "であって、【" +
         (parameters.isEmpty ? "" : "入力が、\(zip(parameters, signature.strings).map {$0.string + $1}.joined(separator: "と"))であり、") +
         (initializer.map {"初期化は、\($0.string)であり、"} ?? "") +
-        (protocols.isEmpty ? "" : "準拠する規約が、\(protocols.map {$0}.joined(separator: "と、"))であり、") +
-        (typeMembers.map {"型のメンバーが、\($0.string)であり、"} ?? "") +
-        (body.map {"本体が、\($0.string)"} ?? "") +
+        (protocols.isEmpty ? "" : "準拠する規約は、\(protocols.map {$0}.joined(separator: "と、"))であり、") +
+        (typeMembers.map {"型のメンバーは、\($0.string)であり、"} ?? "") +
+        (body.map {"本体は、\($0.string)"} ?? "") +
         "】"
     }
 }
