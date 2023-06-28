@@ -120,7 +120,7 @@ struct JpfRange : JpfObject {
     var name: String = ""
     var lowerBound: (JpfInteger, Token)?
     var upperBound: (JpfInteger, Token)?
-    var string: String {"範囲".color(.magenta) + "【" +
+    var string: String {type.color(.magenta) + "【" +
         (lowerBound.map {$0.string + $1.literal} ?? "") + comma +
         (upperBound.map {$0.string + $1.literal} ?? "") + "】"}
     private var comma: String {(lowerBound != nil && upperBound != nil) ? "、" : ""}
@@ -169,10 +169,9 @@ struct JpfFunction : JpfObject {
     var body: BlockStatement
     var environment: Environment
     var string: String {
-        let s = "関数".color(.magenta) + "であって、【" +
-        (parameters.isEmpty ? "" :
-            "入力が、\(zip(parameters, signature.strings).map {$0.string + $1}.joined(separator: "と"))であり、") +
-         "本体が、" + body.string + "】"
+        let s = type.color(.magenta) + "であって、【" +
+        (parameters.isEmpty ? "" : "入力が、\(zip(parameters, signature.strings).map {$0.string + $1}.joined(separator: "と"))であり、") +
+        "本体が、\(body.string)】"
         return s.replacingOccurrences(of: "。】", with: "】")
     }
 }
@@ -185,7 +184,7 @@ struct JpfComputation : JpfObject {
     var getter: BlockStatement?     // 取得ブロック
     var environment: Environment
     var string: String {
-        let s = "算出".color(.magenta) + "であって、【" +
+        let s = type.color(.magenta) + "であって、【" +
         (parameters.isEmpty ? "" : "入力が、\(zip(parameters, signature.strings).map {$0.string + $1}.joined(separator: "と"))であり、") +
         (setter.map {"設定は、【\($0.string)】。"} ?? "") +
         (getter.map {"取得は、【\($0.string)】。"} ?? "") +
@@ -199,9 +198,8 @@ struct JpfEnum : JpfObject {
     var name: String = ""
     var elements: [String]
     var environment: Environment
-    var string: String {"列挙".color(.magenta) + "であって、【" +
-        (elements.isEmpty ? "" :
-         "要素が、\(elements.map {$0}.joined(separator: "と、"))") + "】"
+    var string: String {type.color(.magenta) + "であって、【" +
+        (elements.isEmpty ? "" : "要素が、\(elements.map {$0}.joined(separator: "と、"))") + "】"
     }
 }
 struct JpfEnumerator : JpfObject {
@@ -228,12 +226,12 @@ struct JpfType : JpfObject {
     var protocols: [String]         // 準拠する規約
     var body: BlockStatement?
     var string: String {
-        let s = "型".color(.magenta) + "であって、【" +
+        let s = type.color(.magenta) + "であって、【" +
         (parameters.isEmpty ? "" : "入力が、\(zip(parameters, signature.strings).map {$0.string + $1}.joined(separator: "と"))であり、") +
         (protocols.isEmpty ? "" : "準拠する規約は、\(protocols.map {$0}.joined(separator: "と、"))。") +
         (initializer.map {"初期化は、【\($0.string)】。"} ?? "") +
-        (environment.enumerated.isEmpty ? "" : "型のメンバーは、\(environment.enumerated.map {$0.key}.joined(separator: "と、"))。") +
-        (body.map {"本体は、\($0.string)"} ?? "") +
+        (environment.enumerated.isEmpty ? "" : "型のメンバーが、\(environment.enumerated.map {$0.key}.joined(separator: "と、"))。") +
+        (body.map {"本体が、\($0.string)"} ?? "") +
         "】"
         return s.replacingOccurrences(of: "。】", with: "】")
     }
@@ -255,10 +253,10 @@ struct JpfProtocol : JpfObject {
     var body: BlockStatement?       // 規約のデフォルト実装
     //
     var string: String {
-        let s = "規約".color(.magenta) + "であって、【\n" +
-        (protocols.isEmpty ? "" : "準拠する規約は、\(protocols.map {$0}.joined(separator: "と"))。\n") +
+        let s = type.color(.magenta) + "であって、【" +
+        (protocols.isEmpty ? "" : "準拠する規約は、\(protocols.map {$0}.joined(separator: "と"))。") +
         "条項が、" + clauses.map {$0.string}.joined(separator: " ") +
-        "\n】"
+        "】"
         return s.replacingOccurrences(of: "。】", with: "】")
     }
 }
@@ -266,7 +264,7 @@ struct JpfArray : JpfObject {
     static let type = "配列"
     var name: String = ""
     var elements: [JpfObject]
-    var string: String {"配列".color(.magenta) + "であって、【" +
+    var string: String {type.color(.magenta) + "であって、【" +
         (elements.isEmpty ? "" :
          "要素が、\(elements.map {$0.string}.joined(separator: "と、"))") + "】"
     }
@@ -291,9 +289,9 @@ struct JpfDictionary : JpfObject {
     var name: String = ""
     /// キーがハッシュ化されているため、元のキーも値として保持しておく｀
     var pairs: [JpfHashKey: (key: JpfObject, value: JpfObject)]
-    var string: String {"辞書".color(.magenta) + "であって、【" +
-        (pairs.isEmpty ? "" :
-         "要素が、\(pairs.map {"\($0.value.key.string)が\($0.value.value.string)"}.joined(separator: "と、"))") + "】"
+    var string: String {type.color(.magenta) + "であって、【" +
+        (pairs.isEmpty ? "" : "要素が、\(pairs.map {"\($0.value.key.string)が\($0.value.value.string)"}.joined(separator: "と、"))") +
+        "】"
     }
     subscript(key: JpfHashKey) -> (JpfObject, JpfObject)? {
         get {return pairs[key]}
