@@ -80,7 +80,7 @@ extension BlockStatement : Evaluatable {
 extension DefineStatement : Evaluatable {
     func evaluated(with environment: Environment) -> JpfObject? {
         if let result = value.evaluated(with: environment), result.isError {return result}
-        var object = environment.pull()
+        guard var object = environment.pull() else {return nil}
         if isExtended {                             // 多重定義
             if let function = object as? JpfFunction {                  // 関数多重定義
                 let result = overload(function, with: environment)
@@ -88,11 +88,11 @@ extension DefineStatement : Evaluatable {
                 object = result
             } else
             if let orignal = environment[name.value] as? JpfProtocol {  // 規約デフォルト実装
-                guard let extended = object as? JpfType else {return protocolExtentionError + "(拡張先が\(object?.type ?? "無い"))"}
+                guard let extended = object as? JpfType else {return protocolExtentionError + "(拡張先が\(object.type))"}
                 object = JpfProtocol(protocols: orignal.protocols, clauses: orignal.clauses, body: extended.body)
             }
         }
-        object?.name = name.value
+        object.name = name.value
         environment[name.value] = object
         return nil
     }

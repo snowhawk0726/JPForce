@@ -993,20 +993,13 @@ struct EmptyOperator : PredicateOperable {
     init(_ environment: Environment, by op: Token) {self.environment = environment; self.op = op}
     let environment: Environment, op: Token
     func operated() -> JpfObject? {
-        if isPeekParticle(.GA), let object = leftOperand?.value {   // <値>が空？
-            return object[op.literal, Token(.GA)]
+        if isPeekParticle(.GA), let object = leftOperand?.value {
+            return object[op.literal, Token(.GA)]   // <値>が空？
         }
-        if isPeekParticle(.WO) {
-            switch environment.peek?.value {
-            case let array as JpfArray:             // <配列>を空にする。
-                environment.drop()
-                return array.remove(JpfString(value: "全て"))
-            case let dictionary as JpfDictionary:   // <辞書>を空にする。
-                environment.drop()
-                return dictionary.remove(JpfString(value: "全て"))
-            default:
-                break
-            }
+        if isPeekParticle(.WO), let object = environment.peek?.value, !object.name.isEmpty {
+            environment.drop()
+            environment[object.name] = nil          // 対象を辞書から消す
+            return nil
         }
         environment.empty()                         // 入力を空にする
         return nil
