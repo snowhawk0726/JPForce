@@ -110,6 +110,22 @@ extension JpfInteger {
     }
 }
 extension JpfRange {
+    /// 範囲の比較（未満と他の上限は不一致）
+    func isEqual(to object: JpfObject) -> Bool {
+        guard let rhs = object as? Self else {return false}
+        return lowerBound?.0.number == rhs.lowerBound?.0.number &&
+        upperBound?.0.number == rhs.upperBound?.0.number &&
+        isEqual(lowerBound?.1, to: rhs.lowerBound?.1) &&
+        isEqual(upperBound?.1, to: rhs.upperBound?.1)
+    }
+    private func isEqual(_ lhs: Token?, to rhs: Token?) -> Bool {
+        if lhs == rhs {return true}
+        guard let lhs = lhs, let rhs = rhs else {return false}
+        return lhs.isParticle(.KARA) && rhs.isKeyword(.GTEQUAL) ||
+        lhs.isKeyword(.GTEQUAL) && rhs.isParticle(.KARA) ||
+        lhs.isParticle(.MADE) && rhs.isKeyword(.LTEQUAL) ||
+        lhs.isKeyword(.LTEQUAL) && rhs.isParticle(.MADE)
+    }
     var count: JpfObject {
         guard let lower = lowerBound?.0.number, let upper = upperBound?.0.number else {return JpfError(cannotCountRange)}
         let countInRange = upper - lower + ((upperBound?.1 == .keyword(.UNDER)) ? 0 : 1)
@@ -265,6 +281,30 @@ extension JpfString {
         default:
             return getObject(from: name, with: particle)
         }
+    }
+    subscript(range: JpfRange) -> JpfObject? {
+        switch (range.lowerBound?.0.number, range.lowerBound?.1,
+                range.upperBound?.0.number, range.upperBound?.1) {
+        case (let l?, Token(.KARA),    let u?, Token(.MADE)),
+            (let l?, Token(.GTEQUAL), let u?, Token(.LTEQUAL)):
+            return JpfString(value: String(value[index(of: l)...index(of: u)]))
+        case (let l?, Token(.GTEQUAL), let u?, Token(.UNDER)):
+            return JpfString(value: String(value[index(of: l)..<index(of: u)]))
+        case (let l?, Token(.KARA), nil, nil),
+            (let l?, Token(.GTEQUAL), nil, nil):
+            return JpfString(value: String(value[index(of: l)...]))
+        case (nil, nil, let u?, Token(.MADE)),
+            (nil, nil, let u?, Token(.LTEQUAL)):
+            return JpfString(value: String(value[...index(of: u)]))
+        case (nil, nil, let u?, Token(.UNDER)):
+            return JpfString(value: String(value[..<index(of: u)]))
+        default:
+            break
+        }
+        return JpfError(rangeFormatError)
+    }
+    private func index(of: Int) -> String.Index {
+        value.index(value.startIndex, offsetBy: of)
     }
 }
 extension JpfInput {

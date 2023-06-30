@@ -10,7 +10,7 @@ import Foundation
 struct Repl {
     func start() {
         let environment = Environment()
-        print("日本語ふぉーすのREPLです。(評価結果表示バージョン)")
+        print("日本語ふぉーす(JPForce)のREPLです。")
         while true {
             printPrompt()
             guard let line = readLine(), !line.isEmpty else {

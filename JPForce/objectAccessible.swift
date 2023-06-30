@@ -58,6 +58,9 @@ extension ObjectAccessible {
             case let string as JpfString:
                 environment.drop()
                 return string[integer]          // <文字列>の<数値>
+            case let input as JpfInput:
+                environment.drop()
+                return input[integer]           // <入力>の<数値>
             default:
                 break
             }
@@ -77,7 +80,7 @@ extension ObjectAccessible {
         }
         return nil
     }
-    /// 範囲で配列にアクセスする。
+    /// 範囲でオブジェクトにアクセスする。
     /// - Parameters:
     ///   - range: JpfRangeで表される範囲
     ///   - environment: 対象の配列を取得
@@ -87,11 +90,27 @@ extension ObjectAccessible {
             environment.drop()
             guard let subArray = array[range] else {return JpfNull.object}
             return subArray                     // <配列>の<範囲>
+        } else
+        if environment.isPeekParticle(.NO), let string = environment.unwrappedPeek as? JpfString {
+            environment.drop()
+            guard let subString = string[range] else {return JpfNull.object}
+            return subString                    // <文字列>の<範囲>
+        } else
+        if let object = environment.peek?.value as? JpfObject {
+            switch object {
+            case is JpfInteger:                 // <数値>が<範囲>にある
+                break
+            case is JpfRange:                   // <数値>が範囲【<数値><下限>】範囲【<数値><上限>】
+                break
+            default:
+                return "\(object.string)を\(range.string)" + cannotAccessObjectWith
+            }
         }
         return nil
     }
     var unusableAsIndex: JpfError       {JpfError("は、「配列」の要素の索引として使用できない。")}
     var unusableAsHashKey: JpfError     {JpfError("は、「辞書」の要素の索引(ハッシュキー)として使用できない。")}
+    var cannotAccessObjectWith: JpfError{JpfError("でアクセスすることはできない。")}
 }
 // MARK: - ASTノードを拡張
 extension Node {

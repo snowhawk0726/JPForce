@@ -449,14 +449,17 @@ struct BooleanOperator : PredicateOperable {
         return "「\(op.literal)」" + atLeastOneParamError + (op.type == .keyword(.BE) ? beUsage : notUsage)
     }
     private func determined(_ left: JpfObject, _ opType: Token.TokenType, _ right: JpfObject) -> JpfObject {
-        if let array = right as? JpfArray {
-            let result = array.contains(left)
-            return determined(result, opType)
-        }
-        if let range = right as? JpfRange {
-            let result = range.contains(left)
-            guard !result.isError else {return result} // 範囲の形式エラー
-            return determined(result, opType)
+        if !(left is JpfArray && opType == .keyword(.EQUAL)) &&
+            !(left is JpfRange && opType == .keyword(.EQUAL)) {
+            if let array = right as? JpfArray {
+                let result = array.contains(left)
+                return determined(result, opType)
+            }
+            if let range = right as? JpfRange {
+                let result = range.contains(left)
+                guard !result.isError else {return result} // 範囲の形式エラー
+                return determined(result, opType)
+            }
         }
         switch opType {
         case .keyword(.BE),

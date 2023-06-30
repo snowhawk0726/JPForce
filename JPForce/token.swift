@@ -244,7 +244,8 @@ enum Token : Equatable {
     var isEol: Bool     {self == .symbol(.EOL)}
     var isPeriod: Bool  {self == .symbol(.PERIOD)}
     var isComma: Bool   {self == .symbol(.COMMA)}
-    func has(_ particle: Token.Particle) -> Bool {self == .particle(particle)}
+    func isKeyword(_ k: Token.Keyword) -> Bool {self == .keyword(k)}
+    func isParticle(_ p: Token.Particle) -> Bool {self == .particle(p)}
     //
     // MARK: - 全角半角対応の記号辞書(symbol dictionary for half/fullwidth)
     static var symbols = {

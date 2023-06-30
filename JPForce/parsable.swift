@@ -158,6 +158,11 @@ extension Parsable {
                 error(message: "範囲で、範囲式の解析に失敗した。(上限「\(upperBound?.tokenLiteral ?? "?")」に後続の式がある。)")
                 return nil
             }
+        } else {
+            guard rest.isEmpty else {
+                error(message: "範囲で、範囲式の解析に失敗した。(上限の形式が間違っている。)")
+                return nil
+            }
         }
         return RangeLiteral(token: token, lowerBound: lowerBound, upperBound: upperBound)
     }
