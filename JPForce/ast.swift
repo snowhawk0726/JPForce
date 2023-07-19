@@ -74,6 +74,7 @@ struct ExpressionStatement : Statement {
     static let syokika = "初期化"
     static let kiyaku = "規約"
     static let typemembers = "型のメンバー"
+    static let katano = "型の"
     static let junkyosuru = "準拠する"
     static let settei = "設定"
     static let syutoku = "取得"
@@ -253,6 +254,7 @@ struct ClauseLiteral {
     var type: String                // 型の文字列
     var parameters: [Identifier]    // 関数のパラメータ
     var signature: InputFormat?     // 関数の入力
+    var isTypeMember: Bool = false  // 型のメンバー
     //
     var string: String {identifier.string + DefineStatement.wa + "、" +
         ((signature.map {"関数であって、【入力が、\(zip(parameters, $0.strings).map {$0.string + $1}.joined(separator: "と"))】"}) ?? "「\(type)」") + "。"
@@ -260,28 +262,37 @@ struct ClauseLiteral {
 }
 struct TypeLiteral : Expression {
     var token: Token                // 型トークン
-    var parameters: [Identifier]    // 入力パラメータ
-    var signature: InputFormat      // 入力形式
-    var initializer: BlockStatement?// 初期化
     var protocols: [String]         // 準拠する規約
     var typeMembers: BlockStatement?// 型のメンバー
+    var initializers: [Initializer] // 初期化処理
     var body: BlockStatement?       // インスタンスのメンバー
     //
     var tokenLiteral: String {token.literal}
     var string: String {
-        token.coloredLiteral + "であって、【" +
-        (parameters.isEmpty ? "" : "入力が、\(zip(parameters, signature.strings).map {$0.string + $1}.joined(separator: "と"))であり、") +
-        (initializer.map {"初期化は、\($0.string)であり、"} ?? "") +
+        var s = token.coloredLiteral + "であって、【" +
         (protocols.isEmpty ? "" : "準拠する規約は、\(protocols.map {$0}.joined(separator: "と、"))であり、") +
         (typeMembers.map {"型のメンバーが、\($0.string)であり、"} ?? "") +
+        (initializers.reduce("") {$0 + "初期化は、\($1.isExtended ? "さらに、" : "")【\($1.string)】。"}) +
         (body.map {"本体が、\($0.string)"} ?? "") +
         "】"
+        s.range(of: "さらに、").map {s.replaceSubrange($0, with: "")}   // 初出の「さらに、」を取り除く
+        return s.replacingOccurrences(of: "。】", with: "】")
     }
 }
 struct InputFormat {
     var numberOfInputs: Int?                        // 期待するパラメータ数(可変の場合はnil)
     var formats: [(type: String, particle: String)] // 期待するパラメータ毎の型と格(無い場合は"")
     var strings: [String] {formats.map {!($0.type.isEmpty && $0.particle.isEmpty) ? "「\($0.type + $0.particle)」" : ""}}
+}
+struct Initializer {
+    var parameters: [Identifier]    // 入力パラメータ
+    var signature: InputFormat      // 入力形式
+    var body: BlockStatement?       // 初期化処理
+    var isExtended: Bool = false    // 拡張識別
+    var string: String {
+        (parameters.isEmpty ? "" : "入力が、\(zip(parameters, signature.strings).map {$0.string + $1}.joined(separator: "と"))であり、") +
+        (body.map {"本体が【\($0.string)】"} ?? "")
+    }
 }
 struct ArrayLiteral : Expression {
     var token: Token                // 配列トークン
@@ -317,3 +328,45 @@ struct EnumLiteral : Expression {
         (elements.isEmpty ? "" : "要素が、\(elements.map {$0.string}.joined(separator: "と、"))".withoutPeriod) + "】"
     }
 }
+//
+func conform(to protocols: [JpfProtocol], with environment: Environment, onType: Bool = false) -> JpfObject? {
+    for p in protocols {
+        if let result = conform(to: p.clauses, with: environment, onType: onType), result.isError {return result}  // 準拠エラー
+    }
+    return nil
+}
+func conform(to protocols: [String], with environment: Environment, onType: Bool = false) -> JpfObject? {
+    for s in protocols {
+        guard let p = environment[s] as? JpfProtocol else {return designatedObjectNotFound}
+        if let result = conform(to: p.clauses, with: environment, onType: onType), result.isError {return result}  // 準拠エラー
+    }
+    return nil
+}
+private func conform(to clauses: [ClauseLiteral], with environment: Environment, onType: Bool = false) -> JpfObject? {
+    for clause in clauses {
+        if onType != clause.isTypeMember {continue}
+        guard let target = environment[clause.identifier.value] else {return designatedObjectNotFound + "指定値：\(clause.identifier.value)(\(clause.type))"}  // 対象のオブジェクト
+        guard clause.type == target.type else {return designatedTypeNotMatch + "(指定型：\(clause.type)"}
+        if let function = target as? JpfFunction {  // メンバー関数パラメタチェック
+            guard clause.parameters.count == function.parameters.count else {return numberOfParamsNotMatch + "(指定数：\(clause.parameters.count)"}
+            for pairs in zip(clause.parameters, function.parameters) {
+                guard pairs.0.value == pairs.1.value else {return nameOfParamsNotMatch + "(指定値：\(pairs.0.value)"}
+            }
+            if let result = compareSignature(clause.signature, with: function.signature), result.isError {return result}
+        }
+    }
+    return nil
+}
+private func compareSignature(_ lhs: InputFormat?, with rhs: InputFormat) -> JpfObject? {
+    guard let left = lhs else {return nil}          // チェックするシグネチャーが無い
+    guard left.numberOfInputs == rhs.numberOfInputs else {return formatOfParamsNotMatch + "(指定入力数：\(left.numberOfInputs.map {"\($0)"} ?? "無し"))"}
+    for pairs in zip(left.formats, rhs.formats) {
+        guard pairs.0.type == pairs.1.type && pairs.0.particle == pairs.1.particle else {return formatOfParamsNotMatch + "(指定形式：「\(pairs.0.type)\(pairs.0.particle)」)"}
+    }
+    return nil
+}
+private var designatedObjectNotFound: JpfError {JpfError("指定した識別子のメンバーが見つからない。")}
+private var designatedTypeNotMatch: JpfError{JpfError("メンバーの型が規約に準拠していない。")}
+private var numberOfParamsNotMatch: JpfError{JpfError("メンバー関数の引数の数が規約に準拠していない。")}
+private var nameOfParamsNotMatch: JpfError  {JpfError("メンバー関数の引数の名前が規約に準拠していない。")}
+private var formatOfParamsNotMatch: JpfError{JpfError("メンバー関数の引数の形式が規約に準拠していない。")}

@@ -35,7 +35,9 @@ extension Node {
     var loopParameterError: JpfError        {JpfError("「反復」の入力が正しくない。")}
     var rangeTypeError: JpfError            {JpfError("「範囲」の上下限が、数値でない。：")}
     var overloadExtentionError: JpfError    {JpfError("「関数」で拡張している。")}
-    var protocolExtentionError: JpfError    {JpfError("「型」以外を「さらに」で拡張している。")}
+    var typeExtentionError: JpfError        {JpfError("「型」を「型」以外で拡張している。")}
+    var protocolExtentionError: JpfError    {JpfError("「規約」を「型」以外で拡張している。")}
+    var cannotExtend: JpfError              {JpfError("拡張することはできない。")}
     var enumuratorError: JpfError           {JpfError("「列挙」の列挙子(識別子)が正しくない。：")}
     // 仕様表示
     var strideLoopUsage: JpfError           {JpfError("仕様：<数値>から<数値>まで（<数値>ずつ）反復【入力が<識別子(カウント値)>、<処理>】。")}
@@ -81,15 +83,24 @@ extension DefineStatement : Evaluatable {
     func evaluated(with environment: Environment) -> JpfObject? {
         if let result = value.evaluated(with: environment), result.isError {return result}
         guard var object = environment.pull() else {return nil}
-        if isExtended {                             // 多重定義
-            if let function = object as? JpfFunction {                  // 関数多重定義
+        if isExtended {                                 // 多重・拡張定義
+            if let function = object as? JpfFunction {  // 関数多重定義
                 let result = overload(function, with: environment)
                 guard !result.isError else {return result}
                 object = result
-            } else
-            if let orignal = environment[name.value] as? JpfProtocol {  // 規約デフォルト実装
-                guard let extended = object as? JpfType else {return protocolExtentionError + "(拡張先が\(object.type))"}
-                object = JpfProtocol(protocols: orignal.protocols, clauses: orignal.clauses, body: extended.body)
+            } else {
+                switch environment[name.value] {
+                case let original as JpfType:           // 型の拡張
+                    guard let extended = object as? JpfType else {return typeExtentionError + "(拡張先が\(object.type))"}
+                    let result = extend(original, to: extended, with: environment)
+                    guard !result.isError else {return result}
+                    object = result
+                case let orignal as JpfProtocol:        // 規約デフォルト実装
+                    guard let extended = object as? JpfType else {return protocolExtentionError + "(拡張先が\(object.type))"}
+                    object = JpfProtocol(protocols: orignal.protocols, clauses: orignal.clauses, body: extended.body)
+                default:
+                    return "「\(name.value)」を「\(object.name)」で" + cannotExtend
+                }
             }
         }
         object.name = name.value
@@ -97,19 +108,52 @@ extension DefineStatement : Evaluatable {
         return nil
     }
     private func overload(_ function: JpfObject, with environment: Environment) -> JpfObject {
+        let original = environment[name.value]
+        guard let array = overload(function, to: original) else {return "拡張元(\(original!.type))を" + overloadExtentionError}
+        return array
+    }
+    private func overload(_ object: JpfObject, to original: JpfObject?) -> JpfArray? {
         var elements: [JpfObject] = []
-        if let original = environment[name.value] { // 既存定義
+        if let original = original {                // 既存定義
             switch original {
             case let f as JpfFunction:              // 関数定義
                 elements.append(f)
             case let a as JpfArray:                 // 多重定義
                 elements = a.elements
             default:
-                return "拡張元(\(original.type))を" + overloadExtentionError
+                return nil
             }
         }
-        elements.append(function)                   // 多重定義(配列)に関数を追加
-        return JpfArray(elements: elements)
+        if object is JpfFunction {
+            elements.append(object)                  // 多重定義(配列)に関数を追加
+        } else if let array = object as? JpfArray {
+            elements += array.elements               // 多重定義(配列)に配列を追加
+        }
+        return JpfArray(name: original?.name ?? "", elements: elements)
+    }
+    private func extend(_ original: JpfType, to type: JpfType, with environment: Environment) -> JpfObject {
+        var extended = original
+        // 初期化の追加(多重定義)
+        for i in type.initializers {
+            if i.isExtended {extended.initializers.append(i)} else {extended.initializers = [i]}
+        }
+        // 型の環境を統合(メソッドの多重定義を考慮)
+        for (k, v) in type.environment.enumerated {
+            var value = v
+            if let functions = v as? JpfArray, functions.elements.first is JpfFunction,
+               let object = original.environment[k] {
+                if let overloaded = overload(functions, to: object) {value = overloaded}
+            }
+            extended.environment[k] = value
+        }
+        // 規約の統合
+        for p in type.protocols {
+            guard !original.protocols.contains(p) else {return ConformityError.duplicated(protocol: p).message}
+            extended.protocols.append(p)
+        }
+        // インスタンスの定義を統合
+        type.body?.statements.forEach {extended.body?.statements.append($0)}
+        return extended
     }
 }
 // MARK: Expression evaluators
@@ -480,7 +524,7 @@ extension JpfFunction {
     /// - Returns: エラーかアンラップされた返り値、なければnil
     func executed(with environment: Environment) -> JpfObject? {
         let local = Environment(outer: self.environment)    // 関数の環境を拡張
-        let stackEnv = environment.outer != nil ? environment : self.environment
+        let stackEnv = environment.isEmpty ? self.environment : environment
         let result = local.apply(parameters, with: signature, from: stackEnv)
         guard !result.isError else {return result}
         defer {environment.push(local.pullAll())}           // スタックを戻す
@@ -495,29 +539,11 @@ extension JpfArray {
     func executed(with environment: Environment) -> JpfObject? {
         for element in elements.reversed() {    // 逆順に入力形式をチェック
             guard let function = element as? JpfFunction else {return notExecutableObject + element.type}
-            if let number = function.signature.numberOfInputs { // 固定長入力
-                guard let params = environment.peek(number) else {continue}
-                for (param, designated) in zip(params, function.signature.formats) {
-                    if environment.isSameType(of: param, as: designated.type) &&
-                        environment.isSameParticle(of: param, as: designated.particle) {
-                        return function.executed(with: environment)
-                    }
-                }
-            } else {                                            // 可変長入力
-                for designated in function.signature.formats {
-                    if contains(designated, in: environment) {
-                        return function.executed(with: environment)
-                    }
-                }
+            if environment.hasParameters(to: function.signature, with: function.parameters.map {$0.value}) {
+                return function.executed(with: environment)
             }
         }
         return functionParameterError
-    }
-    private func contains(_ designated: (String, String), in environment: Environment) -> Bool {
-        let particle = designated.1.hasSuffix("…") ? String(designated.1.dropLast(1)) : designated.1
-        return environment.getAll().contains { object in
-            environment.isSameType(of: object, as: designated.0) && environment.isSameParticle(of: object, as: particle)
-        }
     }
 }
 extension ComputationLiteral : Evaluatable {
@@ -534,7 +560,7 @@ extension JpfComputation {
         guard let body = getter else {return getterNotFound}
         let local = Environment(outer: self.environment)    // 環境を拡張
         if setter == nil {                                  // 「設定」がない場合、入力を評価
-            let stackEnv = environment.outer != nil ? environment : self.environment
+            let stackEnv = environment.isEmpty ? self.environment : environment
             let result = local.apply(parameters, with: signature, from: stackEnv)
             guard !result.isError else {return result}
         }
@@ -551,7 +577,7 @@ extension JpfComputation {
     func set(with environment: Environment) -> JpfObject? {
         guard let body = setter else {return setterNotFound}
         let local = Environment(outer: self.environment)    // 環境を拡張
-        let stackEnv = environment.outer != nil ? environment : self.environment
+        let stackEnv = environment.isEmpty ? self.environment : environment
         let result = local.apply(parameters, with: signature, from: stackEnv)
         guard !result.isError else {return result}
         defer {environment.push(local.pullAll())}           // スタックを戻す
@@ -570,7 +596,12 @@ extension TypeLiteral : Evaluatable {
             let local = Environment(outer: environment)
             if let members = typeMembers,
                let result = Evaluator(from: members, with: local).object, result.isError {return result}
-            return JpfType(parameters: parameters, signature: signature, initializer: initializer, environment: local, protocols: all, body: body)
+            var inits: [Initializer] = []
+            for i in initializers { // 「さらに、」ならばオーバーロード。無ければ、上書き
+                if i.isExtended {inits.append(i)} else {inits = [i]}
+            }
+            if let result = conform(to: all, with: local, onType: true), result.isError {return result}
+            return JpfType(initializers: inits, environment: local, protocols: all, body: body)
         case .failure(let error):
             return error.message
         }

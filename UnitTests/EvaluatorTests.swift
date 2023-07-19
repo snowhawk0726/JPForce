@@ -268,12 +268,13 @@ final class EvaluatorTests: XCTestCase {
         """
         print("テストパターン: \(input)")
         let type = try XCTUnwrap(testEvaluator(input) as? JpfType)
-        XCTAssertEqual(type.parameters.count, 0)
-        XCTAssertEqual(type.signature.numberOfInputs, 0)
-        let initialize = try XCTUnwrap(type.initializer?.statements.first as? DefineStatement)
-        XCTAssertEqual(initialize.name.value, "行列")
-        XCTAssertEqual(initialize.value.expressions.count, 1)
-        let array = try XCTUnwrap(initialize.value.expressions.first as? ArrayLiteral)
+        let initializer = try XCTUnwrap(type.initializers.first)
+        XCTAssertEqual(initializer.parameters.count, 0)
+        XCTAssertEqual(initializer.signature.numberOfInputs, 0)
+        let initialization = try XCTUnwrap(initializer.body?.statements.first as? DefineStatement)
+        XCTAssertEqual(initialization.name.value, "行列")
+        XCTAssertEqual(initialization.value.expressions.count, 1)
+        let array = try XCTUnwrap(initialization.value.expressions.first as? ArrayLiteral)
         XCTAssertTrue(array.elements.isEmpty)
         XCTAssertNotNil(type.body)
         XCTAssertEqual(type.body!.statements.count, 2)
@@ -287,13 +288,13 @@ final class EvaluatorTests: XCTestCase {
     }
     func testTypeOperation() throws {
         let input = """
-            自動車は、型であって、【入力が残量、
-                初期化が、【燃料量は、残量。色は「黒」。】
+            自動車は、型であって、【
                 型のメンバーが、【ハンドルは、「右」】
-                「燃料量」と「給油」と「色」は利用可能。
+                初期化が、【入力が残量、燃料量は、残量。色は「黒」。】
                 給油は、関数であって、【入力が給油量で、
                     燃料量に給油量を足し、「燃料量」に上書きし、燃料量を返す。
                 】
+                「燃料量」と「給油」と「色」は利用可能。
             】
             自動車のメンバー「ハンドル」に「左」を設定する。
             黒い車は、10Lで自動車から生成する。
@@ -321,6 +322,114 @@ final class EvaluatorTests: XCTestCase {
             let expected = eval.object ?? environment.pull()!
             try testObject(expected, with: test.expected)
             print("テスト(\(expected))終了")
+        }
+        print("テスト終了")
+    }
+    func testTypeInitOverloads() throws {
+        let input = """
+            甲は、型であって、【
+                初期化は、【aは１。bは2。】
+                初期化は、さらに、【入力がaで、bは3。】
+                初期化は、さらに、【入力がaとb】
+                「a」と「b」は利用可能。
+            】
+        """
+        let testPatterns: [(input: String, expected: Int)] = [
+            ("乙は甲から生成する。乙のaと乙のbを足す", 3),
+            ("空にする。乙は、2で甲から生成する。乙のaと乙のbを足す", 5),
+            ("空にする。乙は、3と4で甲から生成する。乙のaと乙のbを足す", 7),
+        ]
+        print("テストパターン: \(input)")
+        let environment = Environment()
+        let parser = Parser(Lexer(input))
+        let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+        let result = eval.object ?? environment.pull()
+        XCTAssertFalse(result?.isError ?? false, result?.error?.message ?? "")
+        for test in testPatterns {
+            print("テストパターン: \(test.input)")
+            let parser = Parser(Lexer(test.input))
+            let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+            let expected = eval.object ?? environment.pull()!
+            try testObject(expected, with: test.expected)
+            print("テスト(\(expected))終了")
+        }
+        print("テスト終了")
+    }
+    func testTypeInitExtensions() throws {
+        let input = """
+            甲は、型であって、【
+                初期化は、【入力がaとbとc。】
+                初期化は、さらに、【入力がa「数値」、aと1と2で、自身の初期化をする。】
+                合計は、算出【aとbとcを足す。】
+                「合計」は、利用可能。
+            】
+            甲は、さらに、型であって、【
+                初期化は、さらに、【入力がa「数値」とb「数値」、aとbと1で、自身の初期化をする。】
+            】
+        """
+        let testPatterns: [(input: String, expected: Int)] = [
+            ("乙は、1と2と3で、甲から生成する。乙の合計", 6),
+            ("空にする。乙は、1と2で、甲から生成する。乙の合計", 4),
+            ("空にする。乙は、1で、甲から生成する。乙の合計", 4),
+        ]
+        print("テストパターン: \(input)")
+        let environment = Environment()
+        let parser = Parser(Lexer(input))
+        let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+        let result = eval.object ?? environment.pull()
+        XCTAssertFalse(result?.isError ?? false, result?.error?.message ?? "")
+        for test in testPatterns {
+            print("テストパターン: \(test.input)")
+            let parser = Parser(Lexer(test.input))
+            let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+            let expected = eval.object ?? environment.pull()!
+            try testObject(expected, with: test.expected)
+            print("テスト(\(expected))終了")
+        }
+        print("テスト終了")
+    }
+    func testTypeExtension() throws {
+        let input = """
+            乙は、規約であって、条項が、型の丙は「数値」。
+            甲は、型であって、【
+                準拠する規約が、乙。
+                型のメンバーが、【
+                    丙は、１。
+                    辛は、関数【入力がc、c】。
+                】
+                本体が、丁は、関数【入力がa、a】。
+                「丁」は、利用可能。
+            】
+            戊は、規約であって、条項が、型の己は「文字列」。
+            甲は、さらに、型であって、【
+                準拠する規約が、戊。
+                型のメンバーが、【
+                    丙は、２。己は、「い」。
+                    辛は、さらに、関数【入力がd、d】。
+                】
+                本体が、丁は、さらに、関数【入力がb、b】。
+            】。
+            庚は、甲から生成する。
+        """
+        let testPatterns: [(input: String, expected: Any)] = [
+            ("甲の丙。", 2),
+            ("甲の己。", "い"),
+            ("空にする。4で、甲の辛を実行する。", 4),
+            ("空にする。aは5。aで、庚の丁を実行する。", 5),
+        ]
+        print("テストパターン: \(input)")
+        let environment = Environment()
+        let parser = Parser(Lexer(input))
+        let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+        let result = eval.object ?? environment.pull()
+        XCTAssertFalse(result?.isError ?? false, result?.error?.message ?? "")
+        for test in testPatterns {
+            print("テストパターン: \(test.input)")
+            let parser = Parser(Lexer(test.input))
+            let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+            let result = eval.object ?? environment.pull()!
+            try testObject(result, with: test.expected)
+            print("テスト(\(result))終了")
         }
         print("テスト終了")
     }

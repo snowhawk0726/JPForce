@@ -312,9 +312,9 @@ final class ParserTests: XCTestCase {
     }
     func testTypeLiteralParsings() throws {
         let testPatterns = [
-            "型であって、【入力が、xとyであり、初期化は、【xにyを足し「z」に代入する】。本体が、aは１。】",
-            "型であり、入力が、xとyで、初期化は、【xにyを足し「z」に代入する】。本体が、aは１。",
-            "型【入力がxとy、初期化【xにyを足し「z」に代入する】。aは１】",
+            "型であって、【初期化は、【入力が、xとyであり、xにyを足し「z」に代入する】。本体が、aは１。】",
+            "型であり、初期化は、【入力が、xとyで、xにyを足し「z」に代入する】。本体が、aは１。",
+            "型【初期化【入力がxとy、xにyを足し「z」に代入する】。aは１】",
         ]
         for input in testPatterns {
             print("テストパターン: \(input)")
@@ -323,11 +323,14 @@ final class ParserTests: XCTestCase {
             let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
             XCTAssertEqual(statement.expressions.count, 1, "statement.expressions.count")
             let typeLiteral = try XCTUnwrap(statement.expressions.first as? TypeLiteral)
-            XCTAssertEqual(typeLiteral.parameters.count, 2, "typeLiteral.parameters.count")
-            try testLiteralExpression(typeLiteral.parameters[0], with: "x")
-            try testLiteralExpression(typeLiteral.parameters[1], with: "y")
-            XCTAssertEqual(typeLiteral.initializer?.statements.count, 1)
-            let initStatement = try XCTUnwrap(typeLiteral.initializer?.statements.first as? ExpressionStatement)
+            XCTAssertEqual(typeLiteral.initializers.count, 1)
+            let params = typeLiteral.initializers[0].parameters
+            XCTAssertEqual(params.count, 2, "typeLiteral.parameters.count")
+            try testLiteralExpression(params[0], with: "x")
+            try testLiteralExpression(params[1], with: "y")
+            let body = try XCTUnwrap(typeLiteral.initializers[0].body)
+            XCTAssertEqual(body.statements.count, 1)
+            let initStatement = try XCTUnwrap(body.statements.first as? ExpressionStatement)
             XCTAssertEqual(initStatement.expressions.count, 6)
             try testPhraseExpression(initStatement.expressions[0], with: "x", "に")
             try testPhraseExpression(initStatement.expressions[1], with: "y", "を")

@@ -39,6 +39,8 @@ struct PredicateOperableFactory {
                                     return IdentifiersOperator(environment, by: token)
         case .keyword(.EXECUTE):    return ExecuteOperator(environment) // (関数)を実行
         case .keyword(.GENERATE):   return GenerateOperator(environment)// (型)から生成
+        case .keyword(.INITIALIZATION):
+                                    return InitializeOperator(environment)
         case .keyword(.SURU):       return PerformOperator(environment) // 〜にする、〜をする
         case .keyword(.AVAILABLE):  return AvailableOperator(environment)
         case .keyword(.APPEND):     return AppendOperator(environment, by: token)
@@ -117,6 +119,23 @@ extension PredicateOperable {
         environment.drop()
         return number
     }
+    func initialize(_ instance: JpfInstance, with environment: Environment) -> JpfObject? {
+        guard let type = environment[instance.type] as? JpfType else {return cannotInitialize}
+        let local = instance.environment
+        for initializer in type.initializers.reversed() {               // 初期化多重定義
+            let designated = initializer.signature
+            let names = initializer.parameters.map {$0.value}
+            if environment.hasParameters(to: designated, with: names) {  // 引数が一致する入力を処理
+                let result = local.apply(initializer.parameters, with: designated, from: environment)
+                guard !result.isError else {return result}
+                if let initialization = initializer.body,   // 初期化処理
+                   let result = Evaluator(from: initialization, with: local).object,
+                   result.isError {return result}
+                break
+            }
+        }
+        return nil
+    }
     // エラー
     var numerationParamError1: JpfError {JpfError("には２つの数値入力が必要。")}
     var numerationParamError2: JpfError {JpfError("には２つ以上の数値入力が必要。")}
@@ -139,11 +158,7 @@ extension PredicateOperable {
     var cannotConform: JpfError         {JpfError("には準拠できない。")}
     var valueOfEnumeratorNotFound: JpfError {JpfError("指定の値が見つからない。指定値：")}
     var cannotGenerateFromProtocol: JpfError {JpfError("規約からインスタンスは生成できない。")}
-    var designatedObjectNotFound: JpfError {JpfError("指定した識別子のメンバーが見つからない。")}
-    var designatedTypeNotMatch: JpfError{JpfError("メンバーの型が規約に準拠していない。")}
-    var numberOfParamsNotMatch: JpfError{JpfError("メンバー関数の引数の数が規約に準拠していない。")}
-    var nameOfParamsNotMatch: JpfError  {JpfError("メンバー関数の引数の名前が規約に準拠していない。")}
-    var formatOfParamsNotMatch: JpfError{JpfError("メンバー関数の引数の形式が規約に準拠していない。")}
+    var cannotInitialize: JpfError      {JpfError("オブジェクトの初期化ができない。")}
     var detectParserError: JpfError     {JpfError("構文解析器がエラーを検出した。")}
     // メッセージ(使い方)
     var printUsage: JpfError            {JpfError("仕様：(〜と…)〜を表示する。")}
@@ -605,12 +620,11 @@ struct GenerateOperator : PredicateOperable {
     }
     private func generateInstance(from type: JpfType) -> JpfObject? {
         let local = Environment(outer: self.environment)    // 型の環境を拡張
-        let result = local.apply(type.parameters, with: type.signature, from: self.environment)
-        guard !result.isError else {return result}
         defer {environment.push(local.pullAll())}           // スタックを戻す
-        if let initial = type.initializer,                  // 初期化ブロック
-           let result = Evaluator(from: initial, with: local).object, result.isError {return result}    // 初期化
-        var protocols: [JpfProtocol] = []
+        var instance = JpfInstance(type: type.name, environment: local, protocols: type.protocols, available: [])
+        local["自身"] = instance                              // selfを仮登録
+        if let result = initialize(instance, with: environment), result.isError {return result} // 初期化
+        var protocols: [JpfProtocol] = []                   // 規約(型)登録
         for ident in type.protocols {
             if let rule = environment[ident] as? JpfProtocol {
                 protocols.append(rule)
@@ -627,35 +641,9 @@ struct GenerateOperator : PredicateOperable {
         for p in protocols {    // 規約条項のメンバーリストを利用可能なメンバーリストに追加
             p.clauses.forEach {members.append($0.identifier.value)}
         }
-        return JpfInstance(type: type.name, environment: local, protocols: type.protocols, available: members)
-    }
-    private func conform(to protocols: [JpfProtocol], with environment: Environment) -> JpfObject? {
-        for p in protocols {
-            if let result = conform(to: p.clauses, with: environment), result.isError {return result}  // 準拠エラー
-        }
-        return nil
-    }
-    private func conform(to clauses: [ClauseLiteral], with environment: Environment) -> JpfObject? {
-        for clause in clauses {
-            guard let target = environment[clause.identifier.value] else {return designatedObjectNotFound + "指定値：\(clause.identifier.value)(\(clause.type))"}  // 対象のオブジェクト
-            guard clause.type == target.type else {return designatedTypeNotMatch + "(指定型：\(clause.type)"}
-            if let function = target as? JpfFunction {  // メンバー関数パラメタチェック
-                guard clause.parameters.count == function.parameters.count else {return numberOfParamsNotMatch + "(指定数：\(clause.parameters.count)"}
-                for pairs in zip(clause.parameters, function.parameters) {
-                    guard pairs.0.value == pairs.1.value else {return nameOfParamsNotMatch + "(指定値：\(pairs.0.value)"}
-                }
-                if let result = compareSignature(clause.signature, with: function.signature), result.isError {return result}
-            }
-        }
-        return nil
-    }
-    private func compareSignature(_ lhs: InputFormat?, with rhs: InputFormat) -> JpfObject? {
-        guard let left = lhs else {return nil}          // チェックするシグネチャーが無い
-        guard left.numberOfInputs == rhs.numberOfInputs else {return formatOfParamsNotMatch + "(指定入力数：\(left.numberOfInputs.map {"\($0)"} ?? "無し"))"}
-        for pairs in zip(left.formats, rhs.formats) {
-            guard pairs.0.type == pairs.1.type && pairs.0.particle == pairs.1.particle else {return formatOfParamsNotMatch + "(指定形式：「\(pairs.0.type)\(pairs.0.particle)」)"}
-        }
-        return nil
+        instance = JpfInstance(type: type.name, environment: local, protocols: type.protocols, available: members)
+        local["自身"] = instance  // selfを本登録
+        return instance
     }
     private func generateEnumerator(from type: JpfEnum) -> JpfObject? {
         guard environment.isPeekParticle(.DE) || environment.isPeekParticle(.KARA), let object = environment.unwrappedPeek else {return generateEnumeratorUsage}
@@ -664,6 +652,17 @@ struct GenerateOperator : PredicateOperable {
             if object.isEqual(to: pairs.value) {return JpfEnumerator(type: type.name, identifier: pairs.key, rawValue: pairs.value)}
         }
         return valueOfEnumeratorNotFound + object.string
+    }
+}
+struct InitializeOperator : PredicateOperable {
+    init(_ environment: Environment) {self.environment = environment}
+    let environment: Environment
+    /// インスタンス(オブジェクト)を初期化する。
+    func operated() -> JpfObject? {
+        guard let instance = environment.unwrappedPeek as? JpfInstance else {return cannotInitialize}
+        environment.drop()
+        if let result = initialize(instance, with: environment), result.isError {return result} // 初期化
+        return nil
     }
 }
 struct AvailableOperator : PredicateOperable {

@@ -219,20 +219,18 @@ struct JpfEnumerator : JpfObject {
 struct JpfType : JpfObject {
     static let type = "型"
     var name: String = ""
-    var parameters: [Identifier]    // 入力パラメータ
-    var signature: InputFormat      // 入力形式
-    var initializer: BlockStatement?// 初期化
+    var initializers: [Initializer] // 初期化処理
     var environment: Environment    // メンバーを含む環境
     var protocols: [String]         // 準拠する規約
     var body: BlockStatement?
     var string: String {
-        let s = type.color(.magenta) + "であって、【" +
-        (parameters.isEmpty ? "" : "入力が、\(zip(parameters, signature.strings).map {$0.string + $1}.joined(separator: "と"))であり、") +
+        var s = type.color(.magenta) + "であって、【" +
         (protocols.isEmpty ? "" : "準拠する規約は、\(protocols.map {$0}.joined(separator: "と、"))。") +
-        (initializer.map {"初期化は、【\($0.string)】。"} ?? "") +
         (environment.enumerated.isEmpty ? "" : "型のメンバーが、\(environment.enumerated.map {$0.key}.joined(separator: "と、"))。") +
+        (initializers.reduce("") {$0 + "初期化は、さらに、【\($1.string)】。"}) +
         (body.map {"本体が、\($0.string)"} ?? "") +
         "】"
+        s.range(of: "さらに、").map {s.replaceSubrange($0, with: "")}   // 初出の「さらに、」を取り除く
         return s.replacingOccurrences(of: "。】", with: "】")
     }
 }

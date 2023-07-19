@@ -8,7 +8,7 @@ import Foundation
 
 Repl().start()
 //
-print("lexer動作確認。")
+print("字句解析器(Lexer)動作確認。")
 while true {
     print("テストする日本語を入れてください：")
     guard let line = readLine() else {break}

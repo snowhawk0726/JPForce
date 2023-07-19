@@ -12,7 +12,7 @@ class Environment {
     var overwrite: Bool
     private var store: [String: JpfObject] = [:]
     private var stack: [JpfObject] = []
-    // 辞書操作
+    // MARK: - 辞書操作
     subscript(_ name: String) -> JpfObject? {
         get {store[name] ?? outer?[name]}           // 外部環境の取得は可
         set {
@@ -29,11 +29,11 @@ class Environment {
     var values: [JpfObject] {Array(store.values) + (outer?.values ?? [])}
     var enumeratedStringArray: JpfArray {
         return JpfArray(elements: enumerated.map {
-            JpfString(value: $0.key + " = " + $0.value.string)
+            JpfString(value: $0.key + "が" + $0.value.string)
         })
     }
     func contains(_ name: String) -> Bool {store.keys.contains(name)}
-    // スタック操作
+    // MARK: - スタック操作
     func push(_ object: JpfObject)  {stack.append(object)}
     func push(_ objects: [JpfObject])   {stack += objects}
     func pull() -> JpfObject?       {stack.popLast()}
@@ -56,7 +56,7 @@ class Environment {
         return stack[index]
     }
     var string: String              {stack.map {$0.string}.joined(separator: " ")}
-    //
+    // MARK: - 入力操作
     var isPeekParticle: Bool {peek?.particle != nil}
     func isPeekParticle(_ particle: Token.Particle) -> Bool {
         peek?.particle.map {$0.type} == Token.particle(particle).type
@@ -133,6 +133,41 @@ class Environment {
         }
         return .success(values)
     }
+    /// スタック上の引数(オブジェクト)と指定された形式が一致するかをチェックする。
+    /// - Returns: 一致(true)または、不一致(false)、チェック不要(true)
+    /// - Parameters:
+    ///   - signature: 指定された形式(引数の数および型と格)
+    ///   - names: 引数の識別子
+    func hasParameters(to signature: InputFormat, with names: [String]) -> Bool {
+        if let number = signature.numberOfInputs {          // 固定長引数
+            if number == 0 {return true}                    // 確認する形式が無い
+            guard number == count, let params = peek(number) else {return false}
+            for n in 0..<params.count {
+                let param = params[n], format = signature.formats[n], name = names[n]
+                if isSameType(of: param, as: format.type) &&
+                   isSameParticle(of: param, as: format.particle) &&
+                   isSameName(of: param, as: name) {        // 型と格と識別子が一致
+                    return true
+                }
+            }
+        } else {                                            // 可変長引数
+            for format in signature.formats {
+                if contains(format) {
+                    return true
+                }
+            }
+        }
+        return false
+    }
+    /// スタック上の引数(オブジェクト)に指定された形式が含まれるかチェックする。
+    /// - Parameter designated: 指定された形式(型と格)
+    /// - Returns: 含まれる(true)か否(false)
+    private func contains(_ designated: (type: String, particle: String)) -> Bool {
+        let particle = designated.particle.hasSuffix("…") ? String(designated.1.dropLast(1)) : designated.particle
+        return getAll().contains { object in
+            isSameType(of: object, as: designated.type) && isSameParticle(of: object, as: particle)
+        }
+    }
     /// 対象のオブジェクトの型をチェック
     func isSameType(of object: JpfObject, as type: String) -> Bool {
         return type.isEmpty || object.value?.contains(type: type) ?? false
@@ -140,6 +175,10 @@ class Environment {
     /// 対象のオブジェクトの格をチェック
     func isSameParticle(of object: JpfObject, as particle: String) -> Bool {
         return particle.isEmpty || object.particle?.literal == particle
+    }
+    /// 対象のオブジェクトの識別子をチェック
+    func isSameName(of object: JpfObject, as name: String) -> Bool {
+        return object.value?.name.isEmpty ?? true || object.value?.name == name
     }
     // エラー
     enum InputFormatError : Error {
