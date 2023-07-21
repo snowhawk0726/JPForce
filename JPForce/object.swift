@@ -178,20 +178,16 @@ struct JpfFunction : JpfObject {
 struct JpfComputation : JpfObject {
     static let type = "算出"
     var name: String = ""
-    var parameters: [Identifier]    // 入力パラメータ
-    var signature: InputFormat      // 入力形式
-    var setter: BlockStatement?     // 設定ブロック
-    var getter: BlockStatement?     // 取得ブロック
+    var setters: [FunctionBlock]    // 設定ブロック
+    var getters: [FunctionBlock]    // 取得ブロック
     var environment: Environment
     var string: String {
-        let s = type.color(.magenta) + "であって、【" +
-        (parameters.isEmpty ? "" : "入力が、\(zip(parameters, signature.strings).map {$0.string + $1}.joined(separator: "と"))であり、") +
-        (setter.map {"設定は、【\($0.string)】。"} ?? "") +
-        (getter.map {"取得は、【\($0.string)】。"} ?? "") +
+        var s = type.color(.magenta) + "であって、【" +
+        (setters.reduce("") {$0 + "設定は、\($1.isExtended ? "さらに、" : "")【\($1.string)】。"}) +
+        (getters.reduce("") {$0 + "取得は、\($1.isExtended ? "さらに、" : "")【\($1.string)】。"}) +
         "】"
         return s.replacingOccurrences(of: "。】", with: "】")
     }
-
 }
 struct JpfEnum : JpfObject {
     static let type = "列挙"
@@ -219,7 +215,7 @@ struct JpfEnumerator : JpfObject {
 struct JpfType : JpfObject {
     static let type = "型"
     var name: String = ""
-    var initializers: [Initializer] // 初期化処理
+    var initializers: [FunctionBlock] // 初期化処理
     var environment: Environment    // メンバーを含む環境
     var protocols: [String]         // 準拠する規約
     var body: BlockStatement?

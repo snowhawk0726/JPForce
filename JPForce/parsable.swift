@@ -384,9 +384,9 @@ extension Parsable {
     func isEndOfBlock(of symbol: Token.Symbol) -> Bool {
         nextToken == .symbol(symbol)
     }
-    func parseInitializerBlock(in type: String) -> Result<([Initializer]), Error> {
-        var initializers: [Initializer] = []
-        while getNext(whenNextIs: ExpressionStatement.syokika) {
+    func parseFunctionBlocks(of block: String, in type: String) -> Result<([FunctionBlock]), Error> {
+        var funcBlocks: [FunctionBlock] = []
+        while getNext(whenNextIs: block) {
             _ = getNext(whenNextIs: ExpressionStatement.ga + ExpressionStatement.wa, matchAll: false)
             _ = getNext(whenNextIs: .COMMA)
             let isExtended = getNext(whenNextIs: DefineStatement.further)
@@ -394,14 +394,14 @@ extension Parsable {
             let endSymbol: Token.Symbol = getNext(whenNextIs: .LBBRACKET) ? .RBBRACKET : .EOL
             // Prameter block
             guard let (identifiers, signature) = parseParameterBlock(in: type) else {return .failure(ParameterParseError())}
-            // Initializers block
+            // FunctionBlocks block
             guard let i = BlockStatementParser(parser, symbol: endSymbol).blockStatement else {return .failure(ParameterParseError())}
-            let initializer = i.statements.isEmpty ? nil : i
-            initializers.append(Initializer(parameters: identifiers, signature: signature, body: initializer, isExtended: isExtended))
+            let body = i.statements.isEmpty ? nil : i
+            funcBlocks.append(FunctionBlock(parameters: identifiers, signature: signature, body: body, isExtended: isExtended))
             _ = getNext(whenNextIs: .PERIOD)    // ブロックの句点を飛ばす
             _ = getNext(whenNextIs: .EOL)       // EOLを飛ばす
         }
-        return .success(initializers)
+        return .success(funcBlocks)
     }
 }
 struct ParameterParseError : Error {}
@@ -673,33 +673,33 @@ struct ComputationLiteralParser : ExpressionParsable {
     func parse() -> Expression? {
         let token = parseHeader()
         let endOfType: Token.Symbol = getNext(whenNextIs: .LBBRACKET) ? .RBBRACKET : .EOL
-        // Prameter block
-        guard let (identifiers, signature) = parseParameterBlock(in: token.literal) else {return nil}
         // Setter block
-        var setter: BlockStatement?
-        switch parseOptionalBlock(of: ExpressionStatement.settei, in: token.literal) {
-        case .success(let block):
-            setter = block
+        skipNextEols(suppress: endOfType == .EOL)
+        var setters: [FunctionBlock] = []
+        switch parseFunctionBlocks(of: ExpressionStatement.settei, in: token.literal) {
+        case .success(let blocks):
+            setters = blocks
             skipNextEols(suppress: endOfType == .EOL)
         case .failure(_):
             return nil
         }
         // Getter block
-        var getter: BlockStatement?
+        var getters: [FunctionBlock] = []
         if !isEndOfBlock(of: endOfType) {
-            switch parseOptionalBlock(of: ExpressionStatement.syutoku, in: token.literal) {
-            case .success(let block):
-                getter = block
+            switch parseFunctionBlocks(of: ExpressionStatement.syutoku, in: token.literal) {
+            case .success(let blocks):
+                getters = blocks
                 skipNextEols(suppress: endOfType == .EOL)
             case .failure(_):
                 return nil
             }
-            if getter == nil {      // 「取得は、」が無かった
-                getter = BlockStatementParser(parser, symbol: endOfType).blockStatement
-                if getter == nil {
+            if getters.isEmpty {      // 「取得は、」が無かった
+                guard let (identifiers, signature) = parseParameterBlock(in: token.literal) else {return nil}
+                guard let body = BlockStatementParser(parser, symbol: endOfType).blockStatement else {
                     error(message: "算出で、「取得が、〜」の解析に失敗した。")
                     return nil
                 }
+                getters = [FunctionBlock(parameters: identifiers, signature: signature, body: body)]
                 _ = getNext(whenNextIs: .PERIOD)    // 取得ブロックの句点を飛ばす。
                 skipNextEols(suppress: endOfType == .EOL)
             } else {
@@ -707,7 +707,7 @@ struct ComputationLiteralParser : ExpressionParsable {
             }
         }
         _ = getNext(whenNextIs: .PERIOD)            // 算出ブロックの句点を飛ばす
-        return ComputationLiteral(token: token, parameters: identifiers, signature: signature, setter: setter, getter: getter)
+        return ComputationLiteral(token: token, setters: setters, getters: getters)
     }
 }
 struct ProtocolLiteralParser : ExpressionParsable {
@@ -789,8 +789,8 @@ struct TypeLiteralParser : ExpressionParsable {
             return nil
         }
         // Initializers block
-        var initializers: [Initializer]
-        switch parseInitializerBlock(in: token.literal) {
+        var initializers: [FunctionBlock]
+        switch parseFunctionBlocks(of: ExpressionStatement.syokika, in: token.literal) {
         case .success(let inits):
             initializers = inits
             skipNextEols(suppress: endOfType == .EOL)

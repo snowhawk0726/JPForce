@@ -121,19 +121,8 @@ extension PredicateOperable {
     }
     func initialize(_ instance: JpfInstance, with environment: Environment) -> JpfObject? {
         guard let type = environment[instance.type] as? JpfType else {return cannotInitialize}
-        let local = instance.environment
-        for initializer in type.initializers.reversed() {               // 初期化多重定義
-            let designated = initializer.signature
-            let names = initializer.parameters.map {$0.value}
-            if environment.hasParameters(to: designated, with: names) {  // 引数が一致する入力を処理
-                let result = local.apply(initializer.parameters, with: designated, from: environment)
-                guard !result.isError else {return result}
-                if let initialization = initializer.body,   // 初期化処理
-                   let result = Evaluator(from: initialization, with: local).object,
-                   result.isError {return result}
-                break
-            }
-        }
+        if let result = environment.execute(type.initializers, with: instance.environment),
+           result.isError {return result}
         return nil
     }
     // エラー

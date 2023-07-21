@@ -687,17 +687,17 @@ final class EvaluatorTests: XCTestCase {
         }
     }
     func testDictionaryDeleteds() throws {
-         let testPatterns: [(input: String, expected: Int?)] = [
-             ("辞書【「その一」が１、「その二」が２、「その三」が３】から、「その二」を削除したものの「その二」", nil),
-             ("辞書【「その一」が１、「その二」が２、「その三」が３】から、「全て」を削除したものの数", 0),
-             ("辞書【「その一」が１、「その二」が２、「その三」が３】から、「その四」を削除したものの数", 3),
-         ]
-         for test in testPatterns {
-             print("テストパターン: \(test.input)")
-             let evaluated = try XCTUnwrap(testEvaluator(test.input))
-             try testObject(evaluated, with: test.expected)
-             print("テスト(\(evaluated))終了")
-         }
+        let testPatterns: [(input: String, expected: Int?)] = [
+            ("辞書【「その一」が１、「その二」が２、「その三」が３】から、「その二」を削除したものの「その二」", nil),
+            ("辞書【「その一」が１、「その二」が２、「その三」が３】から、「全て」を削除したものの数", 0),
+            ("辞書【「その一」が１、「その二」が２、「その三」が３】から、「その四」を削除したものの数", 3),
+        ]
+        for test in testPatterns {
+            print("テストパターン: \(test.input)")
+            let evaluated = try XCTUnwrap(testEvaluator(test.input))
+            try testObject(evaluated, with: test.expected)
+            print("テスト(\(evaluated))終了")
+        }
     }
     func testOrPhrase() throws {
         let input = "「その一」または「その二」または「その三」に"
@@ -721,41 +721,41 @@ final class EvaluatorTests: XCTestCase {
         print("テスト(\(evaluated))終了")
     }
     func testSelectiveOrEvaluations() throws {
-         let testPatterns: [(input: String, expected: Bool)] = [
-             ("指定値は、「その二」。指定値が「その一」または「その二」または「その三」である", true),
-             ("指定値は、「その四」。指定値が「その一」または「その二」または「その三」である", false),
-             ("指定値は、「その四」。指定値が「その一」または「その二」または「その三」ではない", true),
-             ("指定値は、「その二」。指定値が「その一」または「その二」または「その三」に等しい", true),
-             ("指定値は、「その四」。指定値が「その一」または「その二」または「その三」に等しくない", true),
-         ]
-         for test in testPatterns {
-             print("テストパターン: \(test.input)")
-             let evaluated = try XCTUnwrap(testEvaluator(test.input))
-             try testObject(evaluated, with: test.expected)
-             print("テスト(\(evaluated))終了")
-         }
+        let testPatterns: [(input: String, expected: Bool)] = [
+            ("指定値は、「その二」。指定値が「その一」または「その二」または「その三」である", true),
+            ("指定値は、「その四」。指定値が「その一」または「その二」または「その三」である", false),
+            ("指定値は、「その四」。指定値が「その一」または「その二」または「その三」ではない", true),
+            ("指定値は、「その二」。指定値が「その一」または「その二」または「その三」に等しい", true),
+            ("指定値は、「その四」。指定値が「その一」または「その二」または「その三」に等しくない", true),
+        ]
+        for test in testPatterns {
+            print("テストパターン: \(test.input)")
+            let evaluated = try XCTUnwrap(testEvaluator(test.input))
+            try testObject(evaluated, with: test.expected)
+            print("テスト(\(evaluated))終了")
+        }
     }
     func testLogicalOperations() throws {
-         let testPatterns: [(input: String, expected: Bool)] = [
-             ("1が2に等しい、または、1が1に等しい", true),
-             ("1が2に等しい、または、1が3に等しい", false),
-             ("1が2に等しい、かつ、1が1に等しい", false),
-             ("1が1に等しい、かつ、2が2に等しい、かつ、3が3に等しい", true),
-             ("1が1に等しい、または、2が2に等しい、または、3が3に等しい", true),
-             ("1が1に等しい、または、【2が2に等しい】、かつ、3が4に等しい", false),
-             ("1が1に等しい、または、2が2に等しい、かつ、3が4に等しい", false),
-             ("1が1に等しい、または、【2が2に等しい、かつ、3が4に等しい】", true),
-             ("1が2に等しい、かつ、2が2に等しい、または、3が3に等しい", true),
-             ("1が2に等しい、かつ、【2が2に等しい】、または、3が3に等しい", true),
-             ("1が2に等しい、かつ、【2が2に等しい、または、3が3に等しい】", false),
-             ("1が1または2に等しい、かつ、2が2に等しい、または、3が3に等しい", true),
+        let testPatterns: [(input: String, expected: Bool)] = [
+            ("1が2に等しい、または、1が1に等しい", true),
+            ("1が2に等しい、または、1が3に等しい", false),
+            ("1が2に等しい、かつ、1が1に等しい", false),
+            ("1が1に等しい、かつ、2が2に等しい、かつ、3が3に等しい", true),
+            ("1が1に等しい、または、2が2に等しい、または、3が3に等しい", true),
+            ("1が1に等しい、または、【2が2に等しい】、かつ、3が4に等しい", false),
+            ("1が1に等しい、または、2が2に等しい、かつ、3が4に等しい", false),
+            ("1が1に等しい、または、【2が2に等しい、かつ、3が4に等しい】", true),
+            ("1が2に等しい、かつ、2が2に等しい、または、3が3に等しい", true),
+            ("1が2に等しい、かつ、【2が2に等しい】、または、3が3に等しい", true),
+            ("1が2に等しい、かつ、【2が2に等しい、または、3が3に等しい】", false),
+            ("1が1または2に等しい、かつ、2が2に等しい、または、3が3に等しい", true),
         ]
-         for test in testPatterns {
-             print("テストパターン: \(test.input)")
-             let evaluated = try XCTUnwrap(testEvaluator(test.input))
-             try testObject(evaluated, with: test.expected)
-             print("テスト(\(evaluated))終了")
-         }
+        for test in testPatterns {
+            print("テストパターン: \(test.input)")
+            let evaluated = try XCTUnwrap(testEvaluator(test.input))
+            try testObject(evaluated, with: test.expected)
+            print("テスト(\(evaluated))終了")
+        }
     }
     func testLoopOperations() throws {
         let testPatterns: [(input: String, expected: Int)] = [
@@ -779,7 +779,7 @@ final class EvaluatorTests: XCTestCase {
             ("合計は０。範囲【1以上10未満】を関数【入力は数字、数字と】で繰り返す。足す。", 45),
             ("合計は０。配列【１、２、３、４、５、６、７、８、９】を関数【入力は数字、数字と】で繰り返す。足す。", 45),
             ("合計は０。辞書【1が１、2が２、3が３、4が４、5が５、6が６、7が７、8が８、9が９】を関数【入力は索引と値、値と】で繰り返す。足す。", 45),
-       ]
+        ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
             let evaluated = try XCTUnwrap(testEvaluator(test.input))
@@ -947,9 +947,9 @@ final class EvaluatorTests: XCTestCase {
             】。
             温度は、型であって、【
                 摂氏は、0。
-                華氏は、算出【入力が設定値、
-                    設定は、【設定値から３２を引いたものに５を掛け、９で割り、「摂氏」に上書きする。】
-                    取得は、【９に摂氏を掛け５で割ったものに、３２を足す。】
+                華氏は、算出【
+                    設定が、【入力が設定値、設定値から３２を引いたものに５を掛け、９で割り、「摂氏」に上書きする。】
+                    取得が、【９に摂氏を掛け５で割ったものに、３２を足す。】
                 】。
                 「摂氏」と「華氏」は利用可能。
             】。
@@ -964,7 +964,43 @@ final class EvaluatorTests: XCTestCase {
             ("気温の華氏。", 68),
             ("気温のメンバー「華氏」を32度に設定する。気温の摂氏。", 0),
             ("気温の華氏。", 32),
-            ("100円の税込。", 110),
+            ("空にする。100円の税込。", 110),
+        ]
+        print("テストパターン: \(input)")
+        let environment = Environment()
+        let parser = Parser(Lexer(input))
+        let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+        let result = eval.object ?? environment.pull()
+        XCTAssertFalse(result?.isError ?? false, result?.error?.message ?? "")
+        for test in testPatterns {
+            print("テストパターン: \(test.input)")
+            let parser = Parser(Lexer(test.input))
+            let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+            let expected = eval.object ?? environment.pull()!
+            try testObject(expected, with: test.expected)
+            print("テスト(\(expected))終了")
+        }
+        print("テスト終了")
+    }
+    func testComputationOverloads() throws {
+        let input = """
+            甲は、型であって、【
+                乙は、算出【
+                    設定が、【入力がa、丁にaを上書き。】
+                    設定が、さらに、【入力がb、丁にbを上書き。】
+                    取得が、【１】
+                    取得が、さらに、【入力がc、c】
+                】
+                丁は、0。
+                「乙」と「丁」は利用可能。
+            】。
+            丙は、甲から生成する。
+        """
+        let testPatterns: [(input: String, expected: Any)] = [
+            ("丙の乙", 1),
+            ("空にする。cは2。cで丙の乙", 2),
+            ("空にする。aは3。丙のメンバー「乙」にaを設定する。丙の丁。", 3),
+            ("空にする。bは4。丙のメンバー「乙」にbを設定する。丙の丁。", 4),
         ]
         print("テストパターン: \(input)")
         let environment = Environment()

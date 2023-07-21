@@ -223,17 +223,14 @@ struct FunctionLiteral : Expression {
 }
 struct ComputationLiteral : Expression {
     var token: Token                // 算出トークン
-    var parameters: [Identifier]    // 入力パラメータ
-    var signature: InputFormat      // 入力形式
-    var setter: BlockStatement?     // 設定ブロック
-    var getter: BlockStatement?     // 取得ブロック
+    var setters: [FunctionBlock]    // 設定ブロック
+    var getters: [FunctionBlock]    // 取得ブロック
     //
     var tokenLiteral: String {token.literal}
     var string: String {
         token.coloredLiteral + "であって、【" +
-        (parameters.isEmpty ? "" : "入力が" + "、\(zip(parameters, signature.strings).map {$0.string + $1}.joined(separator: "と"))であり、") +
-        (setter.map {"設定は、【\($0.string)】。"} ?? "") +
-        (getter.map {"取得は、【\($0.string)】。"} ?? "") +
+        (setters.reduce("") {$0 + "設定は、\($1.isExtended ? "さらに、" : "")【\($1.string)】。"}) +
+        (getters.reduce("") {$0 + "取得は、\($1.isExtended ? "さらに、" : "")【\($1.string)】。"}) +
         "】"
     }
 }
@@ -264,7 +261,7 @@ struct TypeLiteral : Expression {
     var token: Token                // 型トークン
     var protocols: [String]         // 準拠する規約
     var typeMembers: BlockStatement?// 型のメンバー
-    var initializers: [Initializer] // 初期化処理
+    var initializers: [FunctionBlock] // 初期化処理
     var body: BlockStatement?       // インスタンスのメンバー
     //
     var tokenLiteral: String {token.literal}
@@ -284,10 +281,10 @@ struct InputFormat {
     var formats: [(type: String, particle: String)] // 期待するパラメータ毎の型と格(無い場合は"")
     var strings: [String] {formats.map {!($0.type.isEmpty && $0.particle.isEmpty) ? "「\($0.type + $0.particle)」" : ""}}
 }
-struct Initializer {
+struct FunctionBlock {
     var parameters: [Identifier]    // 入力パラメータ
     var signature: InputFormat      // 入力形式
-    var body: BlockStatement?       // 初期化処理
+    var body: BlockStatement?       // 処理本体
     var isExtended: Bool = false    // 拡張識別
     var string: String {
         (parameters.isEmpty ? "" : "入力が、\(zip(parameters, signature.strings).map {$0.string + $1}.joined(separator: "と"))であり、") +

@@ -548,44 +548,25 @@ extension JpfArray {
 }
 extension ComputationLiteral : Evaluatable {
     func evaluated(with environment: Environment) -> JpfObject? {
-        accessed(with: environment) ?? JpfComputation(parameters: parameters, signature: signature, setter: setter, getter: getter, environment: environment)
+        accessed(with: environment) ?? JpfComputation(setters: setters, getters: getters, environment: environment)
     }
 }
 extension JpfComputation {
     /// 算出(取得)を行う。
-    /// 入力は、算出に「設定」がない場合、評価される。
     /// - Parameter environment: 実行中の(通常もしくは算出の)環境
     /// - Returns: エラーかアンラップされた返り値、なければnil
     func retrieved(with environment: Environment) -> JpfObject? {
-        guard let body = getter else {return getterNotFound}
+        guard !getters.isEmpty else {return getterNotFound}
         let local = Environment(outer: self.environment)    // 環境を拡張
-        if setter == nil {                                  // 「設定」がない場合、入力を評価
-            let stackEnv = environment.isEmpty ? self.environment : environment
-            let result = local.apply(parameters, with: signature, from: stackEnv)
-            guard !result.isError else {return result}
-        }
-        defer {environment.push(local.pullAll())}           // スタックを戻す
-        if let evaluated = Evaluator(from: body, with: local).object {
-            guard !evaluated.isError else {return evaluated}
-            return unwrappedReturnValue(of: evaluated)
-        }
-        return nil
+        return environment.execute(getters, with: local)
     }
     /// 算出(設定)を行う。
     /// - Parameter environment: 実行中の(通常もしくは算出の)環境
     /// - Returns: エラーかアンラップされた返り値、なければnil
-    func set(with environment: Environment) -> JpfObject? {
-        guard let body = setter else {return setterNotFound}
+    func setup(with environment: Environment) -> JpfObject? {
+        guard !setters.isEmpty else {return setterNotFound}
         let local = Environment(outer: self.environment)    // 環境を拡張
-        let stackEnv = environment.isEmpty ? self.environment : environment
-        let result = local.apply(parameters, with: signature, from: stackEnv)
-        guard !result.isError else {return result}
-        defer {environment.push(local.pullAll())}           // スタックを戻す
-        if let evaluated = Evaluator(from: body, with: local).object {
-            guard !evaluated.isError else {return evaluated}
-            return unwrappedReturnValue(of: evaluated)
-        }
-        return nil
+        return environment.execute(setters, with: local)
     }
 }
 extension TypeLiteral : Evaluatable {
@@ -596,7 +577,7 @@ extension TypeLiteral : Evaluatable {
             let local = Environment(outer: environment)
             if let members = typeMembers,
                let result = Evaluator(from: members, with: local).object, result.isError {return result}
-            var inits: [Initializer] = []
+            var inits: [FunctionBlock] = []
             for i in initializers { // 「さらに、」ならばオーバーロード。無ければ、上書き
                 if i.isExtended {inits.append(i)} else {inits = [i]}
             }

@@ -76,6 +76,28 @@ class Environment {
         return name
     }
     func getName() -> String {return getName(from: peek)}
+    /// 多重定義の処理ブロックから、引数形式が一致するものを抽出し、処理を行う。
+    /// - Parameters:
+    ///   - functions: 処理ブロック(【入力が〜、本体が〜。】)
+    ///   - local: 処理を行う環境 (selfは入力環境)
+    /// - Returns: 処理結果、エラー、nil
+    func execute(_ functions: [FunctionBlock], with local: Environment) -> JpfObject? {
+        for function in functions.reversed() {               // 多重定義
+            let designated = function.signature
+            let names = function.parameters.map {$0.value}
+            if hasParameters(to: designated, with: names) { // 引数が一致する入力を処理
+                let result = local.apply(function.parameters, with: designated, from: self)
+                guard !result.isError else {return result}
+                defer {push(local.pullAll())}               // スタックを戻す
+                if let body = function.body, let result = Evaluator(from: body, with: local).object {
+                    if result.isError {return result}
+                    if result.isReturnValue {return result.value!}
+                }
+                break
+            }
+        }
+        return nil
+    }
     /// 外部のスタック上の引数(オブジェクト)の形式チェックを行い値を取り出し、各識別子に引き当て、内部の辞書に登録する。
     /// - Parameters
     ///   - parameters: 識別子(Identifier)の配列
