@@ -163,6 +163,7 @@ final class EvaluatorTests: XCTestCase {
         let testPatterns: [(input: String, exptected: Int)] = [
             ("aは、5。a。", 5),
             ("aは、5と5を掛けたもの。a。", 25), ("aは、5。bは、a。b。", 5), ("aは、5。bは、a。cは、aとbと5を足したもの。c。", 15),
+            ("『甲の乙』は、5。甲の乙。", 5),
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")

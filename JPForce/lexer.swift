@@ -25,9 +25,7 @@ class Lexer {
     private var positionTobeRead = 0    // 次に読もうとしている位置
     private var taggedWords: [(word: String, type: TagType)] = [] // 解析(分類)結果文字列
     enum TagType : String {case word, symbol, none}
-    enum LexerError : Error {
-        case notFound(_ token: Token, to: Token)    // TODO: Errorをthrowしたほうが良い？　toに対するtokenが見つからない
-    }
+    static var identifiers = Identifiers()  // 定義された識別子
     // トークン解析
     func getNext() -> Token {
         var token = nextToken
@@ -123,6 +121,11 @@ class Lexer {
     private lazy var nextToken: Token = getNextToken()
     private func getNextToken() -> Token {
         guard positionTobeRead < taggedWords.count else {return Self.EoT}
+        let words = Array((taggedWords.map {$0.word})[positionTobeRead...])
+        if let (identifier, count) = Self.identifiers.identifier(in: words) {
+            positionTobeRead += count
+            return Token(ident: identifier)
+        }
         let tagged = taggedWords[positionTobeRead]
         return (tagged.type == .symbol) ?
         Token(symbol: tagged.word) :
@@ -162,5 +165,20 @@ class Lexer {
         guard positionTobeRead < taggedWords.count else {return false}  // endSymbolが見つからない
         skipToken()                                         // endSymbolを読み飛ばす
         return true
+    }
+}
+/// 識別子辞書：定義された識別子を記憶する。
+struct Identifiers {
+    private var identifiers: Set<String> = []
+    private var maxLen = 0
+    mutating func insert(_ s: String) {identifiers.insert(s); if s.count > maxLen {maxLen = s.count}}
+    func identifier(in words: [String]) -> (String, Int)? {
+        var string = "", pos = 0
+        while pos < words.count && string.count <= maxLen && !identifiers.isEmpty {
+            string += String(words[pos])
+            if identifiers.contains(string) {return (string, pos)}
+            pos += 1
+        }
+        return nil
     }
 }
