@@ -182,7 +182,7 @@ struct JpfComputation : JpfObject {
     var getters: [FunctionBlock]    // 取得ブロック
     var environment: Environment
     var string: String {
-        var s = type.color(.magenta) + "であって、【" +
+        let s = type.color(.magenta) + "であって、【" +
         (setters.reduce("") {$0 + "設定は、\($1.isExtended ? "さらに、" : "")【\($1.string)】。"}) +
         (getters.reduce("") {$0 + "取得は、\($1.isExtended ? "さらに、" : "")【\($1.string)】。"}) +
         "】"

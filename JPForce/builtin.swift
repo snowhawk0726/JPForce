@@ -585,8 +585,10 @@ extension JpfPhrase {
 }
 extension JpfType {
     subscript(name: String, particle: Token?) -> JpfObject? {
-        if environment.contains(name), let object = environment[name] {return object}
-        // 利用可能な名前でないなら、デフォルト
+        // nameかその連用形が辞書にあるかであれば、オブジェクトを返す。
+        let canditate = environment[name] != nil ? name : ContinuativeForm(name).plainForm ?? ""
+        if environment.contains(canditate), let object = environment[canditate] {return object}
+        // 名前が辞書に無いなら、デフォルト
         return getObject(from: name, with: particle)
     }
     func assign(_ value: JpfObject, to target: JpfObject) -> JpfObject {
