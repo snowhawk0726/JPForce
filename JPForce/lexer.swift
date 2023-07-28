@@ -25,7 +25,8 @@ class Lexer {
     private var positionTobeRead = 0    // 次に読もうとしている位置
     private var taggedWords: [(word: String, type: TagType)] = [] // 解析(分類)結果文字列
     enum TagType : String {case word, symbol, none}
-    static var identifiers = Identifiers()  // 定義された識別子
+    private var identifiers = Identifiers()  // 定義された識別子
+    func insert(_ identifier: String) {identifiers.insert(identifier)}
     // トークン解析
     func getNext() -> Token {
         var token = nextToken
@@ -122,7 +123,7 @@ class Lexer {
     private func getNextToken() -> Token {
         guard positionTobeRead < taggedWords.count else {return Self.EoT}
         let words = Array((taggedWords.map {$0.word})[positionTobeRead...])
-        if let (identifier, count) = Self.identifiers.identifier(in: words) {
+        if let (identifier, count) = identifiers.identifier(in: words) {
             positionTobeRead += count
             return Token(ident: identifier)
         }

@@ -429,12 +429,12 @@ struct DefStatementParser : StatementParsable {
     let syntax1 = "定義文「<識別子>とは、<式(値)>ことである。」"
     let syntax2 = "定義文「<識別子>は、<式(値)>。」"
     func parse() -> Statement? {
-        let identifier = Identifier(token: currentToken, value: currentToken.literal) // 識別子名はそのまま
-        Lexer.identifiers.insert(identifier.value)  // 識別子をLexerに登録
+        let identifier = Identifier(token: currentToken, value: currentToken.literal)
+        parser.insert(identifier.value)     // 識別子をLexerに登録
         getNext()
-        let token = currentToken           // 「は」「とは」
+        let token = currentToken            // 「は」「とは」
         let syntax = (token.literal == DefineStatement.towa) ? syntax1 : syntax2
-        _ = getNext(whenNextIs: .COMMA)    // 読点(、)を読み飛ばす
+        _ = getNext(whenNextIs: .COMMA)     // 読点(、)を読み飛ばす
         let  isExtended = getNext(whenNextIs: DefineStatement.further)  // 「さらに、」
         _ = getNext(whenNextIs: .COMMA)
         getNext()

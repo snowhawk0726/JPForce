@@ -68,4 +68,6 @@ class Parser {
         return true
     }
     func skipEols() {while currentToken.isEol {getNext()}}
+    /// Lexerに識別子を登録
+    func insert(_ identifier: String) {lexer.insert(identifier)}
 }
