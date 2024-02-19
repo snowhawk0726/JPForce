@@ -99,7 +99,7 @@ extension DefineStatement : Evaluatable {
                     guard let extended = object as? JpfType else {return protocolExtentionError + "(拡張先が\(object.type))"}
                     object = JpfProtocol(protocols: orignal.protocols, clauses: orignal.clauses, body: extended.body)
                 default:
-                    return "「\(name.value)」を「\(object.name)」で" + cannotExtend
+                    return "「\(name.value)」を「\(object.type)」で" + cannotExtend
                 }
             }
         }
