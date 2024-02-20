@@ -172,7 +172,7 @@ extension PredicateOperable {
     var reduceUsage: JpfError           {JpfError("仕様：<配列、辞書、範囲>を<初期値>と<関数>でまとめる。")}
     var sortUsage: JpfError             {JpfError("仕様：<配列>を<関数>で並び替える。または、<配列>を（「昇順」に、または「降順」に）並び替える。")}
     var reverseUsage: JpfError          {JpfError("仕様：<配列、文字列>を逆順にする。")}
-    var pullDupUsage: JpfError          {JpfError("仕様：(「<識別子>」と…)(「<識別子>」に）(「数値」または「値」を)(<数値>個)")}
+    var pullDupUsage: JpfError          {JpfError("仕様：(識別子「<識別子>」と…)(識別子「<識別子>」に）(「数値」または「値」を)(<数値>個)")}
     var assignUsage: JpfError           {JpfError("仕様：〜(を)<識別子>に代入する。または、<識別子>に〜を代入する。")}
     var overwriteUsage: JpfError        {JpfError("仕様：〜(を)<識別子>に上書きする。または、<識別子>に〜を上書きする。")}
     var assignArrayUsage: JpfError      {JpfError("仕様：〜(を)<配列>の位置<数値>に代入(または上書き)する。または、<配列>の位置<数値>に〜を代入(または上書き)する。")}
@@ -918,17 +918,17 @@ struct PullOperator : PredicateOperable {
     let environment: Environment, op: Token
     func operated() -> JpfObject? {
         var method: String?, number = 1, identifiers: [String] = []
-        if environment.isPeekParticle(.KO), environment.peek?.isNumber ?? false {  // n個写す(得る)
+        if isPeekParticle(.KO) && isPeekNumber {        // n個写す(得る)
             number = leftNumber!
         }
-        if environment.isPeekParticle(.WO), let string = environment.peek?.value as? JpfString, isMethod(string.value) {
-            // 取得方法(「値」or「数値」
+        if isPeekParticle(.WO), let string = environment.peek?.value as? JpfString, isMethod(string.value) {
+            // 取得方法(「値」をor「数値」を
             environment.drop()
             method = string.value
         }
-        if environment.isPeekParticle(.NI) {        // 複写or移動先
+        if isPeekParticle(.NI) && environment.peek?.value?.string == Token.Keyword.IDENTIFIER.rawValue {        // 複写or移動先の識別子(Label)
             repeat {
-                guard let identifier = environment.peek?.value as? JpfString else {return pullDupUsage + op.literal + "。"}
+                guard let identifier = environment[Token.Keyword.IDENTIFIER.rawValue] as? JpfString else {return pullDupUsage + op.literal + "。"}
                 environment.drop()
                 identifiers.append(identifier.value)
             } while environment.isPeekParticle(.TO)
