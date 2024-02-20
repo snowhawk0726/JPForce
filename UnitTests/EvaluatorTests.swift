@@ -495,6 +495,22 @@ final class EvaluatorTests: XCTestCase {
         }
         print("テスト終了")
     }
+    func testBuiltinOperators() throws {
+        let testPatterns: [(input: String, exptected: String?)] = [
+            ("「こんにちは」の型","文字列"),
+            ("cは、型【aは1】。iはcから生成する。iの型", "c"),
+            ("１を積む。「a」に得る。aの格", "を"),
+            ("aは１。aの格", nil),
+            ("「い」を積む。「a」に得る。aの値", "い"),
+            ("aは「い」。aの値", "い"),
+        ]
+        for test in testPatterns {
+            print("テストパターン: \(test.input)")
+            let evaluated = try XCTUnwrap(testEvaluator(test.input))
+            try testObject(evaluated, with: test.exptected)
+            print("テスト(\(evaluated))終了")
+        }
+    }
     func testStringBuiltins() throws {
         let testPatterns: [(input: String, exptected: String?)] = [
             ("「こんにちは」と「、」と「みなさん。」を足す。","こんにちは、みなさん。"),

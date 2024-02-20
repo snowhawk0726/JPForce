@@ -921,7 +921,8 @@ struct PullOperator : PredicateOperable {
         if environment.isPeekParticle(.KO), environment.peek?.isNumber ?? false {  // n個写す(得る)
             number = leftNumber!
         }
-        if environment.isPeekParticle(.WO), let string = environment.peek?.value as? JpfString {    // 取得方法(「値」or「数値」
+        if environment.isPeekParticle(.WO), let string = environment.peek?.value as? JpfString, isMethod(string.value) {
+            // 取得方法(「値」or「数値」
             environment.drop()
             method = string.value
         }
@@ -966,6 +967,9 @@ struct PullOperator : PredicateOperable {
         case "数値":  return !objects.contains(where: {!$0.isNumber})
         default:    return true
         }
+    }
+    private func isMethod(_ s: String?) -> Bool {
+        return s == "値" || s == "数値"
     }
 }
 struct DropOperator : PredicateOperable {
