@@ -74,7 +74,7 @@ extension JpfObject {
     func reversed() -> JpfObject {JpfError(cannotReverse)}
     func assign(_ value: JpfObject, to target: JpfObject) -> JpfObject {JpfError(cannotAssign)}
     // エラーメッセージ
-    var cannotCount: String     {"「\(type)」型の値は、数えることができない。"}
+    var cannotCount: String     {"\(type)型の要素の数は、数えることができない。"}
     var cannotAdd: String       {"を足すことはできない。"}
     var cannotRemove: String    {"を削除することはできない。"}
     var cannotCompare: String   {"を比較することはできない。"}
@@ -130,6 +130,10 @@ extension JpfRange {
         guard let lower = lowerBound?.0.number, let upper = upperBound?.0.number else {return JpfError(cannotCountRange)}
         let countInRange = upper - lower + ((upperBound?.1 == .keyword(.UNDER)) ? 0 : 1)
         return JpfInteger(value: countInRange)
+    }
+    var isEmpty: JpfObject {
+        guard let counter = self.count as? JpfInteger else {return JpfError(cannotCountRange)}
+        return JpfBoolean.object(of: counter.number == 0)
     }
     func contains(_ object: JpfObject) -> JpfObject {
         guard let value = object.number else {return JpfError("「\(object.type)」と「\(type)」" + cannotCompare)}
