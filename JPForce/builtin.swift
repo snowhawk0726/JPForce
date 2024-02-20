@@ -24,8 +24,8 @@ extension JpfObject {
             return self.number.map {JpfInteger(value: $0)} ?? JpfNull.object
         case (Token(.NO),"文字列"),(nil,"文字列"):
             return JpfString(value: self.string)
-        case (Token(.NO),"名前"),(nil,"名前"):
-            return JpfString(value: self.name)
+        case (Token(.NO),"識別子名"),(nil,"識別子名"):
+            return !self.name.isEmpty ? JpfString(value: self.name) : JpfNull.object
         case (Token(.NO),"数"),(nil,"数"):
             return count        // オブジェクトの要素数
         case (Token(.GA),"空"),(nil,"空"):
