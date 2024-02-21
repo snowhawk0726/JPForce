@@ -926,10 +926,12 @@ struct PullOperator : PredicateOperable {
             environment.drop()
             method = string.value
         }
-        if isPeekParticle(.NI) && environment.peek?.value?.string == Token.Keyword.IDENTIFIER.rawValue {        // 複写or移動先の識別子(Label)
+        let label = Token.Keyword.IDENTIFIER.rawValue
+        if isPeekParticle(.NI) && environment.peek?.value?.string == label {        // 複写or移動先の識別子(Label)
             repeat {
-                guard let identifier = environment[Token.Keyword.IDENTIFIER.rawValue] as? JpfString else {return pullDupUsage + op.literal + "。"}
+                guard let identifier = environment.retrieve(name: label) as? JpfString else {return pullDupUsage + op.literal + "。"}
                 environment.drop()
+                environment.remove(name: label)
                 identifiers.append(identifier.value)
             } while environment.isPeekParticle(.TO)
         }
@@ -939,7 +941,7 @@ struct PullOperator : PredicateOperable {
         }
         if !identifiers.isEmpty {                   // (「<識別子>」と…)「<識別子>」に (n個は無視)
             guard let array = getObjects(from: environment, numberOf: identifiers.count, by: method) as? JpfArray else {return JpfNull.object}
-            zip(identifiers.reversed(), array.elements).forEach {environment[$0] = $1}
+            zip(identifiers, array.elements).forEach {environment[$0] = $1}
             return nil
         }
         if number > 1 {                             // n個 → 配列

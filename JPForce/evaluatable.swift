@@ -471,7 +471,7 @@ extension Label : Evaluatable {
             integer.name = tokenLiteral
             return integer
         }
-        environment[tokenLiteral] = JpfString(value: value)
+        environment.append(JpfString(value: value), to: tokenLiteral)
         return JpfString(value: tokenLiteral)
     }
 }

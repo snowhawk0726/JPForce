@@ -33,6 +33,46 @@ class Environment {
         })
     }
     func contains(_ name: String) -> Bool {store.keys.contains(name)}
+    /// 辞書にオブジェクトを追加する。
+    ///     未登録のオブジェクトであれば、そのまま辞書に登録
+    ///     登録済みのオブジェクトが配列(JpfArray)であれば、配列の要素に追加
+    ///     それ以外は、登録済みオブジェクトと追加オブジェクトの配列(JpfArray)を作り、配列を辞書に登録
+    /// - Parameters:
+    ///   - object: 追加するオブジェクト
+    ///   - name: 追加対象の識別子名
+    func append(_ object: JpfObject, to name: String) {
+        if contains(name) {
+            if var array = self[name] as? JpfArray {
+                array.elements.append(object)
+            } else {
+                self[name] = JpfArray(elements: [self[name]!, object])
+            }
+            return
+        }
+        self[name] = object
+    }
+    /// 辞書からオブジェクトを取り出す。
+    /// - Parameter name: 対象の識別子名
+    /// - Returns: 取り出したオブジェクト(もしくはnil)
+    func retrieve(name: String) -> JpfObject? {
+        var object = self[name]
+        if let array = object as? JpfArray {
+            object = array.elements.first
+        }
+        return object
+    }
+    /// 辞書から識別子に対応したオブジェクトを削除する。
+    /// - Parameter name: 対象の識別子名
+    func remove(name: String) {
+        if var array = self[name] as? JpfArray {
+            array.elements.removeFirst()
+            if array.elements.count == 1 {
+                self[name] = array.elements.first
+            }
+        } else {
+            self[name] = nil
+        }
+    }
     // MARK: - スタック操作
     func push(_ object: JpfObject)  {stack.append(object)}
     func push(_ objects: [JpfObject])   {stack += objects}
