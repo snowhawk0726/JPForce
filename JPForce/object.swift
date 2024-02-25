@@ -216,13 +216,13 @@ struct JpfType : JpfObject {
     static let type = "型"
     var name: String = ""
     var initializers: [FunctionBlock] // 初期化処理
-    var environment: Environment    // メンバーを含む環境
+    var environment: Environment    // 要素(メンバー)を含む環境
     var protocols: [String]         // 準拠する規約
     var body: BlockStatement?
     var string: String {
         var s = type.color(.magenta) + "であって、【" +
         (protocols.isEmpty ? "" : "準拠する規約は、\(protocols.map {$0}.joined(separator: "と、"))。") +
-        (environment.enumerated.isEmpty ? "" : "型のメンバーが、\(environment.enumerated.map {$0.key}.joined(separator: "と、"))。") +
+        (environment.enumerated.isEmpty ? "" : "型の要素が、\(environment.enumerated.map {$0.key}.joined(separator: "と、"))。") +
         (initializers.reduce("") {$0 + "初期化は、さらに、【\($1.string)】。"}) +
         (body.map {"本体が、\($0.string)"} ?? "") +
         "】"
@@ -234,10 +234,10 @@ struct JpfInstance : JpfObject {
     static let type = "インスタンス"
     var type: String = ""
     var name: String = ""
-    var environment: Environment    // メンバーを含む環境
+    var environment: Environment    // 要素(メンバー)を含む環境
     var protocols: [String]         // 準拠する規約
     var available: [String]         // 外部から利用可能なメンバー
-    var string: String {"型が、\(type)で、メンバーが、\(environment.enumerated.map {$0.key}.joined(separator: "と、"))。" + available.map {"「\($0)」"}.joined(separator: "と") + "は利用可能。"}
+    var string: String {"型が、\(type)で、要素が、\(environment.enumerated.map {$0.key}.joined(separator: "と、"))。" + available.map {"「\($0)」"}.joined(separator: "と") + "は利用可能。"}
 }
 struct JpfProtocol : JpfObject {
     static let type = "規約"

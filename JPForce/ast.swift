@@ -73,7 +73,7 @@ struct ExpressionStatement : Statement {
     static let joukouwa = "条項は、"
     static let syokika = "初期化"
     static let kiyaku = "規約"
-    static let typemembers = "型のメンバー"
+    static let typemembers = "型の要素"
     static let katano = "型の"
     static let junkyosuru = "準拠する"
     static let settei = "設定"
@@ -251,7 +251,7 @@ struct ClauseLiteral {
     var type: String                // 型の文字列
     var parameters: [Identifier]    // 関数のパラメータ
     var signature: InputFormat?     // 関数の入力
-    var isTypeMember: Bool = false  // 型のメンバー
+    var isTypeMember: Bool = false  // 型の要素
     //
     var string: String {identifier.string + DefineStatement.wa + "、" +
         ((signature.map {"関数であって、【入力が、\(zip(parameters, $0.strings).map {$0.string + $1}.joined(separator: "と"))】"}) ?? "「\(type)」") + "。"
@@ -260,7 +260,7 @@ struct ClauseLiteral {
 struct TypeLiteral : Expression {
     var token: Token                // 型トークン
     var protocols: [String]         // 準拠する規約
-    var typeMembers: BlockStatement?// 型のメンバー
+    var typeMembers: BlockStatement?// 型の要素
     var initializers: [FunctionBlock] // 初期化処理
     var body: BlockStatement?       // インスタンスのメンバー
     //
@@ -268,7 +268,7 @@ struct TypeLiteral : Expression {
     var string: String {
         var s = token.coloredLiteral + "であって、【" +
         (protocols.isEmpty ? "" : "準拠する規約は、\(protocols.map {$0}.joined(separator: "と、"))であり、") +
-        (typeMembers.map {"型のメンバーが、\($0.string)であり、"} ?? "") +
+        (typeMembers.map {"型の要素が、\($0.string)であり、"} ?? "") +
         (initializers.reduce("") {$0 + "初期化は、\($1.isExtended ? "さらに、" : "")【\($1.string)】。"}) +
         (body.map {"本体が、\($0.string)"} ?? "") +
         "】"
@@ -362,8 +362,8 @@ private func compareSignature(_ lhs: InputFormat?, with rhs: InputFormat) -> Jpf
     }
     return nil
 }
-private var designatedObjectNotFound: JpfError {JpfError("指定した識別子のメンバーが見つからない。")}
-private var designatedTypeNotMatch: JpfError{JpfError("メンバーの型が規約に準拠していない。")}
-private var numberOfParamsNotMatch: JpfError{JpfError("メンバー関数の引数の数が規約に準拠していない。")}
-private var nameOfParamsNotMatch: JpfError  {JpfError("メンバー関数の引数の名前が規約に準拠していない。")}
-private var formatOfParamsNotMatch: JpfError{JpfError("メンバー関数の引数の形式が規約に準拠していない。")}
+private var designatedObjectNotFound: JpfError {JpfError("指定した識別子名が見つからない。")}
+private var designatedTypeNotMatch: JpfError{JpfError("指定した型が規約に準拠していない。")}
+private var numberOfParamsNotMatch: JpfError{JpfError("関数の引数の数が規約に準拠していない。")}
+private var nameOfParamsNotMatch: JpfError  {JpfError("関数の引数の名前が規約に準拠していない。")}
+private var formatOfParamsNotMatch: JpfError{JpfError("関数の引数の形式が規約に準拠していない。")}

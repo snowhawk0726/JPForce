@@ -731,7 +731,7 @@ struct ProtocolLiteralParser : ExpressionParsable {
             var params: [Identifier] = []
             var signature: InputFormat?
             skipNextEols(suppress: symbol == .EOL)
-            let isTyped = getNext(whenNextIs: ExpressionStatement.katano)   // 型のメンバーか
+            let isTyped = getNext(whenNextIs: ExpressionStatement.katano)   // 型の要素(メンバー)か
             getNext()
             let ident = Identifier(from: currentToken)
             guard getNext(whenNextIs: DefineStatement.wa) else {

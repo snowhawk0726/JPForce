@@ -143,7 +143,7 @@ extension PredicateOperable {
     var functionObjectNotFound: JpfError{JpfError("実行すべき関数が見つからない。")}
     var cannotJudgeGenuineness: JpfError{JpfError("で、正負を判定できる対象は、数値型のみ。")}
     var fileReadError: JpfError         {JpfError("ファイルの読み込みに失敗した。")}
-    var availableError: JpfError        {JpfError("利用可能なメンバー名でなかった。")}
+    var availableError: JpfError        {JpfError("利用可能な識別子名でなかった。")}
     var cannotConform: JpfError         {JpfError("には準拠できない。")}
     var valueOfEnumeratorNotFound: JpfError {JpfError("指定の値が見つからない。指定値：")}
     var cannotGenerateFromProtocol: JpfError {JpfError("規約からインスタンスは生成できない。")}
@@ -179,7 +179,7 @@ extension PredicateOperable {
     var swapUsage: JpfError             {JpfError("仕様：<識別子>と<識別子>を入れ替える。または、〜と〜を入れ替える。")}
     var generateUsage: JpfError         {JpfError("仕様：<識別子(型)>から生成する。")}
     var generateEnumeratorUsage: JpfError {JpfError("仕様：<値>で<列挙型>から生成する。または<値>から<列挙型>を生成する。")}
-    var setUsage: JpfError      {JpfError("仕様：<値>(を)<オブジェクト>のメンバー「<識別子>」に設定する。または、<オブジェクト>のメンバー「<識別子>」に<値>を設定する。")}
+    var setUsage: JpfError      {JpfError("仕様：<値>(を)<オブジェクト>の要素「<識別子>」に設定する。または、<オブジェクト>の要素「<識別子>」に<値>を設定する。")}
 }
 // MARK: - 表示/音声
 struct PrintOperator : PredicateOperable {
@@ -865,12 +865,12 @@ struct SetOperator : PredicateOperable {
     func operated() -> JpfObject? {
         if var params = environment.peek(3) {
             switch (params[0].particle, params[1].particle, params[2].particle) {
-            case (Token(.NO),Token(.NI),Token(.WO)),    // 対象のメンバー「m」に値を設定
-                 (Token(.NO),Token(.WO),Token(.NI)):    // 対象のメンバー「m」を値に設定
+            case (Token(.NO),Token(.NI),Token(.WO)),    // 対象の要素「m」に値を設定
+                 (Token(.NO),Token(.WO),Token(.NI)):    // 対象の要素「m」を値に設定
                 params.swapAt(0, 1)
                 params.swapAt(0, 2)
                 fallthrough
-            case (Token(.WO),Token(.NO),Token(.NI)):    // 値を、対象のメンバー「m」に設定
+            case (Token(.WO),Token(.NO),Token(.NI)):    // 値を、対象の要素「m」に設定
                 guard let value = params[0].value, let object = params[1].value else {break}
                 let result = object.assign(value, to: params[2].value!)
                 guard !result.isError else {return result}

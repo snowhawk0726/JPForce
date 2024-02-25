@@ -90,7 +90,7 @@ extension JpfObject {
     var cannotAssign: String    {"「\(type)に代入することはできない。"}
     var identifierNotAvailable: String  {"(識別子)は利用可能でない。"}
     var arrayPositionError: String      {"指定位置が、配列内に無い。"}
-    var identifierNotFound: String      {"指定した識別子のメンバーが見つからない。"}
+    var identifierNotFound: String      {"指定した識別子名が見つからない。"}
     var notExecutableObject: JpfError   {JpfError("「関数」以外を実行しようとした。型：")}
     var functionParameterError: JpfError{JpfError("「関数」の入力が指定形式と一致しない。")}
     var getterNotFound: JpfError        {JpfError("「算出」の取得定義が見つからなかった。")}
@@ -600,7 +600,7 @@ extension JpfType {
     }
 }
 extension JpfInstance {
-    var count: JpfObject {JpfInteger(value: available.count)}   // 利用可能メンバー数
+    var count: JpfObject {JpfInteger(value: available.count)}   // 利用可能要素(メンバー)数
     func contains(type: String) -> Bool {return type == self.type || protocols.contains(type)}
     subscript(name: String, particle: Token?) -> JpfObject? {
         // nameが利用可能なメンバー名であれば、オブジェクトを返す。
