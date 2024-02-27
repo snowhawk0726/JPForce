@@ -410,10 +410,11 @@ extension JpfArray {
     }
     func contains(_ object: JpfObject) -> JpfObject {
         return JpfBoolean.object(of: elements.contains {
-            if let range = $0 as? JpfRange {    // オブジェクトが範囲内か
-                return range.contains(object).isTrue
+            if object is JpfRange && $0.isNumber {  // 要素(数値)が範囲内か
+                return object.contains($0).isTrue
             }
-            return $0.isEqual(to: object)       // オブジェクトが要素と一致か
+            return $0.type == object.type &&
+                    $0.isEqual(to: object)          // 要素がオブジェクトと一致するか
         })
     }
     func contains(where function: JpfFunction, with environment: Environment) -> JpfObject {

@@ -102,6 +102,8 @@ extension ObjectAccessible {
                 break
             case is JpfRange:                   // <数値>が範囲【<数値><下限>】範囲【<数値><上限>】
                 break
+            case is JpfArray:                   // <数値>(配列の要素)が<範囲>にある
+                break
             default:
                 return "\(object.string)を\(range.string)" + cannotAccessObjectWith
             }
