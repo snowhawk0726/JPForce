@@ -168,6 +168,6 @@ extension JpfArray : JpfObjectAccessible {
 extension JpfComputation : JpfObjectAccessible {
     func accessed(by name: String, with environment: Environment) -> JpfObject? {
         accessed(type: type, with: environment) ??  // 算出でオブジェクトにアクセスしている？→ Yesならエラー
-        retrieved(with: environment)
+        retrieved(with: environment)                // 取得処理(実行)
     }
 }

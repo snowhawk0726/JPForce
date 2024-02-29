@@ -435,7 +435,7 @@ struct DefStatementParser : StatementParsable {
         let token = currentToken            // 「は」「とは」
         let syntax = (token.literal == DefineStatement.towa) ? syntax1 : syntax2
         _ = getNext(whenNextIs: .COMMA)     // 読点(、)を読み飛ばす
-        let  isExtended = getNext(whenNextIs: DefineStatement.further)  // 「さらに、」
+        let isExtended = getNext(whenNextIs: DefineStatement.further)   // 「さらに、」
         _ = getNext(whenNextIs: .COMMA)
         getNext()
         guard let parsed = ExpressionStatementParser(parser).parse() as? ExpressionStatement else {
