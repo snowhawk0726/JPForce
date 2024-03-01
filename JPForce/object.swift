@@ -204,7 +204,7 @@ struct JpfEnumerator : JpfObject {
     var name: String = ""
     var identifier: String
     var rawValue: JpfObject?
-    var string: String {"型が、\(type)で、列挙子は、\(identifier)" + (rawValue.map {"、値は、\($0.string)。"} ?? "。")}
+    var string: String {"列挙型名は" + (!type.isEmpty ? type : "無し") + "で、列挙子は\(identifier)、" + (rawValue.map {"値は\($0.string)。"} ?? "。")}
     //
     func isEqual(to object: JpfObject) -> Bool {
         guard let rhs = object as? JpfEnumerator else {return false}
