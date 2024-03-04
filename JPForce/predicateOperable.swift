@@ -38,7 +38,7 @@ struct PredicateOperableFactory {
         case .keyword(.IDENTIFIERS):
                                     return IdentifiersOperator(environment, by: token)
         case .keyword(.EXECUTE):    return ExecuteOperator(environment) // (関数)を実行
-        case .keyword(.GENERATE):   return GenerateOperator(environment)// (型)から生成
+        case .keyword(.CREATE):     return CreateOperator(environment)  // (型)から生成
         case .keyword(.INITIALIZATION):
                                     return InitializeOperator(environment)
         case .keyword(.SURU):       return PerformOperator(environment) // 〜にする、〜をする
@@ -146,7 +146,7 @@ extension PredicateOperable {
     var availableError: JpfError        {JpfError("利用可能な識別子名でなかった。")}
     var cannotConform: JpfError         {JpfError("には準拠できない。")}
     var valueOfEnumeratorNotFound: JpfError {JpfError("指定の値が見つからない。指定値：")}
-    var cannotGenerateFromProtocol: JpfError {JpfError("規約からインスタンスは生成できない。")}
+    var cannotCreateFromProtocol:  JpfError {JpfError("規約からインスタンスは生成できない。")}
     var cannotInitialize: JpfError      {JpfError("オブジェクトの初期化ができない。")}
     var detectParserError: JpfError     {JpfError("構文解析器がエラーを検出した。")}
     // メッセージ(使い方)
@@ -177,8 +177,8 @@ extension PredicateOperable {
     var overwriteUsage: JpfError        {JpfError("仕様：〜(を)<識別子>に上書きする。または、<識別子>に〜を上書きする。")}
     var assignArrayUsage: JpfError      {JpfError("仕様：〜(を)<配列>の位置<数値>に代入(または上書き)する。または、<配列>の位置<数値>に〜を代入(または上書き)する。")}
     var swapUsage: JpfError             {JpfError("仕様：<識別子>と<識別子>を入れ替える。または、〜と〜を入れ替える。")}
-    var generateUsage: JpfError         {JpfError("仕様：<識別子(型)>から生成する。")}
-    var generateEnumeratorUsage: JpfError {JpfError("仕様：<値>で<列挙型>から生成する。または<値>から<列挙型>を生成する。")}
+    var createUsage: JpfError           {JpfError("仕様：<識別子(型)>から生成する。")}
+    var createEnumeratorUsage: JpfError {JpfError("仕様：<値>で<列挙型>から生成する。または<値>から<列挙型>を生成する。")}
     var setUsage: JpfError      {JpfError("仕様：<値>(を)<オブジェクト>の要素「<識別子>」に設定する。または、<オブジェクト>の要素「<識別子>」に<値>を設定する。")}
 }
 // MARK: - 表示/音声
@@ -586,28 +586,28 @@ struct BreakOperator : PredicateOperable {
     /// 処理を中止する。
     func operated() -> JpfObject? {JpfReturnValue(value: nil)}
 }
-struct GenerateOperator : PredicateOperable {
+struct CreateOperator : PredicateOperable {
     init(_ environment: Environment) {self.environment = environment}
     let environment: Environment
     /// 1. インスタンス(オブジェクト)を生成する。
     /// 2. 値から列挙子を生成
     /// - Returns: インスタンスまたは列挙子
     func operated() -> JpfObject? {
-        guard environment.isPeekParticle(.KARA) || environment.isPeekParticle(.WO) else {return generateUsage}
+        guard environment.isPeekParticle(.KARA) || environment.isPeekParticle(.WO) else {return createUsage}
         switch environment.peek?.value {
         case let instanceType as JpfType:   // 型からインスタンスを生成
             environment.drop()
-            return generateInstance(from: instanceType)
+            return createInstance(from: instanceType)
         case let enumType as JpfEnum:       // 列挙型の値から列挙子を生成
             environment.drop()
-            return generateEnumerator(from: enumType)
+            return createEnumerator(from: enumType)
         case is JpfProtocol:
-            return cannotGenerateFromProtocol
+            return cannotCreateFromProtocol
         default:
-            return generateUsage
+            return createUsage
         }
     }
-    private func generateInstance(from type: JpfType) -> JpfObject? {
+    private func createInstance(from type: JpfType) -> JpfObject? {
         let local = Environment(outer: self.environment)    // 型の環境を拡張
         defer {environment.push(local.pullAll())}           // スタックを戻す
         var instance = JpfInstance(type: type.name, environment: local, protocols: type.protocols, available: [])
@@ -634,8 +634,8 @@ struct GenerateOperator : PredicateOperable {
         local["自身"] = instance  // selfを本登録
         return instance
     }
-    private func generateEnumerator(from type: JpfEnum) -> JpfObject? {
-        guard environment.isPeekParticle(.DE) || environment.isPeekParticle(.KARA), let object = environment.unwrappedPeek else {return generateEnumeratorUsage}
+    private func createEnumerator(from type: JpfEnum) -> JpfObject? {
+        guard environment.isPeekParticle(.DE) || environment.isPeekParticle(.KARA), let object = environment.unwrappedPeek else {return createEnumeratorUsage}
         environment.drop()
         for pairs in type.environment.enumerated {
             if object.isEqual(to: pairs.value) {return JpfEnumerator(type: type.name, identifier: pairs.key, rawValue: pairs.value)}
