@@ -173,12 +173,12 @@ extension PredicateOperable {
     var sortUsage: JpfError             {JpfError("仕様：<配列>を<関数>で並び替える。または、<配列>を（「昇順」に、または「降順」に）並び替える。")}
     var reverseUsage: JpfError          {JpfError("仕様：<配列、文字列>を逆順にする。")}
     var pullDupUsage: JpfError          {JpfError("仕様：(識別子「<識別子>」と…)(識別子「<識別子>」に）(「数値」または「値」を)(<数値>個)")}
-    var assignUsage: JpfError           {JpfError("仕様：〜(を)<識別子>に代入する。または、<識別子>に〜を代入する。")}
-    var overwriteUsage: JpfError        {JpfError("仕様：〜(を)<識別子>に上書きする。または、<識別子>に〜を上書きする。")}
+    var assignUsage: JpfError           {JpfError("仕様：〜(を)「<識別子>」に代入する。または、「<識別子>」に〜を代入する。")}
+    var overwriteUsage: JpfError        {JpfError("仕様：〜(を)「<識別子>」に上書きする。または、「<識別子>」に〜を上書きする。")}
     var assignArrayUsage: JpfError      {JpfError("仕様：〜(を)<配列>の位置<数値>に代入(または上書き)する。または、<配列>の位置<数値>に〜を代入(または上書き)する。")}
     var swapUsage: JpfError             {JpfError("仕様：<識別子>と<識別子>を入れ替える。または、〜と〜を入れ替える。")}
-    var createUsage: JpfError           {JpfError("仕様：<識別子(型)>から生成する。")}
-    var createEnumeratorUsage: JpfError {JpfError("仕様：<値>で<列挙型>から生成する。または<値>から<列挙型>を生成する。")}
+    var createUsage: JpfError           {JpfError("仕様：(「<識別子>」を)(<引数>で)<型>から生成する。または、<型>から(<引数>で)「<識別子>」を生成する。")}
+    var createEnumeratorUsage: JpfError {JpfError("仕様：(「<識別子>」を)<値>で<列挙型>から生成する。または、<列挙型>から<値>で「<識別子>」を生成する。")}
     var setUsage: JpfError      {JpfError("仕様：<値>(を)<オブジェクト>の要素「<識別子>」に設定する。または、<オブジェクト>の要素「<識別子>」に<値>を設定する。")}
 }
 // MARK: - 表示/音声
@@ -591,21 +591,55 @@ struct CreateOperator : PredicateOperable {
     let environment: Environment
     /// 1. インスタンス(オブジェクト)を生成する。
     /// 2. 値から列挙子を生成
-    /// - Returns: インスタンスまたは列挙子
+    /// 形式：
+    /// 1.  (<引数>で)<型>から生成する。(生成したオブジェクトを返す)
+    /// 2.「<識別子>」を(<引数>で)<型>から生成する。(nilを返す)
+    /// 3.<型>から(<引数>で)「<識別子>」を生成する。(nilを返す)
+    /// - Returns: インスタンス・列挙子、またはnil
     func operated() -> JpfObject? {
+        if environment.isPeekParticle(.DE) {// <型>から<引数>で → <引数>で<型>から
+            guard let phrase = environment.pull(where: {$0.isParticle(.KARA)}) else {return createUsage}
+            environment.push(phrase)
+        }
         guard environment.isPeekParticle(.KARA) || environment.isPeekParticle(.WO) else {return createUsage}
         switch environment.peek?.value {
         case let instanceType as JpfType:   // 型からインスタンスを生成
             environment.drop()
+            if let identifier = getIdentifier() {   // 識別子あり？
+                environment[identifier.value] = createInstance(from: instanceType)  // 生成したインスタンスを代入
+                return nil
+            }
             return createInstance(from: instanceType)
-        case let enumType as JpfEnum:       // 列挙型の値から列挙子を生成
+        case let enumType as JpfEnum:       // 列挙子を値で列挙型から生成
             environment.drop()
+            if let identifier = getIdentifier() {   // 識別子あり？
+                environment[identifier.value] = createEnumerator(from: enumType)    // 生成した列挙子を代入
+                return nil
+            }
             return createEnumerator(from: enumType)
+        case let identifier as JpfString:   // 識別子名(に代入)
+            environment.drop()
+            if let object = operated() {
+                environment[identifier.value] = object                              // 生成したオブジェクトを識別子に代入
+                return nil
+            }
+            break
         case is JpfProtocol:
             return cannotCreateFromProtocol
         default:
-            return createUsage
+            break
         }
+        return createUsage
+    }
+    /// スタックの中の「句(<識別子>」を)を探し、識別子名(JpfString)を取り出す。
+    private func getIdentifier() -> JpfString? {
+        guard let phrase = environment.pull(where: {
+            guard let o = $0.value else {return false}
+            return o.type == JpfString.type && $0.isParticle(.WO)
+        }) else {
+            return nil
+        }
+        return phrase.value as? JpfString
     }
     private func createInstance(from type: JpfType) -> JpfObject? {
         let local = Environment(outer: self.environment)    // 型の環境を拡張

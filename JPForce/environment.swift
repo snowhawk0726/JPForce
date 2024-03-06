@@ -77,6 +77,11 @@ class Environment {
     func push(_ object: JpfObject)  {stack.append(object)}
     func push(_ objects: [JpfObject])   {stack += objects}
     func pull() -> JpfObject?       {stack.popLast()}
+    /// スタックに指定のオブジェクトがあったら、それを取り出す。(無ければ nil)
+    func pull(where codition: (JpfObject) -> Bool) -> JpfObject? {
+        guard let p = stack.lastIndex(where: { codition($0) }) else {return nil}
+        return stack.remove(at: p)
+    }
     func pullAll() -> [JpfObject]   {defer {empty()}; return stack}
     func getAll() -> [JpfObject]    {return stack}
     func drop()                     {_ = pull()} // removeLast()を使うと、emptyチェックが必要
