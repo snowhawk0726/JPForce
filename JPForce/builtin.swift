@@ -625,6 +625,7 @@ extension JpfInstance {
 }
 extension JpfEnum {
     var count: JpfObject {JpfInteger(value: elements.count)}
+    var isEmpty: JpfObject {JpfBoolean(value: elements.isEmpty)}
     subscript(name: String, particle: Token?) -> JpfObject? {
         if particle == .particle(.NO), elements.contains(name) {
             return JpfEnumerator(type: self.name, identifier: name, rawValue: environment[name])
