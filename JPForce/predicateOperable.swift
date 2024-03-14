@@ -37,7 +37,8 @@ struct PredicateOperableFactory {
         case .keyword(.SWAP):       return SwapOperator(environment, by: token)
         case .keyword(.IDENTIFIERS):
                                     return IdentifiersOperator(environment, by: token)
-        case .keyword(.EXECUTE):    return ExecuteOperator(environment) // (関数)を実行
+        case .keyword(.EXECUTE),.keyword(.RUN):
+                                    return ExecuteOperator(environment) // (関数)を実行(する)
         case .keyword(.CREATE):     return CreateOperator(environment)  // (型)から生成
         case .keyword(.INITIALIZATION):
                                     return InitializeOperator(environment)
