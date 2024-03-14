@@ -114,7 +114,7 @@ enum Token : Equatable {
         case SWAP       = "入れ替える"
         case PRINT      = "表示"
         case NEWLINE    = "改行"
-        case READ       = "読む"
+        case READ       = "音読"
         case FILES      = "ファイル一覧"
         case FILE       = "ファイル"
         case IDENTIFIERS = "識別子一覧"

@@ -151,7 +151,7 @@ extension PredicateOperable {
     var detectParserError: JpfError     {JpfError("構文解析器がエラーを検出した。")}
     // メッセージ(使い方)
     var printUsage: JpfError            {JpfError("仕様：(〜と…)〜を表示する。")}
-    var readUsage: JpfError             {JpfError("仕様：(〜と…)〜を読む。")}
+    var readUsage: JpfError             {JpfError("仕様：(〜と…)〜を音読する。")}
     var additionUsage: JpfError         {JpfError("仕様：(〜と…)〜を足す。")}
     var multiplicationUsage: JpfError   {JpfError("仕様：(〜と…)〜を掛ける。")}
     var substractionUsage: JpfError     {JpfError("仕様：(〜から)〜を引く。または、(〜を)〜から引く。")}
