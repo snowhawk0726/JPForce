@@ -81,7 +81,6 @@ enum Token : Equatable {
         case CASE       = "場合"
         case LOOP       = "反復"
         case FUNCTION   = "関数"
-        case RUN        = "実行する"
         case EXECUTE    = "実行"
         case SURU       = "する"  // irregular verb
         case KOTO       = "こと"  // end of definition

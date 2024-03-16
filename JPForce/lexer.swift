@@ -32,13 +32,24 @@ class Lexer {
         var token = nextToken
         skipToken()
         let compoundToken = Token(word: token.literal + nextToken.literal)
-        /// 識別子として許容:        キーワードで始まる文字列
-        /// 識別子として使用不可: 助詞を含む文字列、キーワード・記号で終わる文字列、助詞・記号で始まる文字列
+        /// 識別子として使用不可:  助詞を含む文字列、記号・数値で始まる文字列、記号で終わる文字列、予約語「する」「こと」「また」「以上」「以下」「未満」で終わる文字列
         switch (token, nextToken, compoundToken) {
+        case (.IDENT(_),.keyword(let keyword),_):       // 識別子 + 予約語 → 合成
+            if ![.SURU,.KOTO,.MATA,.GTEQUAL,.LTEQUAL,.UNDER].contains(keyword) {
+                token = Token(word: token.literal + getNext().literal)
+            }   // (する、こと、また、以上、以下、未満を除く)
         case (_,_,.keyword(_)), (_,_,.particle(_)),
             (.IDENT(_),.IDENT(_),_), (.IDENT(_),.wrapped(.ident,_),_), (.IDENT(_),.INT(_),_),
             (.keyword(_),.IDENT(_),_),(.wrapped(.ident,_),.IDENT(_),_):
-            token = Token(word: token.literal + getNext().literal)
+            token = Token(word: token.literal + getNext().literal)  // 識別子を合成
+        case (.keyword(_),.keyword(let keyword),_):     // 予約語 + 予約語
+            if [.SURU,.KOTO].contains(keyword) {
+                _ = getNext()                           //　「する」「こと」は飛ばす
+            }
+        case  (.keyword(_),.wrapped(.keyword,let literal),_): // 予約語 + 連用形
+            if ContinuativeForm(literal).plainFormType == .keyword(.SURU) {
+                _ = getNext()                           // 「し」は飛ばす
+            }
         case (.INT(_),.IDENT(_),_):                     // 数値 + 単位 → 単位を無視する
             while nextToken.type == .ident {skipToken()}
         case (.symbol(.LWBRACKET),_,_):                 // "『" 文字列開始
