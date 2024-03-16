@@ -485,6 +485,7 @@ extension ArrayLiteral : Evaluatable {
                 results = elements
                 break
             }
+            if environment.isEmpty {return elementEvalError + "空"}
             results.append(environment.pull()!)     // スタックに積まれた評価結果を回収
         }
         return JpfArray(elements: results)
