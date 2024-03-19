@@ -18,38 +18,6 @@
             endingLineNumber = "295"
             landmarkName = "evaluated(with:)"
             landmarkType = "7">
-            <Locations>
-               <Location
-                  uuid = "25D35BAB-0BAA-409A-9EF2-4B02A376AE1E - 8965464862ea1748"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "JPForce.CaseExpression.evaluated(with: JPForce.Environment) -&gt; Swift.Optional&lt;JPForce.JpfObject&gt;"
-                  moduleName = "JPForce"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/evaluatable.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "161"
-                  endingLineNumber = "161"
-                  offsetFromSymbolStart = "60">
-               </Location>
-               <Location
-                  uuid = "25D35BAB-0BAA-409A-9EF2-4B02A376AE1E - 5ea14718e7914451"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "UnitTests.CaseExpression.evaluated(with: UnitTests.Environment) -&gt; Swift.Optional&lt;UnitTests.JpfObject&gt;"
-                  moduleName = "UnitTests"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/evaluatable.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "161"
-                  endingLineNumber = "161"
-                  offsetFromSymbolStart = "60">
-               </Location>
-            </Locations>
          </BreakpointContent>
       </BreakpointProxy>
       <BreakpointProxy
@@ -78,8 +46,8 @@
             filePath = "JPForce/predicateOperable.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "781"
-            endingLineNumber = "781"
+            startingLineNumber = "789"
+            endingLineNumber = "789"
             landmarkName = "operated()"
             landmarkType = "7">
          </BreakpointContent>
@@ -94,102 +62,10 @@
             filePath = "JPForce/parsable.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "1004"
-            endingLineNumber = "1004"
+            startingLineNumber = "1012"
+            endingLineNumber = "1012"
             landmarkName = "parse()"
             landmarkType = "7">
-            <Locations>
-               <Location
-                  uuid = "74A6DC6A-BE3E-486A-A4AC-E1646C759E36 - dc426fdc36df24e1"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "JPForce.InfixExpressionParser.parse() -&gt; Swift.Optional&lt;JPForce.Expression&gt;"
-                  moduleName = "JPForce"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/parsable.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "444"
-                  endingLineNumber = "444"
-                  offsetFromSymbolStart = "112">
-               </Location>
-               <Location
-                  uuid = "74A6DC6A-BE3E-486A-A4AC-E1646C759E36 - dc426fdc36df24e1"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "JPForce.InfixExpressionParser.parse() -&gt; Swift.Optional&lt;JPForce.Expression&gt;"
-                  moduleName = "JPForce"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/parsable.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "444"
-                  endingLineNumber = "444"
-                  offsetFromSymbolStart = "696">
-               </Location>
-               <Location
-                  uuid = "74A6DC6A-BE3E-486A-A4AC-E1646C759E36 - dc426fdc36df24e1"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "JPForce.InfixExpressionParser.parse() -&gt; Swift.Optional&lt;JPForce.Expression&gt;"
-                  moduleName = "JPForce"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/parsable.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "444"
-                  endingLineNumber = "444"
-                  offsetFromSymbolStart = "104">
-               </Location>
-               <Location
-                  uuid = "74A6DC6A-BE3E-486A-A4AC-E1646C759E36 - e038742babe1d115"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "UnitTests.InfixExpressionParser.parse() -&gt; Swift.Optional&lt;UnitTests.Expression&gt;"
-                  moduleName = "UnitTests"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/parsable.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "444"
-                  endingLineNumber = "444"
-                  offsetFromSymbolStart = "104">
-               </Location>
-               <Location
-                  uuid = "74A6DC6A-BE3E-486A-A4AC-E1646C759E36 - e038742babe1d3c2"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "UnitTests.InfixExpressionParser.parse() -&gt; Swift.Optional&lt;UnitTests.Expression&gt;"
-                  moduleName = "UnitTests"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/parsable.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "457"
-                  endingLineNumber = "457"
-                  offsetFromSymbolStart = "108">
-               </Location>
-               <Location
-                  uuid = "74A6DC6A-BE3E-486A-A4AC-E1646C759E36 - dc426fdc36df2636"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "JPForce.InfixExpressionParser.parse() -&gt; Swift.Optional&lt;JPForce.Expression&gt;"
-                  moduleName = "JPForce"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/parsable.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "457"
-                  endingLineNumber = "457"
-                  offsetFromSymbolStart = "108">
-               </Location>
-            </Locations>
          </BreakpointContent>
       </BreakpointProxy>
       <BreakpointProxy
@@ -206,113 +82,6 @@
             endingLineNumber = "311"
             landmarkName = "getCondition(from:)"
             landmarkType = "7">
-            <Locations>
-               <Location
-                  uuid = "ED399F02-D54B-46A8-A6A9-1A14AFBD0BBE - 95fd551f5ebc65a2"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "JPForce.CaseExpression.getCondition(with: JPForce.Environment) -&gt; Swift.Optional&lt;Swift.Bool&gt;"
-                  moduleName = "JPForce"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/evaluatable.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "169"
-                  endingLineNumber = "169"
-                  offsetFromSymbolStart = "68">
-               </Location>
-               <Location
-                  uuid = "ED399F02-D54B-46A8-A6A9-1A14AFBD0BBE - 95fd551f5ebc65a2"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "JPForce.CaseExpression.getCondition(with: JPForce.Environment) -&gt; Swift.Optional&lt;Swift.Bool&gt;"
-                  moduleName = "JPForce"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/evaluatable.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "169"
-                  endingLineNumber = "169"
-                  offsetFromSymbolStart = "56">
-               </Location>
-               <Location
-                  uuid = "ED399F02-D54B-46A8-A6A9-1A14AFBD0BBE - 95fd551f5ebc65a2"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "JPForce.CaseExpression.getCondition(with: JPForce.Environment) -&gt; Swift.Optional&lt;Swift.Bool&gt;"
-                  moduleName = "JPForce"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/evaluatable.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "169"
-                  endingLineNumber = "169"
-                  offsetFromSymbolStart = "60">
-               </Location>
-               <Location
-                  uuid = "ED399F02-D54B-46A8-A6A9-1A14AFBD0BBE - 5641405d15d7a14"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "UnitTests.CaseExpression.getCondition(with: UnitTests.Environment) -&gt; Swift.Optional&lt;UnitTests.JpfObject&gt;"
-                  moduleName = "UnitTests"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/evaluatable.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "171"
-                  endingLineNumber = "171"
-                  offsetFromSymbolStart = "128">
-               </Location>
-               <Location
-                  uuid = "ED399F02-D54B-46A8-A6A9-1A14AFBD0BBE - 5641405d15d7a14"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "UnitTests.CaseExpression.getCondition(with: UnitTests.Environment) -&gt; Swift.Optional&lt;UnitTests.JpfObject&gt;"
-                  moduleName = "UnitTests"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/evaluatable.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "171"
-                  endingLineNumber = "171"
-                  offsetFromSymbolStart = "192">
-               </Location>
-               <Location
-                  uuid = "ED399F02-D54B-46A8-A6A9-1A14AFBD0BBE - e0323cdd510ee92e"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "JPForce.CaseExpression.getCondition(with: JPForce.Environment) -&gt; Swift.Optional&lt;JPForce.JpfObject&gt;"
-                  moduleName = "JPForce"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/evaluatable.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "171"
-                  endingLineNumber = "171"
-                  offsetFromSymbolStart = "128">
-               </Location>
-               <Location
-                  uuid = "ED399F02-D54B-46A8-A6A9-1A14AFBD0BBE - e0323cdd510ee92e"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "JPForce.CaseExpression.getCondition(with: JPForce.Environment) -&gt; Swift.Optional&lt;JPForce.JpfObject&gt;"
-                  moduleName = "JPForce"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/evaluatable.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "171"
-                  endingLineNumber = "171"
-                  offsetFromSymbolStart = "192">
-               </Location>
-            </Locations>
          </BreakpointContent>
       </BreakpointProxy>
       <BreakpointProxy
@@ -341,8 +110,8 @@
             filePath = "JPForce/parsable.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "971"
-            endingLineNumber = "971"
+            startingLineNumber = "979"
+            endingLineNumber = "979"
             landmarkName = "parseCondition(endSymbol:)"
             landmarkType = "7">
          </BreakpointContent>
@@ -357,8 +126,8 @@
             filePath = "JPForce/predicateOperable.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "460"
-            endingLineNumber = "460"
+            startingLineNumber = "468"
+            endingLineNumber = "468"
             landmarkName = "determined(_:_:_:)"
             landmarkType = "7">
          </BreakpointContent>
@@ -377,38 +146,6 @@
             endingLineNumber = "13"
             landmarkName = "subscript(name:particle:)"
             landmarkType = "7">
-            <Locations>
-               <Location
-                  uuid = "E0447494-B747-4F06-86F1-F3A6A1D9CFD0 - 455f7ad49d10a946"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "JPForce.JpfObject.subscript.getter : (Swift.String) -&gt; Swift.Optional&lt;JPForce.JpfObject&gt;"
-                  moduleName = "JPForce"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/builtin.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "13"
-                  endingLineNumber = "13"
-                  offsetFromSymbolStart = "52">
-               </Location>
-               <Location
-                  uuid = "E0447494-B747-4F06-86F1-F3A6A1D9CFD0 - 5200dbccc7f0ed02"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "UnitTests.JpfObject.subscript.getter : (Swift.String) -&gt; Swift.Optional&lt;UnitTests.JpfObject&gt;"
-                  moduleName = "UnitTests"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/builtin.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "13"
-                  endingLineNumber = "13"
-                  offsetFromSymbolStart = "52">
-               </Location>
-            </Locations>
          </BreakpointContent>
       </BreakpointProxy>
       <BreakpointProxy
@@ -421,8 +158,8 @@
             filePath = "JPForce/predicateOperable.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "314"
-            endingLineNumber = "314"
+            startingLineNumber = "316"
+            endingLineNumber = "316"
             landmarkName = "operated()"
             landmarkType = "7">
          </BreakpointContent>
@@ -441,53 +178,6 @@
             endingLineNumber = "197"
             landmarkName = "getValues(from:with:)"
             landmarkType = "7">
-            <Locations>
-               <Location
-                  uuid = "57579352-7C05-4E80-9903-9D5DD2EC8918 - 9cc1bd58cb58ce5c"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "JPForce.Environment.getValues(from: Swift.Array&lt;JPForce.JpfObject&gt;, with: Swift.Array&lt;(type: Swift.String, particle: Swift.String)&gt;) -&gt; Swift.Result&lt;Swift.Array&lt;JPForce.JpfObject&gt;, JPForce.Environment.InputFormatError&gt;"
-                  moduleName = "JPForce"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/environment.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "116"
-                  endingLineNumber = "116"
-                  offsetFromSymbolStart = "436">
-               </Location>
-               <Location
-                  uuid = "57579352-7C05-4E80-9903-9D5DD2EC8918 - 9cc1bd58cb58ce5c"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "JPForce.Environment.getValues(from: Swift.Array&lt;JPForce.JpfObject&gt;, with: Swift.Array&lt;(type: Swift.String, particle: Swift.String)&gt;) -&gt; Swift.Result&lt;Swift.Array&lt;JPForce.JpfObject&gt;, JPForce.Environment.InputFormatError&gt;"
-                  moduleName = "JPForce"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/environment.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "116"
-                  endingLineNumber = "116"
-                  offsetFromSymbolStart = "424">
-               </Location>
-               <Location
-                  uuid = "57579352-7C05-4E80-9903-9D5DD2EC8918 - 3a4a89e82bf92765"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "UnitTests.Environment.getValues(from: Swift.Array&lt;UnitTests.JpfObject&gt;, with: Swift.Array&lt;(type: Swift.String, particle: Swift.String)&gt;) -&gt; Swift.Result&lt;Swift.Array&lt;UnitTests.JpfObject&gt;, UnitTests.Environment.InputFormatError&gt;"
-                  moduleName = "UnitTests"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/environment.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "116"
-                  endingLineNumber = "116"
-                  offsetFromSymbolStart = "424">
-               </Location>
-            </Locations>
          </BreakpointContent>
       </BreakpointProxy>
       <BreakpointProxy
@@ -516,42 +206,10 @@
             filePath = "JPForce/parsable.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "541"
-            endingLineNumber = "541"
+            startingLineNumber = "552"
+            endingLineNumber = "552"
             landmarkName = "parse()"
             landmarkType = "7">
-            <Locations>
-               <Location
-                  uuid = "8CC4D49A-F281-494E-B8DF-AA560704E843 - 77afadd6f8d6b16e"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "JPForce.ExpressionPareser.parse() -&gt; Swift.Optional&lt;JPForce.Expression&gt;"
-                  moduleName = "JPForce"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/parsable.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "224"
-                  endingLineNumber = "224"
-                  offsetFromSymbolStart = "188">
-               </Location>
-               <Location
-                  uuid = "8CC4D49A-F281-494E-B8DF-AA560704E843 - fc2279453f3ccc9a"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "UnitTests.ExpressionPareser.parse() -&gt; Swift.Optional&lt;UnitTests.Expression&gt;"
-                  moduleName = "UnitTests"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/parsable.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "224"
-                  endingLineNumber = "224"
-                  offsetFromSymbolStart = "188">
-               </Location>
-            </Locations>
          </BreakpointContent>
       </BreakpointProxy>
       <BreakpointProxy
@@ -564,72 +222,10 @@
             filePath = "JPForce/parsable.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "536"
-            endingLineNumber = "536"
+            startingLineNumber = "547"
+            endingLineNumber = "547"
             landmarkName = "parse()"
             landmarkType = "7">
-            <Locations>
-               <Location
-                  uuid = "1308CD9C-49E8-4429-9761-1F0DB5487CD8 - 77afadd6f8d6b683"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "JPForce.ExpressionPareser.parse() -&gt; Swift.Optional&lt;JPForce.Expression&gt;"
-                  moduleName = "JPForce"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/parsable.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "219"
-                  endingLineNumber = "219"
-                  offsetFromSymbolStart = "72">
-               </Location>
-               <Location
-                  uuid = "1308CD9C-49E8-4429-9761-1F0DB5487CD8 - 77afadd6f8d6b683"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "JPForce.ExpressionPareser.parse() -&gt; Swift.Optional&lt;JPForce.Expression&gt;"
-                  moduleName = "JPForce"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/parsable.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "219"
-                  endingLineNumber = "219"
-                  offsetFromSymbolStart = "128">
-               </Location>
-               <Location
-                  uuid = "1308CD9C-49E8-4429-9761-1F0DB5487CD8 - fc2279453f3ccb77"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "UnitTests.ExpressionPareser.parse() -&gt; Swift.Optional&lt;UnitTests.Expression&gt;"
-                  moduleName = "UnitTests"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/parsable.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "219"
-                  endingLineNumber = "219"
-                  offsetFromSymbolStart = "72">
-               </Location>
-               <Location
-                  uuid = "1308CD9C-49E8-4429-9761-1F0DB5487CD8 - fc2279453f3ccb77"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "UnitTests.ExpressionPareser.parse() -&gt; Swift.Optional&lt;UnitTests.Expression&gt;"
-                  moduleName = "UnitTests"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/parsable.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "219"
-                  endingLineNumber = "219"
-                  offsetFromSymbolStart = "128">
-               </Location>
-            </Locations>
          </BreakpointContent>
       </BreakpointProxy>
       <BreakpointProxy
@@ -642,42 +238,10 @@
             filePath = "JPForce/parsable.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "550"
-            endingLineNumber = "550"
+            startingLineNumber = "561"
+            endingLineNumber = "561"
             landmarkName = "parse()"
             landmarkType = "7">
-            <Locations>
-               <Location
-                  uuid = "51B9454A-7371-43C9-8EB1-7416FDA1EEFD - 77afadd6f8d6b0b5"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "JPForce.ExpressionPareser.parse() -&gt; Swift.Optional&lt;JPForce.Expression&gt;"
-                  moduleName = "JPForce"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/parsable.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "233"
-                  endingLineNumber = "233"
-                  offsetFromSymbolStart = "1280">
-               </Location>
-               <Location
-                  uuid = "51B9454A-7371-43C9-8EB1-7416FDA1EEFD - fc2279453f3ccd41"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "UnitTests.ExpressionPareser.parse() -&gt; Swift.Optional&lt;UnitTests.Expression&gt;"
-                  moduleName = "UnitTests"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/parsable.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "233"
-                  endingLineNumber = "233"
-                  offsetFromSymbolStart = "1280">
-               </Location>
-            </Locations>
          </BreakpointContent>
       </BreakpointProxy>
       <BreakpointProxy
@@ -690,57 +254,10 @@
             filePath = "JPForce/parsable.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "637"
-            endingLineNumber = "637"
+            startingLineNumber = "648"
+            endingLineNumber = "648"
             landmarkName = "parse()"
             landmarkType = "7">
-            <Locations>
-               <Location
-                  uuid = "3B828129-4752-4E1D-B649-5E8203955B48 - 4036ad125e7d6fa9"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "UnitTests.RangeLiteralParser.parse() -&gt; Swift.Optional&lt;UnitTests.Expression&gt;"
-                  moduleName = "UnitTests"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/parsable.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "343"
-                  endingLineNumber = "343"
-                  offsetFromSymbolStart = "112">
-               </Location>
-               <Location
-                  uuid = "3B828129-4752-4E1D-B649-5E8203955B48 - b84ad9d98ca4006d"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "JPForce.RangeLiteralParser.parse() -&gt; Swift.Optional&lt;JPForce.Expression&gt;"
-                  moduleName = "JPForce"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/parsable.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "343"
-                  endingLineNumber = "343"
-                  offsetFromSymbolStart = "112">
-               </Location>
-               <Location
-                  uuid = "3B828129-4752-4E1D-B649-5E8203955B48 - 4036ad125e7d6dd8"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "UnitTests.RangeLiteralParser.parse() -&gt; Swift.Optional&lt;UnitTests.Expression&gt;"
-                  moduleName = "UnitTests"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/parsable.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "328"
-                  endingLineNumber = "328"
-                  offsetFromSymbolStart = "112">
-               </Location>
-            </Locations>
          </BreakpointContent>
       </BreakpointProxy>
       <BreakpointProxy
@@ -753,42 +270,10 @@
             filePath = "JPForce/parsable.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "589"
-            endingLineNumber = "589"
+            startingLineNumber = "600"
+            endingLineNumber = "600"
             landmarkName = "IdentifierParser"
             landmarkType = "14">
-            <Locations>
-               <Location
-                  uuid = "6084C891-E8B0-4255-A749-F6175A19E011 - efd593bc699bf5a1"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "JPForce.IdentifierParser.parse() -&gt; Swift.Optional&lt;JPForce.Expression&gt;"
-                  moduleName = "JPForce"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/parsable.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "428"
-                  endingLineNumber = "428"
-                  offsetFromSymbolStart = "56">
-               </Location>
-               <Location
-                  uuid = "6084C891-E8B0-4255-A749-F6175A19E011 - df167890eb9584f5"
-                  shouldBeEnabled = "No"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "UnitTests.IdentifierParser.parse() -&gt; Swift.Optional&lt;UnitTests.Expression&gt;"
-                  moduleName = "UnitTests"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/parsable.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "428"
-                  endingLineNumber = "428"
-                  offsetFromSymbolStart = "56">
-               </Location>
-            </Locations>
          </BreakpointContent>
       </BreakpointProxy>
       <BreakpointProxy
@@ -801,42 +286,10 @@
             filePath = "JPForce/parsable.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "952"
-            endingLineNumber = "952"
+            startingLineNumber = "960"
+            endingLineNumber = "960"
             landmarkName = "parse()"
             landmarkType = "7">
-            <Locations>
-               <Location
-                  uuid = "1E7FA9E2-DEE4-4609-A2D4-BA37337480DB - a986e8b0b8259527"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "JPForce.LoopExpressionParser.parse() -&gt; Swift.Optional&lt;JPForce.Expression&gt;"
-                  moduleName = "JPForce"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/parsable.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "655"
-                  endingLineNumber = "655"
-                  offsetFromSymbolStart = "96">
-               </Location>
-               <Location
-                  uuid = "1E7FA9E2-DEE4-4609-A2D4-BA37337480DB - 517a1beb26bcb5e3"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "UnitTests.LoopExpressionParser.parse() -&gt; Swift.Optional&lt;UnitTests.Expression&gt;"
-                  moduleName = "UnitTests"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/parsable.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "655"
-                  endingLineNumber = "655"
-                  offsetFromSymbolStart = "96">
-               </Location>
-            </Locations>
          </BreakpointContent>
       </BreakpointProxy>
       <BreakpointProxy
@@ -849,105 +302,10 @@
             filePath = "JPForce/parsable.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "495"
-            endingLineNumber = "495"
+            startingLineNumber = "506"
+            endingLineNumber = "506"
             landmarkName = "blockStatement"
             landmarkType = "24">
-            <Locations>
-               <Location
-                  uuid = "264E2619-4216-41E8-A741-AB6BCE49218B - 2fc0e2e6fa14abe2"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "UnitTests.BlockStatementParser.blockStatement.getter : Swift.Optional&lt;UnitTests.BlockStatement&gt;"
-                  moduleName = "UnitTests"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/parsable.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "475"
-                  endingLineNumber = "475"
-                  offsetFromSymbolStart = "308">
-               </Location>
-               <Location
-                  uuid = "264E2619-4216-41E8-A741-AB6BCE49218B - 2fc0e2e6fa14abe2"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "UnitTests.BlockStatementParser.blockStatement.getter : Swift.Optional&lt;UnitTests.BlockStatement&gt;"
-                  moduleName = "UnitTests"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/parsable.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "475"
-                  endingLineNumber = "475"
-                  offsetFromSymbolStart = "320">
-               </Location>
-            </Locations>
-         </BreakpointContent>
-      </BreakpointProxy>
-      <BreakpointProxy
-         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
-         <BreakpointContent
-            uuid = "DB9F0435-88B3-43CE-A236-0C1317584C72"
-            shouldBeEnabled = "No"
-            ignoreCount = "0"
-            continueAfterRunningActions = "No"
-            filePath = "JPForce/parsable.swift"
-            startingColumnNumber = "9223372036854775807"
-            endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "873"
-            endingLineNumber = "873"
-            landmarkName = "parse()"
-            landmarkType = "7">
-            <Locations>
-               <Location
-                  uuid = "DB9F0435-88B3-43CE-A236-0C1317584C72 - a46402ccb7b47aa3"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "UnitTests.CaseExpressionParser.parse() -&gt; Swift.Optional&lt;UnitTests.Expression&gt;"
-                  moduleName = "UnitTests"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/parsable.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "621"
-                  endingLineNumber = "621"
-                  offsetFromSymbolStart = "428">
-               </Location>
-               <Location
-                  uuid = "DB9F0435-88B3-43CE-A236-0C1317584C72 - a46402ccb7b47aa3"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "UnitTests.CaseExpressionParser.parse() -&gt; Swift.Optional&lt;UnitTests.Expression&gt;"
-                  moduleName = "UnitTests"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/parsable.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "621"
-                  endingLineNumber = "621"
-                  offsetFromSymbolStart = "324">
-               </Location>
-               <Location
-                  uuid = "DB9F0435-88B3-43CE-A236-0C1317584C72 - a46402ccb7b47aa3"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "UnitTests.CaseExpressionParser.parse() -&gt; Swift.Optional&lt;UnitTests.Expression&gt;"
-                  moduleName = "UnitTests"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/parsable.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "621"
-                  endingLineNumber = "621"
-                  offsetFromSymbolStart = "404">
-               </Location>
-            </Locations>
          </BreakpointContent>
       </BreakpointProxy>
       <BreakpointProxy
@@ -960,42 +318,10 @@
             filePath = "JPForce/parsable.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "702"
-            endingLineNumber = "702"
+            startingLineNumber = "713"
+            endingLineNumber = "713"
             landmarkName = "parse()"
             landmarkType = "7">
-            <Locations>
-               <Location
-                  uuid = "40961DB3-B0EF-4839-8FA7-F16F962EA4E7 - baf079f15739aa53"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "JPForce.ComputationLiteralParser.parse() -&gt; Swift.Optional&lt;JPForce.Expression&gt;"
-                  moduleName = "JPForce"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/parsable.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "673"
-                  endingLineNumber = "673"
-                  offsetFromSymbolStart = "1768">
-               </Location>
-               <Location
-                  uuid = "40961DB3-B0EF-4839-8FA7-F16F962EA4E7 - 5cfa0c0f627e65d7"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "UnitTests.ComputationLiteralParser.parse() -&gt; Swift.Optional&lt;UnitTests.Expression&gt;"
-                  moduleName = "UnitTests"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/parsable.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "673"
-                  endingLineNumber = "673"
-                  offsetFromSymbolStart = "1768">
-               </Location>
-            </Locations>
          </BreakpointContent>
       </BreakpointProxy>
       <BreakpointProxy
@@ -1008,42 +334,10 @@
             filePath = "JPForce/parsable.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "695"
-            endingLineNumber = "695"
+            startingLineNumber = "706"
+            endingLineNumber = "706"
             landmarkName = "parse()"
             landmarkType = "7">
-            <Locations>
-               <Location
-                  uuid = "30DB35A7-F421-476C-BEE8-8A4008639882 - 5cfa0c0f627e6678"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "UnitTests.ComputationLiteralParser.parse() -&gt; Swift.Optional&lt;UnitTests.Expression&gt;"
-                  moduleName = "UnitTests"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/parsable.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "668"
-                  endingLineNumber = "668"
-                  offsetFromSymbolStart = "1472">
-               </Location>
-               <Location
-                  uuid = "30DB35A7-F421-476C-BEE8-8A4008639882 - 5cfa0c0f627e665b"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "UnitTests.ComputationLiteralParser.parse() -&gt; Swift.Optional&lt;UnitTests.Expression&gt;"
-                  moduleName = "UnitTests"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/parsable.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "669"
-                  endingLineNumber = "669"
-                  offsetFromSymbolStart = "1472">
-               </Location>
-            </Locations>
          </BreakpointContent>
       </BreakpointProxy>
       <BreakpointProxy
@@ -1072,42 +366,10 @@
             filePath = "JPForce/parsable.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "377"
-            endingLineNumber = "377"
+            startingLineNumber = "375"
+            endingLineNumber = "375"
             landmarkName = "parseOptionalBlock(of:in:)"
             landmarkType = "7">
-            <Locations>
-               <Location
-                  uuid = "73F251D2-4021-4503-B7DE-C8C402A9B871 - de8062498eba527e"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "UnitTests.Parsable.parseOptionalBlock(of: Swift.String, in: Swift.String) -&gt; Swift.Result&lt;Swift.Optional&lt;UnitTests.BlockStatement&gt;, Swift.Error&gt;"
-                  moduleName = "UnitTests"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/parsable.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "370"
-                  endingLineNumber = "370"
-                  offsetFromSymbolStart = "748">
-               </Location>
-               <Location
-                  uuid = "73F251D2-4021-4503-B7DE-C8C402A9B871 - de8062498eba527e"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "UnitTests.Parsable.parseOptionalBlock(of: Swift.String, in: Swift.String) -&gt; Swift.Result&lt;Swift.Optional&lt;UnitTests.BlockStatement&gt;, Swift.Error&gt;"
-                  moduleName = "UnitTests"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/parsable.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "370"
-                  endingLineNumber = "370"
-                  offsetFromSymbolStart = "920">
-               </Location>
-            </Locations>
          </BreakpointContent>
       </BreakpointProxy>
       <BreakpointProxy
@@ -1120,10 +382,10 @@
             filePath = "JPForce/evaluatable.swift"
             startingColumnNumber = "45"
             endingColumnNumber = "45"
-            startingLineNumber = "526"
-            endingLineNumber = "526"
-            landmarkName = "executed(with:)"
-            landmarkType = "7">
+            startingLineNumber = "524"
+            endingLineNumber = "524"
+            landmarkName = "JpfFunction"
+            landmarkType = "21">
          </BreakpointContent>
       </BreakpointProxy>
       <BreakpointProxy
@@ -1140,38 +402,6 @@
             endingLineNumber = "46"
             landmarkName = "append(_:to:)"
             landmarkType = "7">
-            <Locations>
-               <Location
-                  uuid = "ADFA6793-EF06-4565-9761-8D50FB6629BD - c7650a8d5fc90ce3"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "JPForce.Environment.append(_: JPForce.JpfObject, to: Swift.String) -&gt; ()"
-                  moduleName = "JPForce"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/environment.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "46"
-                  endingLineNumber = "46"
-                  offsetFromSymbolStart = "548">
-               </Location>
-               <Location
-                  uuid = "ADFA6793-EF06-4565-9761-8D50FB6629BD - 77bbc98774d15067"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "UnitTests.Environment.append(_: UnitTests.JpfObject, to: Swift.String) -&gt; ()"
-                  moduleName = "UnitTests"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/environment.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "46"
-                  endingLineNumber = "46"
-                  offsetFromSymbolStart = "548">
-               </Location>
-            </Locations>
          </BreakpointContent>
       </BreakpointProxy>
       <BreakpointProxy
@@ -1184,8 +414,8 @@
             filePath = "JPForce/predicateOperable.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "449"
-            endingLineNumber = "449"
+            startingLineNumber = "457"
+            endingLineNumber = "457"
             landmarkName = "operated()"
             landmarkType = "7">
          </BreakpointContent>
@@ -1204,38 +434,6 @@
             endingLineNumber = "136"
             landmarkName = "JpfNull"
             landmarkType = "14">
-            <Locations>
-               <Location
-                  uuid = "817B2B86-09B4-4020-AD00-0C93BAA97050 - 638f2f7d80583ada"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "JPForce.JpfNull.isTrue.getter : Swift.Bool"
-                  moduleName = "JPForce"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/object.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "136"
-                  endingLineNumber = "136"
-                  offsetFromSymbolStart = "24">
-               </Location>
-               <Location
-                  uuid = "817B2B86-09B4-4020-AD00-0C93BAA97050 - 965ff3f5a5a950da"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "UnitTests.JpfNull.isTrue.getter : Swift.Bool"
-                  moduleName = "UnitTests"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/object.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "136"
-                  endingLineNumber = "136"
-                  offsetFromSymbolStart = "24">
-               </Location>
-            </Locations>
          </BreakpointContent>
       </BreakpointProxy>
       <BreakpointProxy
@@ -1248,49 +446,17 @@
             filePath = "JPForce/predicateOperable.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "902"
-            endingLineNumber = "902"
+            startingLineNumber = "910"
+            endingLineNumber = "910"
             landmarkName = "operated()"
             landmarkType = "7">
-            <Locations>
-               <Location
-                  uuid = "714A50C6-40CE-422B-A7D9-3E0EE7D4112C - c0b3fd33675d6c85"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "JPForce.SetOperator.operated() -&gt; Swift.Optional&lt;JPForce.JpfObject&gt;"
-                  moduleName = "JPForce"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/predicateOperable.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "866"
-                  endingLineNumber = "866"
-                  offsetFromSymbolStart = "124">
-               </Location>
-               <Location
-                  uuid = "714A50C6-40CE-422B-A7D9-3E0EE7D4112C - 87ccba6a190708b9"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "UnitTests.SetOperator.operated() -&gt; Swift.Optional&lt;UnitTests.JpfObject&gt;"
-                  moduleName = "UnitTests"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/predicateOperable.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "866"
-                  endingLineNumber = "866"
-                  offsetFromSymbolStart = "124">
-               </Location>
-            </Locations>
          </BreakpointContent>
       </BreakpointProxy>
       <BreakpointProxy
          BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
          <BreakpointContent
             uuid = "ACB22912-B6B3-4ED6-9C58-F8A44A988875"
-            shouldBeEnabled = "Yes"
+            shouldBeEnabled = "No"
             ignoreCount = "0"
             continueAfterRunningActions = "No"
             filePath = "JPForce/builtin.swift"
@@ -1300,68 +466,70 @@
             endingLineNumber = "414"
             landmarkName = "contains(_:)"
             landmarkType = "7">
-            <Locations>
-               <Location
-                  uuid = "ACB22912-B6B3-4ED6-9C58-F8A44A988875 - ee2531c35195dc64"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "closure #1 (JPForce.JpfObject) -&gt; Swift.Bool in JPForce.JpfArray.contains(JPForce.JpfObject) -&gt; JPForce.JpfObject"
-                  moduleName = "JPForce"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/builtin.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "414"
-                  endingLineNumber = "414"
-                  offsetFromSymbolStart = "584">
-               </Location>
-               <Location
-                  uuid = "ACB22912-B6B3-4ED6-9C58-F8A44A988875 - ca4d4f6a6dfaef58"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "closure #1 (UnitTests.JpfObject) -&gt; Swift.Bool in UnitTests.JpfArray.contains(UnitTests.JpfObject) -&gt; UnitTests.JpfObject"
-                  moduleName = "UnitTests"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/builtin.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "414"
-                  endingLineNumber = "414"
-                  offsetFromSymbolStart = "584">
-               </Location>
-               <Location
-                  uuid = "ACB22912-B6B3-4ED6-9C58-F8A44A988875 - ca4d4f6a6dfaef58"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "closure #1 (UnitTests.JpfObject) -&gt; Swift.Bool in UnitTests.JpfArray.contains(UnitTests.JpfObject) -&gt; UnitTests.JpfObject"
-                  moduleName = "UnitTests"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/builtin.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "414"
-                  endingLineNumber = "414"
-                  offsetFromSymbolStart = "732">
-               </Location>
-               <Location
-                  uuid = "ACB22912-B6B3-4ED6-9C58-F8A44A988875 - ee2531c35195dc64"
-                  shouldBeEnabled = "Yes"
-                  ignoreCount = "0"
-                  continueAfterRunningActions = "No"
-                  symbolName = "closure #1 (JPForce.JpfObject) -&gt; Swift.Bool in JPForce.JpfArray.contains(JPForce.JpfObject) -&gt; JPForce.JpfObject"
-                  moduleName = "JPForce"
-                  usesParentBreakpointCondition = "Yes"
-                  urlString = "file:///Users/takayuki/Library/Mobile%20Documents/com~apple~CloudDocs/Development/JPForce/JPForce/builtin.swift"
-                  startingColumnNumber = "9223372036854775807"
-                  endingColumnNumber = "9223372036854775807"
-                  startingLineNumber = "414"
-                  endingLineNumber = "414"
-                  offsetFromSymbolStart = "732">
-               </Location>
-            </Locations>
+         </BreakpointContent>
+      </BreakpointProxy>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            uuid = "4F0A281F-73A4-476D-8EAE-6F3B142E00AC"
+            shouldBeEnabled = "No"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "JPForce/predicateOperable.swift"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "870"
+            endingLineNumber = "870"
+            landmarkName = "operated()"
+            landmarkType = "7">
+         </BreakpointContent>
+      </BreakpointProxy>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            uuid = "03885193-9C45-49BC-9C24-17E4D99DA517"
+            shouldBeEnabled = "No"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "JPForce/parsable.swift"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "406"
+            endingLineNumber = "406"
+            landmarkName = "parseEndOfElementsLiteral(with:)"
+            landmarkType = "7">
+         </BreakpointContent>
+      </BreakpointProxy>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            uuid = "48F87E49-672A-4E95-AE86-833D403B2074"
+            shouldBeEnabled = "No"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "JPForce/parsable.swift"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "844"
+            endingLineNumber = "844"
+            landmarkName = "parse()"
+            landmarkType = "7">
+         </BreakpointContent>
+      </BreakpointProxy>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            uuid = "0A16FBE4-7934-4B62-9E11-32D7E954D55D"
+            shouldBeEnabled = "No"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "JPForce/parsable.swift"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "241"
+            endingLineNumber = "241"
+            landmarkName = "parseElements(of:with:)"
+            landmarkType = "7">
          </BreakpointContent>
       </BreakpointProxy>
    </Breakpoints>

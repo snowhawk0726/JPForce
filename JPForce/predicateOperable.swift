@@ -175,6 +175,8 @@ extension PredicateOperable {
     var pullDupUsage: JpfError          {JpfError("仕様：(識別子「<識別子>」と…)(識別子「<識別子>」に）(「数値」または「値」を)(<数値>個)")}
     var assignUsage: JpfError           {JpfError("仕様：〜(を)「<識別子>」に代入する。または、「<識別子>」に〜を代入する。")}
     var overwriteUsage: JpfError        {JpfError("仕様：〜(を)「<識別子>」に上書きする。または、「<識別子>」に〜を上書きする。")}
+    var compoundAssignUsage: JpfError           {JpfError("仕様：<識別子>(を)<演算し>て代入する。")}
+    var compoundOverwriteUsage: JpfError           {JpfError("仕様：<識別子>(を)<演算し>て上書きする。")}
     var assignArrayUsage: JpfError      {JpfError("仕様：〜(を)<配列>の位置<数値>に代入(または上書き)する。または、<配列>の位置<数値>に〜を代入(または上書き)する。")}
     var swapUsage: JpfError             {JpfError("仕様：<識別子>と<識別子>を入れ替える。または、〜と〜を入れ替える。")}
     var createUsage: JpfError           {JpfError("仕様：(「<識別子>」を)(<引数>で)<型>から生成する。または、<型>から(<引数>で)「<識別子>」を生成する。")}
@@ -320,11 +322,13 @@ struct AddOperator : PredicateOperable {
     let environment: Environment, op: Token
     func operated() -> JpfObject? {
         guard let params = environment.peek(2)  else {return "「\(op.literal)」" + additionParamError + additionUsage}
+        let ident = params[0].value?.name ?? ""
         var added = params[0].add(params[1])
         if !added.isError {environment.drop(2)}
         while isPeekParticle(.TO) && !added.isError {   // スタックにト格があれば、中身を足す
             added = leftOperand!.add(added)
         }
+        added.name = ident
         return added
     }
 }
@@ -334,12 +338,13 @@ struct MultiplyOperator : PredicateOperable {
     func operated() -> JpfObject? {
         guard let params = environment.peek(2),
               let left = params[0].number, let right = params[1].number else {return "「\(op.literal)」" + numerationParamError2 + multiplicationUsage}
+        let ident = params[0].value?.name ?? ""
         var number = left * right
         environment.drop(2)
         while isPeekParticle(.TO) && isPeekNumber {     // スタックにト格の数値があれば、掛ける
             number *= leftNumber!
         }
-        return JpfInteger(value: number)
+        return JpfInteger(name: ident, value: number)
     }
 }
 struct SubstractOperator : PredicateOperable {
@@ -348,13 +353,14 @@ struct SubstractOperator : PredicateOperable {
     func operated() -> JpfObject? {
         guard let params = environment.peek(2),
               let left = params[0].number, let right = params[1].number else {return "「\(op.literal)」" + numerationParamError1 + substractionUsage}
+        let ident = params[0].value?.name ?? ""
         switch (params[0].particle, params[1].particle) {
         case (Token(.KARA),Token(.WO)), (nil,Token(.WO)), (nil,nil):    // leftから、rightを引く
             environment.drop(2)
-            return JpfInteger(value: left - right)
+            return JpfInteger(name: ident, value: left - right)
         case (Token(.WO),Token(.KARA)), (nil,Token(.KARA)):             // leftを、rightから引く
             environment.drop(2)
-            return JpfInteger(value: right - left)
+            return JpfInteger(name: ident, value: right - left)
         default:
             return substractionUsage
         }
@@ -366,15 +372,16 @@ struct DivideOperator : PredicateOperable {
     func operated() -> JpfObject? {
         guard let params = environment.peek(2),
               let left = params[0].number, let right = params[1].number else {return "「\(op.literal)」" + numerationParamError1 + divisionUsage}
+        let ident = params[0].value?.name ?? ""
         switch (params[0].particle, params[1].particle) {
         case (Token(.WO),Token(.DE)), (nil,Token(.DE)), (nil,nil):      // leftを、rightで割る
             guard right != 0 else {return "\(left)を" + cannotDivideByZero}
             environment.drop(2)
-            return JpfInteger(value: left / right)
+            return JpfInteger(name: ident, value: left / right)
         case (Token(.DE),Token(.WO)), (nil,Token(.WO)):                 // leftで、rightを割る
             guard left != 0 else {return "\(right)を" + cannotDivideByZero}
             environment.drop(2)
-            return JpfInteger(value: right / left)
+            return JpfInteger(name: ident, value: right / left)
         default:
             return divisionUsage
         }
@@ -385,8 +392,9 @@ struct NegateOperator : PredicateOperable {
     let environment: Environment, op: Token
     func operated() -> JpfObject? {
         guard let number = environment.peek?.number else {return "「\(op.literal)」" + numerationParamError3 + negateUsage}
+        let ident = environment.peek!.value?.name ?? ""
         environment.drop()
-        return JpfInteger(value: -number)
+        return JpfInteger(name: ident, value: -number)
     }
 }
 struct SignOperator : PredicateOperable {
@@ -1059,29 +1067,42 @@ struct AssignOperator : PredicateOperable {
                 break
             }
         }
-        guard var params = environment.peek(2) else {return usage}
-        switch (params[0].particle, params[1].particle) {
-        case (Token(.NI),Token(.WO)):
-            params.swapAt(0, 1)
-            fallthrough
-        case (Token(.WO),Token(.NI)), (nil,Token(.NI)):
-            guard var value = params[0].value else {break}
-            if let enumerator = params[1].value as? JpfEnumerator {
+        if var params = environment.peek(2) {
+            switch (params[0].particle, params[1].particle) {
+            case (Token(.NI),Token(.WO)):
+                params.swapAt(0, 1)
+                fallthrough
+            case (Token(.WO),Token(.NI)), (nil,Token(.NI)):
+                guard var value = params[0].value else {break}
+                if let enumerator = params[1].value as? JpfEnumerator {
+                    environment.drop(2)
+                    return JpfEnumerator(type: enumerator.type, name: enumerator.name, identifier: enumerator.identifier, rawValue: value)  // 列挙子に値を代入し返す。
+                }
+                let name = environment.getName(from: params[1])
+                guard !name.isEmpty else {break}
+                value.name = name
                 environment.drop(2)
-                return JpfEnumerator(type: enumerator.type, name: enumerator.name, identifier: enumerator.identifier, rawValue: value)  // 列挙子に値を代入し返す。
+                assign(value, to: environment, by: name, with: op)  // 識別子に値を代入
+                return nil
+            default:
+                break
             }
-            let name = environment.getName(from: params[1])
-            guard !name.isEmpty else {break}
-            value.name = name
-            environment.drop(2)
-            assign(value, to: environment, by: name, with: op)
+        }
+        if let param = environment.peek {
+            if let value = param.value,
+               !value.name.isEmpty,
+               param.particle?.unwrappedLiteral == Token(.TA).literal {
+                environment.drop()
+                assign(value, to: environment, by: value.name, with: op)    // 識別子に計算した値を代入
+            } else {
+                return usage2
+            }
             return nil
-        default:
-            break
         }
         return usage
     }
     private var usage: JpfError {op == .keyword(.ASSIGN) ? assignUsage : overwriteUsage}
+    private var usage2: JpfError {op == .keyword(.ASSIGN) ? compoundAssignUsage : compoundOverwriteUsage}
     private func assign(_ value: JpfObject, to environment: Environment, by name: String, with op: Token) {
         if op == .keyword(.OVERWRITE) && environment.outer?[name] != nil {
             environment.outer![name] = value
