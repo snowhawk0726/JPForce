@@ -99,7 +99,7 @@ extension JpfObject {
 extension JpfInteger {
     func add(_ object: JpfObject) -> JpfObject {
         guard let number = object.number else {return JpfError("「\(type)」と「\(object.type)」" + cannotAdd)}
-        return JpfInteger(value: value + number)
+        return JpfInteger(name: self.name, value: value + number)
     }
     subscript(name: String, particle: Token?) -> JpfObject? {
         switch (particle, name) {
@@ -211,7 +211,7 @@ extension JpfRange {
         default:
             return JpfError(rangeFormatError)
         }
-        return JpfArray(elements: mapped)
+        return JpfArray(name: self.name, elements: mapped)
     }
     func map(_ function: JpfFunction, with environment: Environment) -> JpfObject {
         var mapped: [JpfObject] = []
@@ -233,7 +233,7 @@ extension JpfRange {
         default:
             return JpfError(rangeFormatError)
         }
-        return JpfArray(elements: mapped)
+        return JpfArray(name: self.name, elements: mapped)
     }
     func reduce(_ initial: JpfObject, _ function: JpfFunction, with environment: Environment) -> JpfObject {
         switch (lowerBound?.0.number, lowerBound?.1,
@@ -260,13 +260,13 @@ extension JpfString {
     var number: Int? {Int(value)}
     func add(_ object: JpfObject) -> JpfObject {
         guard let string = object as? Self else {return JpfError("「\(type)」と「\(object.type)」" + cannotAdd)}
-        return JpfString(value: value + string.value)
+        return JpfString(name: self.name, value: value + string.value)
     }
     func contains(_ object: JpfObject) -> JpfObject {
         guard let string = object as? JpfString else {return JpfBoolean.FALSE}
         return JpfBoolean.object(of: value.contains(string.value))
     }
-    func reversed() -> JpfObject {JpfString(value: String(value.reversed()))}
+    func reversed() -> JpfObject {JpfString(name: self.name, value: String(value.reversed()))}
     // 要素アクセス
     subscript(index: Int) -> JpfObject? {
         guard case 0..<value.count = index else {return JpfNull.object}
@@ -340,7 +340,7 @@ extension JpfArray {
     var isEmpty: JpfObject {JpfBoolean.object(of: elements.isEmpty)}
     func add(_ object: JpfObject) -> JpfObject {
         guard let array = object as? Self else {return JpfError("「\(type)」と「\(object.type)」" + cannotAdd)}
-        return JpfArray(elements: elements + array.elements)
+        return JpfArray(name: self.name, elements: elements + array.elements)
     }
     // 要素アクセス
     subscript(index: Int) -> JpfObject? {
@@ -355,7 +355,7 @@ extension JpfArray {
             return elements.last ?? JpfNull.object
         case (Token(.NO),"残り"),(nil,"残り"):
             guard !elements.isEmpty else {return JpfNull.object}
-            return JpfArray(elements: [JpfObject](elements.dropFirst()))
+            return JpfArray(name: self.name, elements: [JpfObject](elements.dropFirst()))
         default:
             break
         }
@@ -366,17 +366,17 @@ extension JpfArray {
                 range.upperBound?.0.number, range.upperBound?.1) {
         case (let l?, Token(.KARA),    let u?, Token(.MADE)),
              (let l?, Token(.GTEQUAL), let u?, Token(.LTEQUAL)):
-            return JpfArray(elements: Array(elements[l...u]))
+            return JpfArray(name: self.name, elements: Array(elements[l...u]))
         case (let l?, Token(.GTEQUAL), let u?, Token(.UNDER)):
-            return JpfArray(elements: Array(elements[l..<u]))
+            return JpfArray(name: self.name, elements: Array(elements[l..<u]))
         case (let l?, Token(.KARA), nil, nil),
              (let l?, Token(.GTEQUAL), nil, nil):
-            return JpfArray(elements: Array(elements[l...]))
+            return JpfArray(name: self.name, elements: Array(elements[l...]))
         case (nil, nil, let u?, Token(.MADE)),
              (nil, nil, let u?, Token(.LTEQUAL)):
-            return JpfArray(elements: Array(elements[...u]))
+            return JpfArray(name: self.name, elements: Array(elements[...u]))
         case (nil, nil, let u?, Token(.UNDER)):
-            return JpfArray(elements: Array(elements[..<u]))
+            return JpfArray(name: self.name, elements: Array(elements[..<u]))
         default:
             break
         }
@@ -387,7 +387,7 @@ extension JpfArray {
         var elements = elements
         guard case 0..<elements.count = position else {return JpfError(arrayPositionError)}
         elements[position] = value
-        return JpfArray(elements: elements)
+        return JpfArray(name: self.name, elements: elements)
     }
     func remove(_ object: JpfObject) -> JpfObject {
         var objects = elements
@@ -406,7 +406,7 @@ extension JpfArray {
         } else {
             return error
         }
-        return JpfArray(elements: objects)
+        return JpfArray(name: self.name, elements: objects)
     }
     func contains(_ object: JpfObject) -> JpfObject {
         return JpfBoolean.object(of: elements.contains {
@@ -435,14 +435,14 @@ extension JpfArray {
         return nil
     }
     func map(_ function: JpfFunction, with environment: Environment) -> JpfObject {
-        JpfArray(elements: elements.map { element in
+        JpfArray(name: self.name, elements: elements.map { element in
             environment.push(element)
             return function.executed(with: environment) ??
             environment.pull() ?? JpfNull.object
         })
     }
     func filter(_ function: JpfFunction, with environment: Environment) -> JpfObject {
-        JpfArray(elements: elements.filter { element in
+        JpfArray(name: self.name, elements: elements.filter { element in
             environment.push(element)
             let result = function.executed(with: environment) ?? environment.pull()
             return result?.isTrue ?? false
@@ -462,10 +462,10 @@ extension JpfArray {
             return sorted()
         case "降順":
             if let elements: [JpfInteger] = cast(self.elements) {
-                return JpfArray(elements: elements.sorted(by: >))
+                return JpfArray(name: self.name, elements: elements.sorted(by: >))
             } else
             if let elements: [JpfString] = cast(self.elements) {
-                return JpfArray(elements: elements.sorted(by: >))
+                return JpfArray(name: self.name, elements: elements.sorted(by: >))
             }
         default:
             break
@@ -474,15 +474,15 @@ extension JpfArray {
     }
     func sorted() -> JpfObject {    // 昇順に並び替える
         if let elements: [JpfInteger] = cast(self.elements) {
-            return JpfArray(elements: elements.sorted())
+            return JpfArray(name: self.name, elements: elements.sorted())
         } else
         if let elements: [JpfString] = cast(self.elements) {
-            return JpfArray(elements: elements.sorted())
+            return JpfArray(name: self.name, elements: elements.sorted())
         }
         return JpfError(cannotSortByOrder)
     }
     func sorted(by function: JpfFunction, with environment: Environment) -> JpfObject { //関数の条件で並び替える
-        return JpfArray(elements: elements.sorted { lhs, rhs in
+        return JpfArray(name: self.name, elements: elements.sorted { lhs, rhs in
             environment.push(lhs)
             environment.push(rhs)
             let result = function.executed(with: environment) ?? environment.pull()
@@ -500,7 +500,7 @@ extension JpfArray {
         }
         return results
     }
-    func reversed() -> JpfObject {JpfArray(elements: elements.reversed())}
+    func reversed() -> JpfObject {JpfArray(name: self.name, elements: elements.reversed())}
 }
 extension JpfDictionary {
     func isEqual(to object: JpfObject) -> Bool {
@@ -519,10 +519,10 @@ extension JpfDictionary {
         let error = JpfError("「\(type)」から「\(object.string)」" + cannotRemove)
         if let key = object.value as? JpfHashable {
             if let keyword = object.value as? JpfString, keyword.string == "全て" {
-                return JpfDictionary(pairs: [:])
+                return JpfDictionary(name: self.name, pairs: [:])
             }
             objects[key.hashKey] = nil
-            return JpfDictionary(pairs: objects)
+            return JpfDictionary(name: self.name, pairs: objects)
         }
         return error
     }
@@ -546,7 +546,7 @@ extension JpfDictionary {
         return nil
     }
     func map(_ function: JpfFunction, with environment: Environment) -> JpfObject {
-        JpfArray(elements: pairs.values.map { key, value in
+        JpfArray(name: self.name, elements: pairs.values.map { key, value in
             environment.push(key)
             environment.push(value)
             return function.executed(with: environment) ??
@@ -631,7 +631,7 @@ extension JpfEnum {
             return JpfEnumerator(type: self.name, identifier: name, rawValue: environment[name])
         } else
         if particle == .particle(.NO), name == "列挙子" {
-            return JpfArray(elements: elements.map {JpfString(value: $0)})
+            return JpfArray(name: self.name, elements: elements.map {JpfString(value: $0)})
         }
         return getObject(from: name, with: particle)
     }

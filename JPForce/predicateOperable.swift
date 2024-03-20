@@ -313,7 +313,7 @@ struct FilesOperator : PredicateOperable {
     func operated() -> JpfObject? {
         let documentUrl = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         guard let fileNames = try? FileManager.default.contentsOfDirectory(atPath: documentUrl.path()) else {return JpfNull.object}
-        return JpfArray(elements: fileNames.map {JpfString(value: $0)})
+        return JpfArray(name: op.literal, elements: fileNames.map {JpfString(value: $0)})
     }
 }
 // MARK: - 算術演算
@@ -322,13 +322,11 @@ struct AddOperator : PredicateOperable {
     let environment: Environment, op: Token
     func operated() -> JpfObject? {
         guard let params = environment.peek(2)  else {return "「\(op.literal)」" + additionParamError + additionUsage}
-        let ident = params[0].value?.name ?? ""
         var added = params[0].add(params[1])
         if !added.isError {environment.drop(2)}
         while isPeekParticle(.TO) && !added.isError {   // スタックにト格があれば、中身を足す
             added = leftOperand!.add(added)
         }
-        added.name = ident
         return added
     }
 }
@@ -1061,8 +1059,7 @@ struct AssignOperator : PredicateOperable {
                 guard !result.isError else {return result}
                 environment.drop(3)
                 if array.name.isEmpty {return result}// 辞書にない場合、代入した配列を返す。
-                assign(result, to: environment, by: array.name, with: op)
-                return nil
+                return assign(result, to: environment, by: array.name, with: op)
             default:
                 break
             }
@@ -1073,42 +1070,43 @@ struct AssignOperator : PredicateOperable {
                 params.swapAt(0, 1)
                 fallthrough
             case (Token(.WO),Token(.NI)), (nil,Token(.NI)):
-                guard var value = params[0].value else {break}
+                guard let value = params[0].value else {break}
                 if let enumerator = params[1].value as? JpfEnumerator {
                     environment.drop(2)
                     return JpfEnumerator(type: enumerator.type, name: enumerator.name, identifier: enumerator.identifier, rawValue: value)  // 列挙子に値を代入し返す。
                 }
                 let name = environment.getName(from: params[1])
                 guard !name.isEmpty else {break}
-                value.name = name
                 environment.drop(2)
-                assign(value, to: environment, by: name, with: op)  // 識別子に値を代入
-                return nil
+                return assign(value, to: environment, by: name, with: op)  // 識別子に値を代入
             default:
                 break
             }
         }
         if let param = environment.peek {
-            if let value = param.value,
-               !value.name.isEmpty,
-               param.particle?.unwrappedLiteral == Token(.TA).literal {
+            if let value = param.value, !value.name.isEmpty,
+               param.particle?.unwrappedLiteral == Token(.TA).literal {     // 助詞「て」
                 environment.drop()
-                assign(value, to: environment, by: value.name, with: op)    // 識別子に計算した値を代入
+                return assign(value, to: environment, by: value.name, with: op)    // 識別子に計算した値を代入
             } else {
                 return usage2
             }
-            return nil
         }
         return usage
     }
     private var usage: JpfError {op == .keyword(.ASSIGN) ? assignUsage : overwriteUsage}
     private var usage2: JpfError {op == .keyword(.ASSIGN) ? compoundAssignUsage : compoundOverwriteUsage}
-    private func assign(_ value: JpfObject, to environment: Environment, by name: String, with op: Token) {
-        if op == .keyword(.OVERWRITE) && environment.outer?[name] != nil {
-            environment.outer![name] = value
-            return
+    private func assign(_ value: JpfObject, to environment: Environment, by name: String, with op: Token) -> JpfError? {
+        if op == .keyword(.ASSIGN) {
+            environment[name] = value
+        } else {
+            if let outer = environment.outer, outer.contains(name) {
+                environment.outer![name] = value
+            } else {
+                return JpfError("エラー：『\(name)』(識別子)が定義されていない。")
+            }
         }
-        environment[name] = value
+        return nil
     }
 }
 struct SwapOperator : PredicateOperable {

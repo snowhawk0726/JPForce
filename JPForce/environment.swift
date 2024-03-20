@@ -16,11 +16,13 @@ class Environment {
     subscript(_ name: String) -> JpfObject? {
         get {store[name] ?? outer?[name]}           // 外部環境の取得は可
         set {
+            var object = newValue
+            object?.name = name                     // 識別子名をオブジェクトに記録
             if overwrite && outer?[name] != nil {   // 外部環境への上書き可
-                outer![name] = newValue
+                outer![name] = object
                 return
             }
-            store[name] = newValue
+            store[name] = object
         }
     }
     var enumerated: [(key: String, value: JpfObject)] {
