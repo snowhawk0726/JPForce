@@ -32,6 +32,7 @@ struct PredicateOperableFactory {
         case .keyword(.EMPTY):      return EmptyOperator(environment, by: token)
         case .keyword(.DUPLICATE),.keyword(.PULL):
                                     return PullOperator(environment, by: token)
+        case .keyword(.PUSH):       return PushOperator(environment, by: token)
         case .keyword(.ASSIGN),.keyword(.OVERWRITE):
                                     return AssignOperator(environment, by: token)
         case .keyword(.SWAP):       return SwapOperator(environment, by: token)
@@ -178,7 +179,7 @@ extension PredicateOperable {
     var compoundAssignUsage: JpfError           {JpfError("仕様：<識別子>(を)<演算し>て代入する。")}
     var compoundOverwriteUsage: JpfError           {JpfError("仕様：<識別子>(を)<演算し>て上書きする。")}
     var assignArrayUsage: JpfError      {JpfError("仕様：〜(を)<配列>の位置<数値>に代入(または上書き)する。または、<配列>の位置<数値>に〜を代入(または上書き)する。")}
-    var swapUsage: JpfError             {JpfError("仕様：<識別子>と<識別子>を入れ替える。または、〜と〜を入れ替える。")}
+    var swapUsage: JpfError             {JpfError("仕様：<識別子１>と<識別子２>を入れ替える。または、<識別子１>を<識別子２>と入れ替える。")}
     var createUsage: JpfError           {JpfError("仕様：(「<識別子>」を)(<引数>で)<型>から生成する。または、<型>から(<引数>で)「<識別子>」を生成する。")}
     var createEnumeratorUsage: JpfError {JpfError("仕様：(「<識別子>」を)<値>で<列挙型>から生成する。または、<列挙型>から<値>で「<識別子>」を生成する。")}
     var setUsage: JpfError      {JpfError("仕様：<値>(を)<オブジェクト>の要素「<識別子>」に設定する。または、<オブジェクト>の要素「<識別子>」に<値>を設定する。")}
@@ -953,6 +954,19 @@ struct StackOperator : PredicateOperable {
     let environment: Environment
     func operated() -> JpfObject? {JpfInput(stack: environment.getAll())}
 }
+struct PushOperator : PredicateOperable {
+    init(_ environment: Environment, by op: Token) {self.environment = environment; self.op = op}
+    let environment: Environment, op: Token
+    func operated() -> JpfObject? {
+        if isPeekParticle(.WO) {
+            if let value = environment.unwrappedPeek {
+                environment.drop()
+                environment.push(value)
+            }
+        }
+        return nil
+    }
+}
 struct PullOperator : PredicateOperable {
     init(_ environment: Environment, by op: Token) {self.environment = environment; self.op = op}
     let environment: Environment, op: Token
@@ -973,7 +987,7 @@ struct PullOperator : PredicateOperable {
                 environment.drop()
                 environment.remove(name: label)
                 identifiers.append(identifier.value)
-            } while environment.isPeekParticle(.TO)
+            } while environment.isPeekParticle(.TO) && environment.peek?.value?.string == label
         }
         if identifiers.count == 1 && number > 1 {   // 「<識別子>」にn個
             environment[identifiers.first!] = getObjects(from: environment, numberOf: number, by: method)
