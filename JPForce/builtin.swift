@@ -84,8 +84,8 @@ extension JpfObject {
     var cannotReduce: String    {"「\(type)」を「関数」で、まとめることはできない。仕様：<配列、辞書>を<初期値>と<関数>でまとめる。"}
     var cannotMapping: String   {"「\(type)」を「関数」で、写像することはできない。仕様：<配列、辞書>を<関数>で写像する。"}
     var cannotFilter: String   {"「\(type)」を「関数」で、フィルターすることはできない。仕様：<配列、辞書>を<関数>でフィルターする。"}
-    var cannotSortByFunc: String{"「\(type)」を並び替えることはできない。仕様：<配列>を<関数>で並び替える。"}
-    var cannotSortByOrder: String{"「\(type)」を並び替えることはできない。仕様：<配列>を(「昇順」に、または「降順」に)並び替える。"}
+    var cannotSortByFunc: String{"「\(type)」を並べ替えることはできない。仕様：<配列>を<関数>で並べ替える。"}
+    var cannotSortByOrder: String{"「\(type)」を並べ替えることはできない。仕様：<配列>を(「昇順」に、または「降順」に)並べ替える。"}
     var cannotReverse: String   {"「\(type)」は逆順にすることはできない。仕様：<配列、文字列>を逆順にする。"}
     var cannotAssign: String    {"「\(type)に代入することはできない。"}
     var identifierNotAvailable: String  {"(識別子)は利用可能でない。"}
@@ -457,7 +457,7 @@ extension JpfArray {
         }
     }
     func sorted(by string: JpfString) -> JpfObject {
-        switch string.value {       // 指定の順序で並び替える
+        switch string.value {       // 指定の順序で並べ替える
         case "昇順":
             return sorted()
         case "降順":
@@ -472,7 +472,7 @@ extension JpfArray {
         }
         return JpfError(cannotSortByOrder)
     }
-    func sorted() -> JpfObject {    // 昇順に並び替える
+    func sorted() -> JpfObject {    // 昇順に並べ替える
         if let elements: [JpfInteger] = cast(self.elements) {
             return JpfArray(name: self.name, elements: elements.sorted())
         } else
@@ -481,7 +481,7 @@ extension JpfArray {
         }
         return JpfError(cannotSortByOrder)
     }
-    func sorted(by function: JpfFunction, with environment: Environment) -> JpfObject { //関数の条件で並び替える
+    func sorted(by function: JpfFunction, with environment: Environment) -> JpfObject { //関数の条件で並べ替える
         return JpfArray(name: self.name, elements: elements.sorted { lhs, rhs in
             environment.push(lhs)
             environment.push(rhs)
@@ -489,7 +489,7 @@ extension JpfArray {
             return result?.isTrue ?? false
         })
     }
-    /// 要素が並び替え可能であれば、その型(T)にキャストする
+    /// 要素が並べ替え可能であれば、その型(T)にキャストする
     /// - Parameter elements: テストする要素
     /// - Returns: キャストした要素(できなければnil)
     private func cast<T : Comparable>(_ elements: [JpfObject]) -> [T]? {
