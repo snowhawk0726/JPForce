@@ -224,11 +224,9 @@ extension Parsable {
     /// 形式： 要素が(は)、〜。、要素が(は)、【〜】
     /// - Parameters: token: 配列・辞書・列挙のトークン
     /// - Returns: 解析した要素の配列
-    func parseElements<T>(of token: Token) -> [T]? {
+    func parseElements<T>(of token: Token, with endSymbol: Token.Symbol) -> [T]? {
         skipNextEols()
         _ = getNext(whenNextIs: ExpressionStatement.yousoga + ExpressionStatement.yousowa, matchAll: false) // 要素が、(要素は、)
-        skipNextEol()
-        let endSymbol: Token.Symbol = getNext(whenNextIs: .LBBRACKET) ? .RBBRACKET : .PERIOD
         skipNextEol()
         var elements: [T] = []
         if isEndOfElements {return elements}    // 空の配列
@@ -402,6 +400,17 @@ extension Parsable {
             _ = getNext(whenNextIs: .EOL)       // EOLを飛ばす
         }
         return .success(funcBlocks)
+    }
+    func parseEndOfElementsLiteral(with endSymbol: Token.Symbol) -> Bool {
+        skipNextEols()
+        if currentToken != .symbol(endSymbol) {
+            if endSymbol == .RBBRACKET {_ = getNext(whenNextIs: .PERIOD)}   // 】の前の「。」は読み飛ばす
+            skipNextEols()
+            guard getNext(whenNextIs: endSymbol, withError: true) else {return false}
+        } else {                                                            // 】の時は、進めない
+            if counter(.RBBRACKET) < 1 {_ = getNext(whenNextIs: .RBBRACKET)}    // ただし、】】の時は、１つ進める。
+        }
+        return true
     }
 }
 struct ParameterParseError : Error {}
@@ -814,13 +823,14 @@ struct EnumLiteralParser : ExpressionParsable {
     func parse() -> Expression? {
         let token = parseHeader()
         let endSymbol: Token.Symbol = getNext(whenNextIs: .LBBRACKET) ? .RBBRACKET : .PERIOD
+        countUp(endSymbol)
         // 要素の解析
-        guard let elements: [Statement] = parseElements(of: token) else {
+        guard let elements: [Statement] = parseElements(of: token, with: endSymbol) else {
             error(message: "列挙で、「要素が、〜」の解析に失敗した。")
             return nil
         }
-        skipNextEols()
-        guard currentToken == .symbol(endSymbol) || getNext(whenNextIs: endSymbol, withError: true) else {return nil}
+        guard parseEndOfElementsLiteral(with: endSymbol) else {return nil}
+        countDown(endSymbol)
         return EnumLiteral(token: token, elements: elements)
     }
 }
@@ -830,13 +840,14 @@ struct ArrayLiteralParser : ExpressionParsable {
     func parse() -> Expression? {
         let token = parseHeader()
         let endSymbol: Token.Symbol = getNext(whenNextIs: .LBBRACKET) ? .RBBRACKET : .PERIOD
+        countUp(endSymbol)
         // 要素の解析
-        guard let elements: [ExpressionStatement] = parseElements(of: token) else {
+        guard let elements: [ExpressionStatement] = parseElements(of: token, with: endSymbol) else {
             error(message: "配列で、「要素が、〜」の解析に失敗した。")
             return nil
         }
-        skipNextEols()
-        guard currentToken == .symbol(endSymbol) || getNext(whenNextIs: endSymbol, withError: true) else {return nil}
+        countDown(endSymbol)
+        guard parseEndOfElementsLiteral(with: endSymbol) else {return nil}
         return ArrayLiteral(token: token, elements: elements)
     }
 }
@@ -846,13 +857,14 @@ struct DictionaryLiteralParser : ExpressionParsable {
     func parse() -> Expression? {
         let token = parseHeader()
         let endSymbol: Token.Symbol = getNext(whenNextIs: .LBBRACKET) ? .RBBRACKET : .PERIOD
+        countUp(endSymbol)
         // 要素の解析
-        guard let pairs: [PairExpression] = parseElements(of: token) else {
+        guard let pairs: [PairExpression] = parseElements(of: token, with: endSymbol) else {
             error(message: "辞書で、「要素が、〜」の解析に失敗した。")
             return nil
         }
-        skipNextEols()
-        guard currentToken == .symbol(endSymbol) || getNext(whenNextIs: endSymbol, withError: true) else {return nil}
+        countDown(endSymbol)
+        guard parseEndOfElementsLiteral(with: endSymbol) else {return nil}
         return DictionaryLiteral(token: token, pairs: pairs)
     }
 }

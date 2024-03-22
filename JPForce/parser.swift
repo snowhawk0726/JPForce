@@ -20,7 +20,7 @@ class Parser {
     var nextToken: Token
     var previousToken: Token
     var errors: [String] = []
-    var counters: [Token.Symbol: Int] = [.RBBRACKET: 0, .EOL: 0]
+    var counters: [Token.Symbol: Int] = [.RBBRACKET: 0, .EOL: 0, .PERIOD: 0]
     // MARK: - プログラムの解析
     func parseProgram() -> Program? {
         var program = Program()
