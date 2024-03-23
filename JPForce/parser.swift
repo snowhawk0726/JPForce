@@ -20,7 +20,8 @@ class Parser {
     var nextToken: Token
     var previousToken: Token
     var errors: [String] = []
-    var counters: [Token.Symbol: Int] = [.RBBRACKET: 0, .EOL: 0, .PERIOD: 0]
+    var nestedBlockCounter = NestCounter(.RBBRACKET, .EOL)
+    var nestedElementsCounter = NestCounter(.RBBRACKET, .PERIOD)
     // MARK: - プログラムの解析
     func parseProgram() -> Program? {
         var program = Program()
@@ -70,4 +71,14 @@ class Parser {
     func skipEols() {while currentToken.isEol {getNext()}}
     /// Lexerに識別子を登録
     func insert(_ identifier: String) {lexer.insert(identifier)}
+    /// 入れ子制御カウンター
+    class NestCounter {
+        var counters: [Token.Symbol : Int] = [:]
+        init(_ counters: Token.Symbol...) {counters.forEach {self.counters[$0] = 0}}
+        private init() {}
+        //
+        func up(to symbol: Token.Symbol) {counters[symbol]! += 1}
+        func down(to symbol: Token.Symbol) {counters[symbol]! -= 1}
+        func value(of symbol: Token.Symbol) -> Int {counters[symbol]!}
+    }
 }
