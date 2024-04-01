@@ -131,7 +131,7 @@ enum Token : Equatable {
         case INITIALIZATION = "初期化"
     }
     /// 文字列の連想値について識別しないための分類(.IDENT("文字列") → .ident)
-    enum TokenType : Hashable {
+    enum TokenType: Hashable {
         case ident, int, string, keyword(Keyword), particle(Particle), symbol(Symbol), illegal
         //
         static func == (lhs: TokenType, rhs: TokenType) -> Bool {
@@ -265,9 +265,9 @@ enum Token : Equatable {
 // MARK: - String extension
 extension String {
     var hankaku: String? {applyingTransform(.fullwidthToHalfwidth, reverse: false)} // 半角変換(Fullwidth to Halfwidth (ascii))
-    var zenkaku: String? {applyingTransform(.fullwidthToHalfwidth, reverse: true)} // 全角変換(Halfwidth to Fullwidth)
+    var zenkaku: String? {applyingTransform(.fullwidthToHalfwidth, reverse: true)}  // 全角変換(Halfwidth to Fullwidth)
     var withoutPeriod: Self {self.replacingOccurrences(of: Token.Symbol.PERIOD.rawValue, with: "")}
-    var isPainForm: Bool {                                                          // 終止形？(Check self if palin form)
+    var isPlainForm: Bool {                                                         // 終止形？(Check self if palin form)
         PlainForm.hasEnd(of: self) || PlainForm.hasIrregular(self)
     }
     var isContinuativeForm: Bool {                                                  // 連用形？(Check self if continuative form)
