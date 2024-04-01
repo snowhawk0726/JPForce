@@ -207,6 +207,39 @@ final class EvaluatorTests: XCTestCase {
             print("テスト(\(evaluated))終了")
         }
     }
+    func testClosure() throws {
+        let input = """
+        外側は、関数【
+          カウント値は、０。
+          内側は、関数【
+            カウント値と1を足し、「カウント値」に上書きする。
+            カウント値を返す。
+          】。
+          内側を返す。
+        】
+        外側を実行し、「カウントアップ」に代入する。
+        """
+        let testPatterns: [(input: String, expected: Int)] = [
+            ("カウントアップする。", 1),
+            ("カウントアップする。", 2),
+            ("カウントアップする。", 3),
+        ]
+        print("テストパターン: \(input)")
+        let environment = Environment()
+        let parser = Parser(Lexer(input))
+        let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+        let result = eval.object ?? environment.pull()
+        XCTAssertFalse(result?.isError ?? false, result?.error?.message ?? "")
+        for test in testPatterns {
+            print("テストパターン: \(test.input)")
+            let parser = Parser(Lexer(test.input))
+            let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+            let result = eval.object ?? environment.pull()!
+            try testObject(result, with: test.expected)
+            print("テスト結果(\(result.string))")
+        }
+        print("テスト終了")
+    }
     func testOverloadObject() throws {
         let input = "加算は、さらに、関数【入力がa「数値に」とb「数値を」、aにbを足す】。加算。"
         print("テストパターン: \(input)")
