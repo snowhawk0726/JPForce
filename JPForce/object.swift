@@ -164,14 +164,12 @@ struct JpfReturnValue : JpfObject {
 struct JpfFunction : JpfObject {
     static let type = "関数"
     var name: String = ""
-    var parameters: [Identifier]    // 入力パラメータ
-    var signature: InputFormat      // 入力形式
-    var body: BlockStatement
+    var functions: [FunctionBlock]  // 関数ブロック
     var environment: Environment
     var string: String {
-        let s = type.color(.magenta) + "であって、【" +
-        (parameters.isEmpty ? "" : "入力が、\(zip(parameters, signature.strings).map {$0.string + $1}.joined(separator: "と"))であり、") +
-        "本体が、\(body.string)】"
+        let s = functions.reduce("") {$0 +
+            "\($1.isExtended ? "さらに、" : "")\(type.color(.magenta))であって、【\($1.string)】。"
+        }
         return s.replacingOccurrences(of: "。】", with: "】")
     }
 }

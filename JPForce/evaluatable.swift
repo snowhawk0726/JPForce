@@ -35,6 +35,8 @@ extension Node {
     var loopParameterError: JpfError        {JpfError("「反復」の入力が正しくない。")}
     var rangeTypeError: JpfError            {JpfError("「範囲」の上下限が、数値でない。：")}
     var overloadExtentionError: JpfError    {JpfError("「関数」で拡張している。")}
+    var functionOverloadError: JpfError     {JpfError("「関数」を「関数」以外で多重定義している。")}
+    var computationOverloadError: JpfError     {JpfError("「算出」を「算出」以外で多重定義している。")}
     var typeExtentionError: JpfError        {JpfError("「型」を「型」以外で拡張している。")}
     var protocolExtentionError: JpfError    {JpfError("「規約」を「型」以外で拡張している。")}
     var cannotExtend: JpfError              {JpfError("拡張することはできない。")}
@@ -82,78 +84,92 @@ extension BlockStatement : Evaluatable {
 extension DefineStatement : Evaluatable {
     func evaluated(with environment: Environment) -> JpfObject? {
         if let result = value.evaluated(with: environment), result.isError {return result}
-        guard var object = environment.pull() else {return nil}
-        if isExtended {                                 // 多重・拡張定義
-            if let function = object as? JpfFunction {  // 関数多重定義
-                let result = overload(function, with: environment)
-                guard !result.isError else {return result}
-                object = result
-            } else {
-                switch environment[name.value] {
-                case let original as JpfType:           // 型の拡張
-                    guard let extended = object as? JpfType else {return typeExtentionError + "(拡張先が\(object.type))"}
-                    let result = extend(original, to: extended, with: environment)
-                    guard !result.isError else {return result}
-                    object = result
-                case let orignal as JpfProtocol:        // 規約デフォルト実装
-                    guard let extended = object as? JpfType else {return protocolExtentionError + "(拡張先が\(object.type))"}
-                    object = JpfProtocol(protocols: orignal.protocols, clauses: orignal.clauses, body: extended.body)
-                default:
-                    return "「\(name.value)」を「\(object.type)」で" + cannotExtend
-                }
-            }
+        guard var definition = environment.pull() else {return nil}
+        if isExtended && environment.contains(name.value) {
+            definition = extend(environment, by: name.value, with: definition)
+            if definition.isError {return definition}
         }
-        object.name = name.value
-        environment[name.value] = object
+        environment[name.value] = definition
         return nil
     }
-    private func overload(_ function: JpfObject, with environment: Environment) -> JpfObject {
-        let original = environment[name.value]
-        guard let array = overload(function, to: original) else {return "拡張元(\(original!.type))を" + overloadExtentionError}
-        return array
-    }
-    private func overload(_ object: JpfObject, to original: JpfObject?) -> JpfArray? {
-        var elements: [JpfObject] = []
-        if let original = original {                // 既存定義
-            switch original {
-            case let f as JpfFunction:              // 関数定義
-                elements.append(f)
-            case let a as JpfArray:                 // 多重定義
-                elements = a.elements
-            default:
-                return nil
-            }
+    /// 元の定義(environment[name])を、新しい定義(object)で拡張(または多重定義する)
+    /// - Parameters:
+    ///   - environment: 元の環境
+    ///   - name: 拡張される識別子
+    ///   - object: 拡張するオブジェクト(定義)
+    /// - Returns: 拡張されたオブジェクト(定義)、またはエラー
+    ///   (元の環境に識別子が無い、もしくは非対称である場合は、objectを返す。)
+    private func extend(_ environment: Environment, by name: String, with object: JpfObject) -> JpfObject {
+        switch environment[name] {              // 元の定義
+        case let original as JpfFunction:       // 関数の多重定義
+            guard let function = object as? JpfFunction else {return functionOverloadError}
+            return JpfFunction(
+                name: original.name,
+                functions: overload(original.functions, with: function.functions),
+                environment: environment
+            )
+        case let original as JpfComputation:    // 算出の多重定義
+            guard let computation = object as? JpfComputation else {return computationOverloadError}
+            return JpfComputation(
+                name: original.name,
+                setters: overload(original.setters, with: computation.setters),
+                getters: overload(original.getters, with: computation.getters),
+                environment: environment
+            )
+        case let original as JpfType:           // 型の拡張
+            guard let type = object as? JpfType else {return typeExtentionError + "(拡張先が\(object.type))"}
+            let result = extend(original, by: type)
+            if result.isError {return result}
+            return result
+        case let orignal as JpfProtocol:        // 規約デフォルト実装
+            guard let extended = object as? JpfType else {return protocolExtentionError + "(拡張先が\(object.type))"}
+            return JpfProtocol(
+                protocols: orignal.protocols,
+                clauses: orignal.clauses,
+                body: extended.body
+            )
+        default:
+            break
         }
-        if object is JpfFunction {
-            elements.append(object)                  // 多重定義(配列)に関数を追加
-        } else if let array = object as? JpfArray {
-            elements += array.elements               // 多重定義(配列)に配列を追加
-        }
-        return JpfArray(name: original?.name ?? "", elements: elements)
+        return object
     }
-    private func extend(_ original: JpfType, to type: JpfType, with environment: Environment) -> JpfObject {
+    /// 元の型を、新しい型の定義で拡張する。
+    /// - Parameters:
+    ///   - original: 元の型
+    ///   - definition: 拡張する型の定義
+    /// - Returns: 拡張された型、またはエラー
+    private func extend(_ original: JpfType, by definition: JpfType) -> JpfObject {
         var extended = original
         // 初期化の追加(多重定義)
-        for i in type.initializers {
-            if i.isExtended {extended.initializers.append(i)} else {extended.initializers = [i]}
-        }
+        extended.initializers = overload(original.initializers, with: definition.initializers)
         // 型の環境を統合(メソッドの多重定義を考慮)
-        for (k, v) in type.environment.enumerated {
-            var value = v
-            if let functions = v as? JpfArray, functions.elements.first is JpfFunction,
-               let object = original.environment[k] {
-                if let overloaded = overload(functions, to: object) {value = overloaded}
-            }
-            extended.environment[k] = value
+        for (k, v) in definition.environment.enumerated {
+            let object = extend(original.environment, by: k, with: v)
+            if object.isError {return object}
+            extended.environment[k] = object
         }
         // 規約の統合
-        for p in type.protocols {
+        for p in definition.protocols {
             guard !original.protocols.contains(p) else {return ConformityError.duplicated(protocol: p).message}
             extended.protocols.append(p)
         }
         // インスタンスの定義を統合
-        type.body?.statements.forEach {extended.body?.statements.append($0)}
+        if let statements = definition.body?.statements {
+            extended.body?.statements += statements
+        }
         return extended
+    }
+    private func overload(_ original: [FunctionBlock], with definition: [FunctionBlock]) -> [FunctionBlock] {
+        var overloaded = original
+        definition.forEach {    // 拡張識別をtrueにして、元のブロックに追加
+            overloaded.append(FunctionBlock(
+                parameters: $0.parameters,
+                signature: $0.signature,
+                body: $0.body,
+                isExtended: true
+            ))
+        }
+        return overloaded
     }
 }
 // MARK: Expression evaluators
@@ -514,7 +530,7 @@ extension DictionaryLiteral : Evaluatable {
 }
 extension FunctionLiteral : Evaluatable {
     func evaluated(with environment: Environment) -> JpfObject? {
-        accessed(with: environment) ?? JpfFunction(parameters: parameters, signature: signature, body: body, environment: environment)
+        accessed(with: environment) ?? JpfFunction(functions: functions, environment: environment)
     }
 }
 extension JpfFunction {
@@ -526,25 +542,11 @@ extension JpfFunction {
     func executed(with environment: Environment) -> JpfObject? {
         let local = Environment(outer: self.environment)    // 関数の環境を拡張
         let stackEnv = environment.isEmpty ? self.environment : environment
-        let result = local.apply(parameters, with: signature, from: stackEnv)
-        guard !result.isError else {return result}
-        defer {environment.push(local.pullAll())}           // スタックを戻す
-        if let evaluated = Evaluator(from: body, with: local).object {
-            guard !evaluated.isError else {return evaluated}
-            return unwrappedReturnValue(of: evaluated)
+        defer {environment.push(stackEnv.pullAll())}        // スタックを戻す
+        if let returnValue = stackEnv.execute(functions, with: local) {
+            return returnValue
         }
         return nil
-    }
-}
-extension JpfArray {
-    func executed(with environment: Environment) -> JpfObject? {
-        for element in elements.reversed() {    // 逆順に入力形式をチェック
-            guard let function = element as? JpfFunction else {return notExecutableObject + element.type}
-            if environment.hasParameters(to: function.signature, with: function.parameters.map {$0.value}) {
-                return function.executed(with: environment)
-            }
-        }
-        return functionParameterError
     }
 }
 extension ComputationLiteral : Evaluatable {

@@ -210,15 +210,11 @@ struct LoopExpression : Expression {
 }
 struct FunctionLiteral : Expression {
     var token: Token                // 関数トークン
-    var parameters: [Identifier]    // 入力パラメータ
-    var signature: InputFormat      // 入力形式
-    var body: BlockStatement        // 本体ブロック
+    var functions: [FunctionBlock]  // 関数部
     //
     var tokenLiteral: String {token.literal}
     var string: String {
-        token.coloredLiteral + "であって、【" +
-        (parameters.isEmpty ? "" : "入力が" + "、\(zip(parameters, signature.strings).map {$0.string + $1}.joined(separator: "と"))であり、") +
-        "本体が、" + body.string + "】"
+        functions.reduce("") {$0 + ($1.isExtended ? "さらに、" : "") + "\(token.coloredLiteral)であって、【\($1.string)】。"}
     }
 }
 struct ComputationLiteral : Expression {
@@ -288,7 +284,7 @@ struct FunctionBlock {
     var isExtended: Bool = false    // 拡張識別
     var string: String {
         (parameters.isEmpty ? "" : "入力が、\(zip(parameters, signature.strings).map {$0.string + $1}.joined(separator: "と"))であり、") +
-        (body.map {"本体が【\($0.string)】"} ?? "")
+        (body.map {"本体が、\($0.string)"} ?? "")
     }
 }
 struct ArrayLiteral : Expression {
@@ -345,11 +341,12 @@ private func conform(to clauses: [ClauseLiteral], with environment: Environment,
         guard let target = environment[clause.identifier.value] else {return designatedObjectNotFound + "指定値：\(clause.identifier.value)(\(clause.type))"}  // 対象のオブジェクト
         guard clause.type == target.type else {return designatedTypeNotMatch + "(指定型：\(clause.type)"}
         if let function = target as? JpfFunction {  // メンバー関数パラメタチェック
-            guard clause.parameters.count == function.parameters.count else {return numberOfParamsNotMatch + "(指定数：\(clause.parameters.count)"}
-            for pairs in zip(clause.parameters, function.parameters) {
+            guard let fb = function.functions.first else {return functionDefineError}
+            guard clause.parameters.count == fb.parameters.count else {return numberOfParamsNotMatch + "(指定数：\(clause.parameters.count)"}
+            for pairs in zip(clause.parameters, fb.parameters) {
                 guard pairs.0.value == pairs.1.value else {return nameOfParamsNotMatch + "(指定値：\(pairs.0.value)"}
             }
-            if let result = compareSignature(clause.signature, with: function.signature), result.isError {return result}
+            if let result = compareSignature(clause.signature, with: fb.signature), result.isError {return result}
         }
     }
     return nil
@@ -364,6 +361,7 @@ private func compareSignature(_ lhs: InputFormat?, with rhs: InputFormat) -> Jpf
 }
 private var designatedObjectNotFound: JpfError {JpfError("指定した識別子名が見つからない。")}
 private var designatedTypeNotMatch: JpfError{JpfError("指定した型が規約に準拠していない。")}
+private var functionDefineError: JpfError{JpfError("関数の定義が誤っている(多重定義はできない)。")}
 private var numberOfParamsNotMatch: JpfError{JpfError("関数の引数の数が規約に準拠していない。")}
 private var nameOfParamsNotMatch: JpfError  {JpfError("関数の引数の名前が規約に準拠していない。")}
 private var formatOfParamsNotMatch: JpfError{JpfError("関数の引数の形式が規約に準拠していない。")}

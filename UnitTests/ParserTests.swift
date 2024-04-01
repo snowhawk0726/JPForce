@@ -23,7 +23,7 @@ final class ParserTests: XCTestCase {
                 zは、0。
             """, 2, "z", [1, 0], false),
             ("『割った余り』は、2。",1,"割った余り",[2], false),
-            ("正しいは、さらに、関数であって、入力が甲、本体が、甲である。", 1, "正しい", ["関数であって、【入力が、甲であり、本体が、甲である。】"], true),
+            ("正しいは、さらに、関数であって、入力が甲、本体が、甲である。", 1, "正しい", ["関数であって、【入力が、甲であり、本体が、甲である。】。"], true),
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
@@ -256,11 +256,12 @@ final class ParserTests: XCTestCase {
             let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
             XCTAssertEqual(statement.expressions.count, 1, "statement.expressions.count")
             let function = try XCTUnwrap(statement.expressions.first as? FunctionLiteral)   // 関数であって、
-            XCTAssertEqual(function.parameters.count, 2, "function.parameters.count")
-            try testLiteralExpression(function.parameters[0], with: "x")
-            try testLiteralExpression(function.parameters[1], with: "y")
-            XCTAssertEqual(function.body.statements.count, 1)
-            let bodyStatement = try XCTUnwrap(function.body.statements.first as? ExpressionStatement)
+            let functionBlock = try XCTUnwrap(function.functions.first)
+            XCTAssertEqual(functionBlock.parameters.count, 2, "function.parameters.count")
+            try testLiteralExpression(functionBlock.parameters[0], with: "x")
+            try testLiteralExpression(functionBlock.parameters[1], with: "y")
+            XCTAssertEqual(functionBlock.body?.statements.count, 1)
+            let bodyStatement = try XCTUnwrap(functionBlock.body?.statements.first as? ExpressionStatement)
             XCTAssertEqual(bodyStatement.expressions.count, 4)
             try testPhraseExpression(bodyStatement.expressions[0], with: "x", "に")
             try testPhraseExpression(bodyStatement.expressions[1], with: "y", "を")
@@ -282,8 +283,9 @@ final class ParserTests: XCTestCase {
             let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
             XCTAssertEqual(statement.expressions.count, 1, "statement.expressions.count")
             let function = try XCTUnwrap(statement.expressions.first as? FunctionLiteral)   // 関数であって、
-            XCTAssertEqual(function.parameters.count, test.expectedParameters.count, "関数のパラメータ数が間違っている。")
-            try zip(function.parameters, test.expectedParameters).forEach {
+            let functionBlock = try XCTUnwrap(function.functions.first)
+            XCTAssertEqual(functionBlock.parameters.count, test.expectedParameters.count, "関数のパラメータ数が間違っている。")
+            try zip(functionBlock.parameters, test.expectedParameters).forEach {
                 try testLiteralExpression($0, with: $1)
             }
             print("テスト(\(statement.string))終了")
@@ -673,9 +675,10 @@ final class ParserTests: XCTestCase {
             let program = try XCTUnwrap(parseProgram(with: test.input))
             let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
             let function = try XCTUnwrap(statement.expressions.first as? FunctionLiteral)
-            XCTAssertEqual(function.signature.numberOfInputs, test.number)
-            XCTAssertEqual(function.signature.formats.first?.type, test.type)
-            XCTAssertEqual(function.signature.formats.first?.particle, test.particle)
+            let functionBlock = try XCTUnwrap(function.functions.first)
+            XCTAssertEqual(functionBlock.signature.numberOfInputs, test.number)
+            XCTAssertEqual(functionBlock.signature.formats.first?.type, test.type)
+            XCTAssertEqual(functionBlock.signature.formats.first?.particle, test.particle)
             print("テスト終了: \(statement.string)")
         }
     }

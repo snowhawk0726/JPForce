@@ -176,9 +176,10 @@ final class EvaluatorTests: XCTestCase {
         let input = "関数であって、【入力がxであり、本体が、xに2を足す】。"
         print("テストパターン: \(input)")
         let function = try XCTUnwrap(testEvaluator(input) as? JpfFunction)
-        XCTAssertEqual(function.parameters.count, 1)
-        XCTAssertEqual(function.parameters.first?.string, "x")
-        XCTAssertEqual(function.body.string, "xに2を足す。")
+        let functionBlock = try XCTUnwrap(function.functions.first)
+        XCTAssertEqual(functionBlock.parameters.count, 1)
+        XCTAssertEqual(functionBlock.parameters.first?.string, "x")
+        XCTAssertEqual(functionBlock.body?.string, "xに2を足す。")
         print("テスト(\(function.string))終了")
     }
     func testFunctionApplication() throws {
@@ -186,12 +187,12 @@ final class EvaluatorTests: XCTestCase {
             ("同一は、関数【入力がx、x】。５は同一である。", true),
             ("同一とは、関数【入力がx、xを返す】こと。５は同一である。", true),
             ("二倍とは、関数【入力がx、xに2を掛ける】こと。５を二倍し、二倍する。", 20),
-            ("加えるとは、関数【入力がxとy、xとyを足す】こと。5に5を加える。", 10),
-            ("加えるは、関数【入力がxとy、xとyを足す】こと。5と5を足したものに、5に5を加えたものを、加える。", 20),
+            ("加えるとは、算出【入力がxとy、xとyを足す】こと。5に5を加える。", 10),
+            ("加えるは、算出【入力がxとy、xとyを足す】こと。5と5を足したものに、5に5を加えたものを、加える。", 20),
             ("5で関数【入力がx、x】を実行する。", 5),
-            ("加算は、関数【入力がaとb、aにbを足す】。適用は、関数【入力がaとbと演算、aとbを演算する】。2と2に、加算を適用する。", 4),
-            ("減算は、関数【入力がaとb、aからbを引く】。適用は、関数【入力がaとbと演算、aとbを演算する】。10と2に、減算を適用する。", 8),
-            ("正しいは、関数【入力がa、aが真である】。4が5より大きいは、正しくない。", true),
+            ("加算は、関数【入力がaとb、aにbを足す】。適用は、関数【入力がaとbと演算、aとbを演算する】。演算は加算。2と2に、演算を適用する。", 4),
+            ("減算は、関数【入力がaとb、aからbを引く】。適用は、関数【入力がaとbと演算、aとbを演算する】。演算は減算。10と2に、演算を適用する。", 8),
+            ("正しいは、算出【入力がa、aが真である】。4が5より大きいは、正しくない。", true),
             ("『割った余り』は、関数【入力がxとy、xをyで割り、yを掛け、xから引いたものを返す】。23を11で『割った余り』は1である。", true),
             ("加算は、関数【入力がa「数値に」とb「数値を」、aにbを足し、返す】。1に2を加算する。", 3),
             ("加算は、関数【入力がa「数値」とb「数値」、aにbを足し、返す】。1と2の加算する。", 3),
@@ -209,12 +210,13 @@ final class EvaluatorTests: XCTestCase {
     func testOverloadObject() throws {
         let input = "加算は、さらに、関数【入力がa「数値に」とb「数値を」、aにbを足す】。加算。"
         print("テストパターン: \(input)")
-        let overload = try XCTUnwrap(testEvaluator(input) as? JpfArray)
-        let function = try XCTUnwrap(overload.elements.first as? JpfFunction)
-        XCTAssertEqual(function.parameters.count, 2)
-        XCTAssertEqual(function.parameters[0].string, "a")
-        XCTAssertEqual(function.parameters[1].string, "b")
-        XCTAssertEqual(function.body.string, "aにbを足す。")
+        let function = try XCTUnwrap(testEvaluator(input) as? JpfFunction)
+        let functionBlock = try XCTUnwrap(function.functions.first)
+        XCTAssertEqual(functionBlock.parameters.count, 2)
+        XCTAssertEqual(functionBlock.parameters[0].string, "a")
+        XCTAssertEqual(functionBlock.parameters[1].string, "b")
+        XCTAssertEqual(functionBlock.body?.string, "aにbを足す。")
+        XCTAssertFalse(functionBlock.isExtended)
         print("テスト(\(function.string))終了")
     }
     func testOverloadObjects() throws {
@@ -225,30 +227,31 @@ final class EvaluatorTests: XCTestCase {
             加算。
         """
         print("テストパターン: \(input)")
-        let overload = try XCTUnwrap(testEvaluator(input) as? JpfArray)
-        XCTAssertEqual(overload.elements.count, 3)
-        var function = try XCTUnwrap(overload.elements[0] as? JpfFunction)
-        XCTAssertEqual(function.signature.numberOfInputs, 2)
-        XCTAssertEqual(function.signature.strings[0], "「数値」")
-        XCTAssertEqual(function.signature.strings[1], "「数値」")
-        function = try XCTUnwrap(overload.elements[1] as? JpfFunction)
-        XCTAssertEqual(function.signature.numberOfInputs, 2)
-        XCTAssertEqual(function.signature.strings[0], "「数値に」")
-        XCTAssertEqual(function.signature.strings[1], "「数値を」")
-        function = try XCTUnwrap(overload.elements[2] as? JpfFunction)
-        XCTAssertEqual(function.signature.numberOfInputs, 2)
-        XCTAssertEqual(function.signature.strings[0], "「文字列」")
-        XCTAssertEqual(function.signature.strings[1], "「文字列」")
-        print("テスト(\(overload.string))終了")
+        let function = try XCTUnwrap(testEvaluator(input) as? JpfFunction)
+        let functionBlocks = function.functions
+        XCTAssertEqual(functionBlocks.count, 3)
+        XCTAssertEqual(functionBlocks[0].signature.numberOfInputs, 2)
+        XCTAssertEqual(functionBlocks[0].signature.strings[0], "「数値」")
+        XCTAssertEqual(functionBlocks[0].signature.strings[1], "「数値」")
+        XCTAssertFalse(functionBlocks[0].isExtended)
+        XCTAssertEqual(functionBlocks[1].signature.numberOfInputs, 2)
+        XCTAssertEqual(functionBlocks[1].signature.strings[0], "「数値に」")
+        XCTAssertEqual(functionBlocks[1].signature.strings[1], "「数値を」")
+        XCTAssertTrue(functionBlocks[1].isExtended)
+        XCTAssertEqual(functionBlocks[2].signature.numberOfInputs, 2)
+        XCTAssertEqual(functionBlocks[2].signature.strings[0], "「文字列」")
+        XCTAssertEqual(functionBlocks[2].signature.strings[1], "「文字列」")
+        XCTAssertTrue(functionBlocks[2].isExtended)
+        print("テスト(\(function.string))終了")
     }
     func testOverloadExecution() throws {
         let input = """
-            加えるは、関数【入力がa「文字列と…」とb「文字列を」、aの最初にbを足し、返す】。
-            加えるは、さらに、関数【入力がa「数値に」とb「数値を」、aにbを足し、返す】。
-            加えるは、さらに、関数【入力がa「文字列を」とb「文字列に」、bにaを足し、返す】。
-            甲は、「あ」と「い」を加えたもの。
-            乙は、1に2を加えたもの。
-            丙は、「あ」を「い」に加えたもの。
+            加算は、関数【入力がa「文字列と…」とb「文字列を」、aの最初にbを足し、返す】。
+            加算は、さらに、関数【入力がa「数値に」とb「数値を」、aにbを足し、返す】。
+            加算は、さらに、関数【入力がa「文字列を」とb「文字列に」、bにaを足し、返す】。
+            甲は、「あ」と「い」を加算したもの。
+            乙は、1に2を加算したもの。
+            丙は、「あ」を「い」に加算したもの。
             配列【甲、乙、丙】。
         """
         print("テストパターン: \(input)")
@@ -292,7 +295,7 @@ final class EvaluatorTests: XCTestCase {
             自動車は、型であって、【
                 型の要素が、【
                     ハンドルは、「右」。
-                    切り替えるは、関数【ハンドルが「右」である場合【ハンドルに「左」を上書き】、それ以外は【ハンドルに「右」を上書き】】。
+                    切り替えるは、算出【ハンドルが「右」である場合【ハンドルに「左」を上書き】、それ以外は【ハンドルに「右」を上書き】】。
                 】
                 初期化が、【入力が残量、燃料量は、残量。色は「黒」。】
                 給油は、関数であって、【入力が給油量で、
@@ -369,19 +372,19 @@ final class EvaluatorTests: XCTestCase {
     func testTypeInitExtensions() throws {
         let input = """
             甲は、型であって、【
-                初期化は、【入力がaとbとc。】
-                初期化は、さらに、【入力がa「数値」、aと1と2で、自身の初期化をする。】
+                初期化は、【入力がa「数値と」とb「数値と」とc「数値で」。】
+                初期化は、さらに、【入力がa「数値で」、bは1。cは2。aとbとcで、自身の初期化をする。】
                 合計は、算出【aとbとcを足す。】
                 「合計」は、利用可能。
             】
             甲は、さらに、型であって、【
-                初期化は、さらに、【入力がa「数値」とb「数値」、aとbと1で、自身の初期化をする。】
+                初期化は、さらに、【入力がa「数値と」とb「数値で」、cは1。aとbとcで、自身の初期化をする。】
             】
         """
         let testPatterns: [(input: String, expected: Int)] = [
-            ("乙は、1と2と3で、甲から生成する。乙の合計", 6),
-            ("空にする。乙は、1と2で、甲から生成する。乙の合計", 4),
-            ("空にする。乙は、1で、甲から生成する。乙の合計", 4),
+            ("aは1。bは2。cは3。乙は、aとbとcで、甲から生成する。乙の合計", 6),
+            ("空にする。aは1。bは2。乙は、aとbで、甲から生成する。乙の合計", 4),
+            ("空にする。aは1。乙は、aで、甲から生成する。乙の合計", 4),
         ]
         print("テストパターン: \(input)")
         let environment = Environment()

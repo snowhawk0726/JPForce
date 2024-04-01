@@ -122,7 +122,8 @@ extension PredicateOperable {
     }
     func initialize(_ instance: JpfInstance, with environment: Environment) -> JpfObject? {
         guard let type = environment[instance.type] as? JpfType else {return cannotInitialize}
-        if let result = environment.execute(type.initializers, with: instance.environment),
+        if !type.initializers.isEmpty,
+           let result = environment.execute(type.initializers, with: instance.environment),
            result.isError {return result}
         return nil
     }
@@ -528,9 +529,6 @@ struct ExecuteOperator : PredicateOperable {
         case let function as JpfFunction:   // 関数を実行する
             environment.drop()
             return function.executed(with: environment)
-        case let overload as JpfArray:      // 多重定義を実行する
-            environment.drop()
-            return overload.executed(with: environment)
         case var filename as JpfString:     // ファイルを実行(解析・評価)する
             if filename.value == Token.Keyword.FILE.rawValue,
                let object = environment[filename.value] as? JpfString {   // ファイル「ファイル名」
@@ -568,11 +566,6 @@ struct PerformOperator : PredicateOperable {
         if let function = environment.unwrappedPeek as? JpfFunction {
             environment.drop()
             return function.executed(with: environment)
-        } else
-        if let overload = environment.unwrappedPeek as? JpfArray,
-           overload.elements.first is JpfFunction {
-            environment.drop()
-            return overload.executed(with: environment)
         }
         return environment.unwrapPhrase()
     }
