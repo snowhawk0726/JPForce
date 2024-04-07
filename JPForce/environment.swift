@@ -121,27 +121,39 @@ class Environment {
     /// 多重定義の処理ブロックから、引数形式が一致するものを抽出し、処理を行う。
     /// - Parameters:
     ///   - functions: 処理ブロック(【入力が〜、本体が〜。】)
-    ///   - local: 処理を行う環境 (selfは入力環境)
+    ///   - local: 関数処理を行う環境 (selfは入力環境)
     /// - Returns: 処理結果、エラー、nil
-    func execute(_ functions: [FunctionBlock], with local: Environment) -> JpfObject? {
-        for function in functions.reversed() {              // 多重定義
-            let designated = function.signature
-            let names = function.parameters.map {$0.value}
-            if hasParameters(to: designated, with: names) { // 引数が一致する入力を処理
-                if local.apply(function.parameters, with: designated, from: self) {
-                    defer {push(local.pullAll())}           // スタックを戻す
-                    if let body = function.body, let result = Evaluator(from: body, with: local).object {
-                        if result.isError {return result}
-                        if result.isReturnValue {return result.value!}
+    func execute(_ functions: FunctionBlocks, with local: Environment) -> JpfObject? {
+        for n in stride(from: count, through: -1, by: -1) {     // スタック上の引数の数毎
+            for function in functions[n].reversed() {           // 引数の数に応じた多重定義毎
+                let designated = function.signature
+                if hasParameters(to: designated, number: n) {   // 引数が一致する入力を処理
+                    if local.apply(function.parameters, with: designated, from: self) {
+                        return execute(function, with: local)
                     }
-                    return nil
                 }
             }
         }
+        if functions[0].count > 0 {
+            return execute(functions[0].last!, with: local)    // 入力無しの最新の関数実行
+        }
         if functions.count == 1 {   // 単体の定義の場合、エラーメッセージを作成する
-            return errorMessage(to: functions.first!)
+            return errorMessage(to: functions.array.last!)
         }
         return noMatchingSignature
+    }
+    /// 関数のローカル環境で、関数を実行する。
+    /// - Parameters:
+    ///   - function: 実行する関数ブロック
+    ///   - local: 関数のローカル環境
+    /// - Returns: 返り値(無いときはnil)、またはエラー
+    private func execute(_ function: FunctionBlock, with local: Environment) -> JpfObject? {
+        defer {push(local.pullAll())}           // スタックを戻す
+        if let body = function.body, let result = Evaluator(from: body, with: local).object {
+            if result.isError {return result}
+            if result.isReturnValue {return result.value!}
+        }
+        return nil
     }
     /// 外部のスタック上の引数(オブジェクト)の形式チェックを行い値を取り出し、各識別子に引き当て、内部の辞書に登録する。
     /// - Parameters
@@ -149,8 +161,9 @@ class Environment {
     ///   - designated: チェックをする入力形式
     ///   - outer:  引数を格納しているスタックを含む環境
     /// - Returns: 引数がパラメータおよび指定形式に合わない場合は、falseを返す。
-    func apply(_ parameters: [Identifier], with designated: InputFormat, from outer: Environment) -> Bool {
-        if designated.numberOfInputs == nil {   // 可変長入力
+    private func apply(_ parameters: [Identifier], with designated: InputFormat, from outer: Environment) -> Bool {
+        switch designated.numberOfInputs {
+        case nil:                               // 可変長入力
             for (p, f) in zip(parameters.reversed(), designated.formats.reversed()) {
                 if f.particle.hasSuffix("…") {  // 連続する同じ格の句→配列
                     guard let array = getArray(from: outer, with: f) else {return false}
@@ -159,8 +172,10 @@ class Environment {
                     store[p.value] = outer.pull()?.value ?? JpfNull.object
                 }
             }
-        } else {                                // 固定(指定)長入力
-            guard let values = getValues(from: outer.peek(parameters.count)!, with: designated.formats) else {return false}
+        case 0:                                 // 入力無し
+            break
+        default:                                // 固定(指定)長入力
+            let values = getValues(from: outer.peek(parameters.count)!, with: designated.formats)
             zip(parameters, values).forEach {store[$0.value] = $1}
             outer.drop(parameters.count)
         }
@@ -178,7 +193,7 @@ class Environment {
         return JpfArray(elements: array.reversed())
     }
     /// 入力を指定形式でチェックし、一致すれば値を取り出して返す
-    private func getValues(from objects: [JpfObject], with formats: [(type: String, particle: String)]) -> [JpfObject]? {
+    private func getValues(from objects: [JpfObject], with formats: [(type: String, particle: String)]) -> [JpfObject] {
         var values: [JpfObject] = []
         for object in objects {
             values.append(object.value ?? JpfNull.object)
@@ -186,26 +201,26 @@ class Environment {
         return values
     }
     /// スタック上の引数(オブジェクト)と指定された形式が一致するかをチェックする。
-    /// - Returns: 一致(true)または、不一致(false)、チェック不要(true)
     /// - Parameters:
     ///   - signature: 指定された形式(引数の数および型と格)
-    ///   - names: 引数の識別子
-    func hasParameters(to signature: InputFormat, with names: [String]) -> Bool {
-        if let number = signature.numberOfInputs {          // 固定長引数
-            if number == 0 {return true}                    // 確認する形式が無い
-            guard number <= count, let params = peek(number) else {return false}
-            for (param, format, name) in zip(params, signature.formats, names) {
-                if !isSameName(of: param, as: name) ||
-                    !isSameType(of: param, as: format.type) ||
-                    !isSameParticle(of: param, as: format.particle) {
-                    return false                            // 識別子と、引数(型と格)が一致しない
-                }
-            }
-            return true
-        } else {                                            // 可変長引数
+    ///   - number:    引数の数
+    /// - Returns: true: 一致、false: 不一致、または引数無し
+    func hasParameters(to signature: InputFormat, number: Int) -> Bool {
+        switch number {
+        case -1:                                    // 可変長引数
             for format in signature.formats {
                 if contains(format) {return true}
             }
+        case 0:                                     // 引数無し
+            return false
+        default:                                    // 固定長引数
+            for (param, format) in zip(peek(number)!, signature.formats) {
+                if !isSameType(of: param, as: format.type) ||
+                    !isSameParticle(of: param, as: format.particle) {
+                    return false                    // 引数(型と格)が一致しない
+                }
+            }
+            return true                             // 全ての引数が一致
         }
         return false
     }
@@ -230,7 +245,7 @@ class Environment {
     func isSameName(of object: JpfObject, as name: String) -> Bool {
         return object.value?.name.isEmpty ?? true || object.value?.name == name
     }
-    func errorMessage(to function: FunctionBlock) -> JpfError? {
+    private func errorMessage(to function: FunctionBlock) -> JpfError? {
         let numberOfParameters = function.parameters.count
         if let numberOfInputs = function.signature.numberOfInputs { // 固定長入力指定
             guard numberOfInputs == numberOfParameters && self.count >= numberOfParameters else {return InputFormatError.numberOfParameters(numberOfParameters).message}
@@ -300,25 +315,4 @@ class Environment {
         }
     }
     let noMatchingSignature = JpfError("入力形式が一致する関数が見つからなかった。")
-}
-
-/// zip(_:_:_:)
-/// by [Qiita]<https://qiita.com/s2mr/items/024cc33e3bd1add3ad4b>
-/// 2024/3/30
-func zip<A: Sequence, B: Sequence, C: Sequence>(_ a: A, _ b: B, _ c: C) -> Zip3Sequence<A, B, C> {
-    Zip3Sequence(a, b, c)
-}
-struct Zip3Sequence<A: Sequence, B: Sequence, C: Sequence>: Sequence, IteratorProtocol {
-    private var a: A.Iterator
-    private var b: B.Iterator
-    private var c: C.Iterator
-    init(_ a: A, _ b: B, _ c: C) {
-        self.a = a.makeIterator()
-        self.b = b.makeIterator()
-        self.c = c.makeIterator()
-    }
-    mutating func next() -> (A.Element, B.Element, C.Element)? {
-        guard let a = a.next(), let b = b.next(), let c = c.next() else {return nil}
-        return (a, b, c)
-    }
 }

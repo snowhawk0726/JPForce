@@ -38,7 +38,7 @@ struct DefineStatement : Statement {
     var token: Token                // とは、は、
     var name: Identifier            // 識別子
     var value: ExpressionStatement  // 値(複数の式)
-    var isExtended: Bool = false    // 拡張識別
+    var isExtended: Bool = false    // 拡張(多重)識別
     //
     var tokenLiteral: String {token.literal}
     var string: String {name.string + tokenLiteral + "、" +
@@ -210,23 +210,23 @@ struct LoopExpression : Expression {
 }
 struct FunctionLiteral : Expression {
     var token: Token                // 関数トークン
-    var functions: [FunctionBlock]  // 関数部
+    var functions: FunctionBlocks   // 関数部
     //
     var tokenLiteral: String {token.literal}
     var string: String {
-        functions.reduce("") {$0 + ($1.isExtended ? "さらに、" : "") + "\(token.coloredLiteral)であって、【\($1.string)】。"}
+        functions.array.reduce("") {$0 + ($1.isOverloaded ? "さらに、" : "") + "\(token.coloredLiteral)であって、【\($1.string)】。"}
     }
 }
 struct ComputationLiteral : Expression {
     var token: Token                // 算出トークン
-    var setters: [FunctionBlock]    // 設定ブロック
-    var getters: [FunctionBlock]    // 取得ブロック
+    var setters: FunctionBlocks     // 設定ブロック
+    var getters: FunctionBlocks     // 取得ブロック
     //
     var tokenLiteral: String {token.literal}
     var string: String {
         token.coloredLiteral + "であって、【" +
-        (setters.reduce("") {$0 + "設定は、\($1.isExtended ? "さらに、" : "")【\($1.string)】。"}) +
-        (getters.reduce("") {$0 + "取得は、\($1.isExtended ? "さらに、" : "")【\($1.string)】。"}) +
+        (setters.array.reduce("") {$0 + "設定は、\($1.isOverloaded ? "さらに、" : "")【\($1.string)】。"}) +
+        (getters.array.reduce("") {$0 + "取得は、\($1.isOverloaded ? "さらに、" : "")【\($1.string)】。"}) +
         "】"
     }
 }
@@ -257,7 +257,7 @@ struct TypeLiteral : Expression {
     var token: Token                // 型トークン
     var protocols: [String]         // 準拠する規約
     var typeMembers: BlockStatement?// 型の要素
-    var initializers: [FunctionBlock] // 初期化処理
+    var initializers: FunctionBlocks// 初期化処理
     var body: BlockStatement?       // インスタンスのメンバー
     //
     var tokenLiteral: String {token.literal}
@@ -265,7 +265,7 @@ struct TypeLiteral : Expression {
         var s = token.coloredLiteral + "であって、【" +
         (protocols.isEmpty ? "" : "準拠する規約は、\(protocols.map {$0}.joined(separator: "と、"))であり、") +
         (typeMembers.map {"型の要素が、\($0.string)であり、"} ?? "") +
-        (initializers.reduce("") {$0 + "初期化は、\($1.isExtended ? "さらに、" : "")【\($1.string)】。"}) +
+        (initializers.array.reduce("") {$0 + "初期化は、\($1.isOverloaded ? "さらに、" : "")【\($1.string)】。"}) +
         (body.map {"本体が、\($0.string)"} ?? "") +
         "】"
         s.range(of: "さらに、").map {s.replaceSubrange($0, with: "")}   // 初出の「さらに、」を取り除く
@@ -281,10 +281,77 @@ struct FunctionBlock {
     var parameters: [Identifier]    // 入力パラメータ
     var signature: InputFormat      // 入力形式
     var body: BlockStatement?       // 処理本体
-    var isExtended: Bool = false    // 拡張識別
+    var isOverloaded: Bool = false  // 多重識別
     var string: String {
         (parameters.isEmpty ? "" : "入力が、\(zip(parameters, signature.strings).map {$0.string + $1}.joined(separator: "と"))であり、") +
         (body.map {"本体が、\($0.string)"} ?? "")
+    }
+    var overloaded: Self {
+        FunctionBlock(parameters: self.parameters, signature: self.signature, body: self.body, isOverloaded: true)
+    }
+}
+/// 必要入力数ごとの関数ブロック配列(多重定義)
+struct FunctionBlocks : Collection {
+    var dictionary: [Int : [FunctionBlock]] = [:]
+    var array: [FunctionBlock] = []
+    //
+    init() {}
+    /// 関数定義で初期化
+    init(_ functionBlock: FunctionBlock) {_ = self.append(functionBlock)}
+    // Collection protocolに準拠
+    typealias Index = Dictionary<Int, [FunctionBlock]>.Index
+    var startIndex: Index {dictionary.startIndex}
+    var endIndex: Index {dictionary.endIndex}
+    func index(after i: Index) -> Index {dictionary.index(after: i)}
+    subscript(position: Index) -> Slice<FunctionBlocks> {self[position..<index(after: position)]}
+    //
+    /// 必要入力数毎の多重定義配列を返す。(無い場合は空)
+    subscript(index: Int) -> [FunctionBlock] {dictionary[index] ?? []}
+    /// 関数定義を多重定義(自身)に追加する。
+    /// - Parameter functionBlock: 追加する関数ブロック (isOverloaded==falseならば上書き)
+    /// - Returns: 追加した自身を返す
+    mutating func append(_ functionBlock: FunctionBlock) -> Self {
+        numberOfInputs(of: functionBlock).forEach {
+            if dictionary[$0] != nil && functionBlock.isOverloaded {
+                dictionary[$0]!.append(functionBlock)
+            } else {
+                dictionary[$0] = [functionBlock]
+            }
+        }
+        if array.isEmpty || functionBlock.isOverloaded {array.append(functionBlock)}
+        return self
+    }
+    /// 多重定義を多重定義(自身)に追加する。
+    /// - Parameter functionBlocks: 追加する多重定義 (hasRedefineならば上書き)
+    /// - Returns: 追加した自身を返す
+    mutating func append(_ functionBlocks: FunctionBlocks) -> Self {
+        functionBlocks.dictionary.keys.forEach {
+            if dictionary[$0] != nil && !functionBlocks.hasRedefine {
+                dictionary[$0]! += functionBlocks[$0]
+            } else {
+                dictionary[$0] = functionBlocks[$0]
+            }
+        }
+        if array.isEmpty || functionBlocks.hasRedefine {
+            array = functionBlocks.array
+        } else {
+            array += functionBlocks.array
+        }
+        return self
+    }
+    var overloaded: Self {
+        var functionBlocks = FunctionBlocks()
+        self.array.forEach {_ = functionBlocks.append($0.overloaded)}
+        return functionBlocks
+    }
+    /// 再定義している(多重定義でない関数ブロックが含まれる)
+    var hasRedefine: Bool {self.array.contains {$0.isOverloaded == false}}
+    /// 既定値を考慮して、入力数のバリエーションを算出する。
+    /// - Parameter functionBlock: 対象の関数ブロック
+    /// - Returns: 取り得る入力数のバリエーション(可変長の場合、[-1]）
+    private func numberOfInputs(of functionBlock: FunctionBlock) -> [Int] {
+        let number = functionBlock.signature.numberOfInputs ?? -1
+        return [number]  /* とりあえず、既定値は無い前提 */
     }
 }
 struct ArrayLiteral : Expression {
@@ -322,26 +389,26 @@ struct EnumLiteral : Expression {
     }
 }
 //
-func conform(to protocols: [JpfProtocol], with environment: Environment, onType: Bool = false) -> JpfObject? {
+func conform(to protocols: [JpfProtocol], with environment: Environment, aboutType: Bool = false) -> JpfObject? {
     for p in protocols {
-        if let result = conform(to: p.clauses, with: environment, onType: onType), result.isError {return result}  // 準拠エラー
+        if let result = conform(to: p.clauses, with: environment, aboutType: aboutType), result.isError {return result}  // 準拠エラー
     }
     return nil
 }
-func conform(to protocols: [String], with environment: Environment, onType: Bool = false) -> JpfObject? {
+func conform(to protocols: [String], with environment: Environment, aboutType: Bool = false) -> JpfObject? {
     for s in protocols {
         guard let p = environment[s] as? JpfProtocol else {return designatedObjectNotFound}
-        if let result = conform(to: p.clauses, with: environment, onType: onType), result.isError {return result}  // 準拠エラー
+        if let result = conform(to: p.clauses, with: environment, aboutType: aboutType), result.isError {return result}  // 準拠エラー
     }
     return nil
 }
-private func conform(to clauses: [ClauseLiteral], with environment: Environment, onType: Bool = false) -> JpfObject? {
+private func conform(to clauses: [ClauseLiteral], with environment: Environment, aboutType: Bool = false) -> JpfObject? {
     for clause in clauses {
-        if onType != clause.isTypeMember {continue}
+        if aboutType != clause.isTypeMember {continue}
         guard let target = environment[clause.identifier.value] else {return designatedObjectNotFound + "指定値：\(clause.identifier.value)(\(clause.type))"}  // 対象のオブジェクト
         guard clause.type == target.type else {return designatedTypeNotMatch + "(指定型：\(clause.type)"}
         if let function = target as? JpfFunction {  // メンバー関数パラメタチェック
-            guard let fb = function.functions.first else {return functionDefineError}
+            guard let fb = function.functions.array.first else {return functionDefineError}
             guard clause.parameters.count == fb.parameters.count else {return numberOfParamsNotMatch + "(指定数：\(clause.parameters.count)"}
             for pairs in zip(clause.parameters, fb.parameters) {
                 guard pairs.0.value == pairs.1.value else {return nameOfParamsNotMatch + "(指定値：\(pairs.0.value)"}

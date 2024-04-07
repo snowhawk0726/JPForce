@@ -164,11 +164,11 @@ struct JpfReturnValue : JpfObject {
 struct JpfFunction : JpfObject {
     static let type = "関数"
     var name: String = ""
-    var functions: [FunctionBlock]  // 関数ブロック
+    var functions: FunctionBlocks   // 関数ブロック
     var environment: Environment
     var string: String {
-        let s = functions.reduce("") {$0 +
-            "\($1.isExtended ? "さらに、" : "")\(type.color(.magenta))であって、【\($1.string)】。"
+        let s = functions.array.reduce("") {$0 +
+            "\($1.isOverloaded ? "さらに、" : "")\(type.color(.magenta))であって、【\($1.string)】。"
         }
         return s.replacingOccurrences(of: "。】", with: "】")
     }
@@ -176,13 +176,13 @@ struct JpfFunction : JpfObject {
 struct JpfComputation : JpfObject {
     static let type = "算出"
     var name: String = ""
-    var setters: [FunctionBlock]    // 設定ブロック
-    var getters: [FunctionBlock]    // 取得ブロック
+    var setters: FunctionBlocks     // 設定ブロック
+    var getters: FunctionBlocks     // 取得ブロック
     var environment: Environment
     var string: String {
         let s = type.color(.magenta) + "であって、【" +
-        (setters.reduce("") {$0 + "設定は、\($1.isExtended ? "さらに、" : "")【\($1.string)】。"}) +
-        (getters.reduce("") {$0 + "取得は、\($1.isExtended ? "さらに、" : "")【\($1.string)】。"}) +
+        (setters.array.reduce("") {$0 + "設定は、\($1.isOverloaded ? "さらに、" : "")【\($1.string)】。"}) +
+        (getters.array.reduce("") {$0 + "取得は、\($1.isOverloaded ? "さらに、" : "")【\($1.string)】。"}) +
         "】"
         return s.replacingOccurrences(of: "。】", with: "】")
     }
@@ -213,7 +213,7 @@ struct JpfEnumerator : JpfObject {
 struct JpfType : JpfObject {
     static let type = "型"
     var name: String = ""
-    var initializers: [FunctionBlock] // 初期化処理
+    var initializers: FunctionBlocks// 初期化処理
     var environment: Environment    // 要素(メンバー)を含む環境
     var protocols: [String]         // 準拠する規約
     var body: BlockStatement?
@@ -221,7 +221,7 @@ struct JpfType : JpfObject {
         var s = type.color(.magenta) + "であって、【" +
         (protocols.isEmpty ? "" : "準拠する規約は、\(protocols.map {$0}.joined(separator: "と、"))。") +
         (environment.enumerated.isEmpty ? "" : "型の要素が、\(environment.enumerated.map {$0.key}.joined(separator: "と、"))。") +
-        (initializers.reduce("") {$0 + "初期化は、さらに、【\($1.string)】。"}) +
+        (initializers.array.reduce("") {$0 + "初期化は、さらに、【\($1.string)】。"}) +
         (body.map {"本体が、\($0.string)"} ?? "") +
         "】"
         s.range(of: "さらに、").map {s.replaceSubrange($0, with: "")}   // 初出の「さらに、」を取り除く

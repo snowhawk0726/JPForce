@@ -384,7 +384,7 @@ extension Parsable {
     }
     /// 関数部：入力が(は)、〜。本体が、〜。
     /// - Returns: 関数ブロック、もしくはエラー
-    func parseFunctionBlock(in typename: String, isExtended: Bool = false) -> Result<FunctionBlock, Error> {
+    func parseFunctionBlock(in typename: String, isOverloaded: Bool = false) -> Result<FunctionBlock, Error> {
         let endSymbol: Token.Symbol = getNext(whenNextIs: .LBBRACKET) ? .RBBRACKET : .EOL
         // Prameter block
         guard let (identifiers, signature) = parseParameterBlock(in: typename) else {return .failure(ParameterParseError())}
@@ -397,21 +397,21 @@ extension Parsable {
             parameters: identifiers,
             signature: signature,
             body: !block.statements.isEmpty ? block : nil,
-            isExtended: isExtended
+            isOverloaded: isOverloaded
         ))
     }
-    func parseFunctionBlocks(of name: String, in typename: String) -> Result<([FunctionBlock]), Error> {
-        var functionBlocks: [FunctionBlock] = []
+    func parseFunctionBlocks(of name: String, in typename: String) -> Result<FunctionBlocks, Error> {
+        var functionBlocks = FunctionBlocks()
         while getNext(whenNextIs: name) {
             _ = getNext(whenNextIs: ExpressionStatement.ga + ExpressionStatement.wa, matchAll: false)
             _ = getNext(whenNextIs: .COMMA)
-            let isExtended = getNext(whenNextIs: DefineStatement.further)
+            let isOverloaded = getNext(whenNextIs: DefineStatement.further)
             _ = getNext(whenNextIs: .COMMA)
 
             //
-            switch parseFunctionBlock(in: typename, isExtended: isExtended) {
+            switch parseFunctionBlock(in: typename, isOverloaded: isOverloaded) {
             case .success(let function):
-                functionBlocks.append(function)
+                _ = functionBlocks.append(function)
             case .failure(let error):
                 return .failure(error)
             }
@@ -683,7 +683,7 @@ struct FunctionLiteralParser : ExpressionParsable {
         let token = parseHeader()
         switch parseFunctionBlock(in: token.literal) {
         case .success(let function):
-            return FunctionLiteral(token: token, functions: [function])
+            return FunctionLiteral(token: token, functions: FunctionBlocks(function))
         case .failure(_):
             return nil
         }
@@ -697,7 +697,7 @@ struct ComputationLiteralParser : ExpressionParsable {
         let endOfType: Token.Symbol = getNext(whenNextIs: .LBBRACKET) ? .RBBRACKET : .EOL
         // Setter block
         skipNextEols(suppress: endOfType == .EOL)
-        var setters: [FunctionBlock] = []
+        var setters = FunctionBlocks()
         switch parseFunctionBlocks(of: ExpressionStatement.settei, in: token.literal) {
         case .success(let blocks):
             setters = blocks
@@ -706,7 +706,7 @@ struct ComputationLiteralParser : ExpressionParsable {
             return nil
         }
         // Getter block
-        var getters: [FunctionBlock] = []
+        var getters = FunctionBlocks()
         if !isEndOfBlock(of: endOfType) {
             switch parseFunctionBlocks(of: ExpressionStatement.syutoku, in: token.literal) {
             case .success(let blocks):
@@ -721,7 +721,9 @@ struct ComputationLiteralParser : ExpressionParsable {
                     error(message: "算出で、「取得が、〜」の解析に失敗した。")
                     return nil
                 }
-                getters = [FunctionBlock(parameters: identifiers, signature: signature, body: body)]
+                getters = FunctionBlocks(
+                    FunctionBlock(parameters: identifiers, signature: signature, body: body)
+                )
                 _ = getNext(whenNextIs: .PERIOD)    // 取得ブロックの句点を飛ばす。
                 skipNextEols(suppress: endOfType == .EOL)
             } else {
@@ -811,7 +813,7 @@ struct TypeLiteralParser : ExpressionParsable {
             return nil
         }
         // Initializers block
-        var initializers: [FunctionBlock]
+        var initializers: FunctionBlocks
         switch parseFunctionBlocks(of: ExpressionStatement.syokika, in: token.literal) {
         case .success(let inits):
             initializers = inits

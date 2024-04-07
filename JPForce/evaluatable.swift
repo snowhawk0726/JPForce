@@ -105,11 +105,15 @@ extension DefineStatement : Evaluatable {
             guard let function = object as? JpfFunction else {return functionOverloadError}
             return JpfFunction(
                 name: original.name,
-                functions: overload(original.functions, with: function.functions),
+                functions: overload(original.functions, with: function.functions.overloaded),
                 environment: environment
             )
         case let original as JpfComputation:    // 算出の多重定義
-            guard let computation = object as? JpfComputation else {return computationOverloadError}
+            guard var computation = object as? JpfComputation else {return computationOverloadError}
+            if computation.getters.array.count == 1 && computation.setters.isEmpty {
+                // 算出定義内に取得が唯一 → <識別子>は、さらに、算出【取得は、さらに、【…】】
+                computation.getters = computation.getters.overloaded
+            }
             return JpfComputation(
                 name: original.name,
                 setters: overload(original.setters, with: computation.setters),
@@ -159,17 +163,9 @@ extension DefineStatement : Evaluatable {
         }
         return extended
     }
-    private func overload(_ original: [FunctionBlock], with definition: [FunctionBlock]) -> [FunctionBlock] {
+    private func overload(_ original: FunctionBlocks, with definition: FunctionBlocks) -> FunctionBlocks {
         var overloaded = original
-        definition.forEach {    // 拡張識別をtrueにして、元のブロックに追加
-            overloaded.append(FunctionBlock(
-                parameters: $0.parameters,
-                signature: $0.signature,
-                body: $0.body,
-                isExtended: true
-            ))
-        }
-        return overloaded
+        return overloaded.append(definition)
     }
 }
 // MARK: Expression evaluators
@@ -580,12 +576,8 @@ extension TypeLiteral : Evaluatable {
             let local = Environment(outer: environment)
             if let members = typeMembers,
                let result = Evaluator(from: members, with: local).object, result.isError {return result}
-            var inits: [FunctionBlock] = []
-            for i in initializers { // 「さらに、」ならばオーバーロード。無ければ、上書き
-                if i.isExtended {inits.append(i)} else {inits = [i]}
-            }
-            if let result = conform(to: all, with: local, onType: true), result.isError {return result}
-            return JpfType(initializers: inits, environment: local, protocols: all, body: body)
+            if let result = conform(to: all, with: local, aboutType: true), result.isError {return result}
+            return JpfType(initializers: initializers, environment: local, protocols: all, body: body)
         case .failure(let error):
             return error.message
         }

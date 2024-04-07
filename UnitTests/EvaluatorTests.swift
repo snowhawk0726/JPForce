@@ -176,7 +176,7 @@ final class EvaluatorTests: XCTestCase {
         let input = "関数であって、【入力がxであり、本体が、xに2を足す】。"
         print("テストパターン: \(input)")
         let function = try XCTUnwrap(testEvaluator(input) as? JpfFunction)
-        let functionBlock = try XCTUnwrap(function.functions.first)
+        let functionBlock = try XCTUnwrap(function.functions.array.first)
         XCTAssertEqual(functionBlock.parameters.count, 1)
         XCTAssertEqual(functionBlock.parameters.first?.string, "x")
         XCTAssertEqual(functionBlock.body?.string, "xに2を足す。")
@@ -190,10 +190,10 @@ final class EvaluatorTests: XCTestCase {
             ("加えるとは、算出【入力がxとy、xとyを足す】こと。5に5を加える。", 10),
             ("加えるは、算出【入力がxとy、xとyを足す】こと。5と5を足したものに、5に5を加えたものを、加える。", 20),
             ("5で関数【入力がx、x】を実行する。", 5),
-            ("加算は、関数【入力がaとb、aにbを足す】。適用は、関数【入力がaとbと演算、aとbを演算する】。演算は加算。2と2に、演算を適用する。", 4),
-            ("減算は、関数【入力がaとb、aからbを引く】。適用は、関数【入力がaとbと演算、aとbを演算する】。演算は減算。10と2に、演算を適用する。", 8),
+            ("加算は、関数【入力がaとb、aにbを足す】。適用は、関数【入力がaとbと演算、aとbを演算する】。2と2に、加算を適用する。", 4),
+            ("減算は、関数【入力がaとb、aからbを引く】。適用は、関数【入力がaとbと演算、aとbを演算する】。10と2に、減算を適用する。", 8),
             ("正しいは、算出【入力がa、aが真である】。4が5より大きいは、正しくない。", true),
-            ("『割った余り』は、関数【入力がxとy、xをyで割り、yを掛け、xから引いたものを返す】。23を11で『割った余り』は1である。", true),
+            ("『割った余り』は、関数【入力がxとy、xをyで割り、yを掛け、xから引いたものを返す】。23を11で割った余りは1である。", true),
             ("加算は、関数【入力がa「数値に」とb「数値を」、aにbを足し、返す】。1に2を加算する。", 3),
             ("加算は、関数【入力がa「数値」とb「数値」、aにbを足し、返す】。1と2の加算する。", 3),
             ("加算は、関数【入力がa「数値に」とb「数値を」、aにbを足し、返す】。「a」に「b」を加算する。", "入力の型が異なる。入力の型：文字列"),
@@ -234,48 +234,75 @@ final class EvaluatorTests: XCTestCase {
             print("テストパターン: \(test.input)")
             let parser = Parser(Lexer(test.input))
             let eval = Evaluator(from: parser.parseProgram()!, with: environment)
-            let result = eval.object ?? environment.pull()!
+            let result = try XCTUnwrap(eval.object ?? environment.pull())
             try testObject(result, with: test.expected)
             print("テスト結果(\(result.string))")
         }
         print("テスト終了")
     }
-    func testOverloadObject() throws {
+    func testOverloadedFunction() throws {
         let input = "加算は、さらに、関数【入力がa「数値に」とb「数値を」、aにbを足す】。加算。"
         print("テストパターン: \(input)")
         let function = try XCTUnwrap(testEvaluator(input) as? JpfFunction)
-        let functionBlock = try XCTUnwrap(function.functions.first)
+        let functionBlock = try XCTUnwrap(function.functions.array.first)
         XCTAssertEqual(functionBlock.parameters.count, 2)
         XCTAssertEqual(functionBlock.parameters[0].string, "a")
         XCTAssertEqual(functionBlock.parameters[1].string, "b")
         XCTAssertEqual(functionBlock.body?.string, "aにbを足す。")
-        XCTAssertFalse(functionBlock.isExtended)
+        XCTAssertFalse(functionBlock.isOverloaded)
         print("テスト(\(function.string))終了")
     }
-    func testOverloadObjects() throws {
+    func testOverloadedComputation() throws {
         let input = """
-            加算は、関数【入力がa「数値」とb「数値」、aにbを足し、返す】。
-            加算は、さらに、関数【入力がa「数値に」とb「数値を」、aにbを足し、返す】。
-            加算は、さらに、関数【入力がa「文字列」とb「文字列」、aにbを足し、返す】。
-            加算。
+            加えるは、算出【入力がa「数値」とb「数値」、aにbを足し、返す】。
+            加えるは、さらに、算出【入力がa「数値に」とb「数値を」、aにbを足し、返す】。
+            加えるは、さらに、算出【入力がa「文字列」とb「文字列」、aにbを足し、返す】。
+            識別子『加える』。
         """
         print("テストパターン: \(input)")
-        let function = try XCTUnwrap(testEvaluator(input) as? JpfFunction)
-        let functionBlocks = function.functions
+        let computation = try XCTUnwrap(testEvaluatorWithLabel(input) as? JpfComputation)
+        XCTAssertTrue(computation.getters.hasRedefine)
+        XCTAssertTrue(computation.setters.isEmpty)
+        let functionBlocks = computation.getters.array
         XCTAssertEqual(functionBlocks.count, 3)
         XCTAssertEqual(functionBlocks[0].signature.numberOfInputs, 2)
         XCTAssertEqual(functionBlocks[0].signature.strings[0], "「数値」")
         XCTAssertEqual(functionBlocks[0].signature.strings[1], "「数値」")
-        XCTAssertFalse(functionBlocks[0].isExtended)
+        XCTAssertFalse(functionBlocks[0].isOverloaded)
         XCTAssertEqual(functionBlocks[1].signature.numberOfInputs, 2)
         XCTAssertEqual(functionBlocks[1].signature.strings[0], "「数値に」")
         XCTAssertEqual(functionBlocks[1].signature.strings[1], "「数値を」")
-        XCTAssertTrue(functionBlocks[1].isExtended)
+        XCTAssertTrue(functionBlocks[1].isOverloaded)
         XCTAssertEqual(functionBlocks[2].signature.numberOfInputs, 2)
         XCTAssertEqual(functionBlocks[2].signature.strings[0], "「文字列」")
         XCTAssertEqual(functionBlocks[2].signature.strings[1], "「文字列」")
-        XCTAssertTrue(functionBlocks[2].isExtended)
-        print("テスト(\(function.string))終了")
+        XCTAssertTrue(functionBlocks[2].isOverloaded)
+        print("テスト(\(computation.string))終了")
+    }
+    func testRedefinedComputation() throws {
+        let input = """
+            加えるは、算出【取得が【入力がa「数値」とb「数値」、aにbを足し、返す】】。
+            加えるは、さらに、算出【取得が、さらに、【入力がa「数値に」とb「数値を」、aにbを足し、返す】】。
+            加えるは、さらに、算出【
+                取得が、【入力がa「文字列」とb「文字列」、aにbを足し、返す】
+                取得が、さらに、【入力がa「文字列に」とb「文字列を」、aにbを足し、返す】
+            】。
+            識別子『加える』。
+        """
+        print("テストパターン: \(input)")
+        let computation = try XCTUnwrap(testEvaluatorWithLabel(input) as? JpfComputation)
+        let functionBlocks = computation.getters.array
+        XCTAssertEqual(functionBlocks.count, 2)
+        XCTAssertEqual(functionBlocks[0].signature.numberOfInputs, 2)
+        XCTAssertEqual(functionBlocks[0].signature.strings[0], "「文字列」")
+        XCTAssertEqual(functionBlocks[0].signature.strings[1], "「文字列」")
+        XCTAssertFalse(functionBlocks[0].isOverloaded)
+        XCTAssertEqual(functionBlocks.count, 2)
+        XCTAssertEqual(functionBlocks[1].signature.numberOfInputs, 2)
+        XCTAssertEqual(functionBlocks[1].signature.strings[0], "「文字列に」")
+        XCTAssertEqual(functionBlocks[1].signature.strings[1], "「文字列を」")
+        XCTAssertTrue(functionBlocks[1].isOverloaded)
+        print("テスト(\(computation.string))終了")
     }
     func testOverloadExecution() throws {
         let input = """
@@ -305,7 +332,7 @@ final class EvaluatorTests: XCTestCase {
         """
         print("テストパターン: \(input)")
         let type = try XCTUnwrap(testEvaluator(input) as? JpfType)
-        let initializer = try XCTUnwrap(type.initializers.first)
+        let initializer = try XCTUnwrap(type.initializers.array.first)
         XCTAssertEqual(initializer.parameters.count, 0)
         XCTAssertEqual(initializer.signature.numberOfInputs, 0)
         let initialization = try XCTUnwrap(initializer.body?.statements.first as? DefineStatement)
@@ -348,7 +375,7 @@ final class EvaluatorTests: XCTestCase {
             ("黒い車の(利用可能要素)数", 3),
             ("黒い車の燃料量。", 40),
             ("黒い車の色。", "白"),
-            ("自動車を切り替え、自動車のハンドル", "右"),
+            ("自動車を切り替えた自動車のハンドル", "右"),
         ]
         print("テストパターン: \(input)")
         let environment = Environment()
@@ -405,19 +432,19 @@ final class EvaluatorTests: XCTestCase {
     func testTypeInitExtensions() throws {
         let input = """
             甲は、型であって、【
-                初期化は、【入力がa「数値と」とb「数値と」とc「数値で」。】
-                初期化は、さらに、【入力がa「数値で」、bは1。cは2。aとbとcで、自身の初期化をする。】
+                初期化は、【入力がaとbとc。】
+                初期化は、さらに、【入力がa、aと1と2で、自身の初期化をする。】
                 合計は、算出【aとbとcを足す。】
                 「合計」は、利用可能。
             】
             甲は、さらに、型であって、【
-                初期化は、さらに、【入力がa「数値と」とb「数値で」、cは1。aとbとcで、自身の初期化をする。】
+                初期化は、さらに、【入力がaとb、aとbと1で、自身の初期化をする。】
             】
         """
         let testPatterns: [(input: String, expected: Int)] = [
-            ("aは1。bは2。cは3。乙は、aとbとcで、甲から生成する。乙の合計", 6),
-            ("空にする。aは1。bは2。乙は、aとbで、甲から生成する。乙の合計", 4),
-            ("空にする。aは1。乙は、aで、甲から生成する。乙の合計", 4),
+            ("乙は、1と2と3で、甲から生成する。乙の合計", 6),
+            ("空にする。乙は、1と2で、甲から生成する。乙の合計", 4),
+            ("空にする。乙は、1で、甲から生成する。乙の合計", 4),
         ]
         print("テストパターン: \(input)")
         let environment = Environment()
@@ -429,7 +456,7 @@ final class EvaluatorTests: XCTestCase {
             print("テストパターン: \(test.input)")
             let parser = Parser(Lexer(test.input))
             let eval = Evaluator(from: parser.parseProgram()!, with: environment)
-            let expected = eval.object ?? environment.pull()!
+            let expected = try XCTUnwrap(eval.object ?? environment.pull())
             try testObject(expected, with: test.expected)
             print("テスト(\(expected))終了")
         }
@@ -474,7 +501,7 @@ final class EvaluatorTests: XCTestCase {
             print("テストパターン: \(test.input)")
             let parser = Parser(Lexer(test.input))
             let eval = Evaluator(from: parser.parseProgram()!, with: environment)
-            let result = eval.object ?? environment.pull()!
+            let result = try XCTUnwrap(eval.object ?? environment.pull())
             try testObject(result, with: test.expected)
             print("テスト(\(result))終了")
         }
@@ -531,7 +558,7 @@ final class EvaluatorTests: XCTestCase {
             print("テストパターン: \(test.input)")
             let parser = Parser(Lexer(test.input))
             let eval = Evaluator(from: parser.parseProgram()!, with: environment)
-            let result = eval.object ?? environment.pull()!
+            let result = try XCTUnwrap(eval.object ?? environment.pull())
             try testObject(result, with: test.expected)
             print("テスト(\(result))終了")
         }
@@ -1099,7 +1126,7 @@ final class EvaluatorTests: XCTestCase {
             print("テストパターン: \(test.input)")
             let parser = Parser(Lexer(test.input))
             let eval = Evaluator(from: parser.parseProgram()!, with: environment)
-            let expected = eval.object ?? environment.pull()!
+            let expected = try XCTUnwrap(eval.object ?? environment.pull())
             try testObject(expected, with: test.expected)
             print("テスト(\(expected))終了")
         }
@@ -1135,7 +1162,7 @@ final class EvaluatorTests: XCTestCase {
             print("テストパターン: \(test.input)")
             let parser = Parser(Lexer(test.input))
             let eval = Evaluator(from: parser.parseProgram()!, with: environment)
-            let expected = eval.object ?? environment.pull()!
+            let expected = try XCTUnwrap(eval.object ?? environment.pull())
             try testObject(expected, with: test.expected)
             print("テスト(\(expected))終了")
         }
@@ -1175,4 +1202,17 @@ private func testObject(_ object: JpfObject, with exptected: Any?) throws {
     default:
         XCTFail("テスト値の型\(type(of: exptected))は未サポート")
     }
+}
+private func testEvaluatorWithLabel(_ input: String) -> JpfObject? {
+    let lexer = Lexer(input)
+    let parser = Parser(lexer)
+    guard let program = parser.parseProgram(), parser.errors.isEmpty else {
+        parser.errors.forEach {print("Parser errors: \($0)")}
+        return nil
+    }
+    let environment = Environment()
+    let eval = Evaluator(from: program, with: environment)
+    guard let label = (eval.object ?? environment.peek) as? JpfString else {return nil}
+    guard let name = environment[label.value] as? JpfString else {return nil}
+    return environment[name.value]
 }
