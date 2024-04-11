@@ -56,8 +56,11 @@ struct ExpressionStatement : Statement {
     //
     var tokenLiteral: String {token.literal}
     var string: String {
-        let s = expressions.reduce("") {$0 + $1.string} + "。"
+        let s = expressions.reduce("") {$0 + $1.string + ($1 is PredicateExpression ? "、" : "")} + "。"
         return s.replacingOccurrences(of: "。】", with: "】")
+                .replacingOccurrences(of: "、】", with: "】")
+                .replacingOccurrences(of: "、。", with: "。")
+                .replacingOccurrences(of: "、場合", with: "場合")
                 .replacingOccurrences(of: "が。", with: "が、")
     }
     //
@@ -214,7 +217,7 @@ struct FunctionLiteral : Expression {
     //
     var tokenLiteral: String {token.literal}
     var string: String {
-        functions.array.reduce("") {$0 + ($1.isOverloaded ? "さらに、" : "") + "\(token.coloredLiteral)であって、【\($1.string)】。"}
+        functions.array.reduce("") {$0 + ($1.isOverloaded ? "さらに、" : "") + "\(token.coloredLiteral)であって、【\($1.string)】"}
     }
 }
 struct ComputationLiteral : Expression {
@@ -404,7 +407,7 @@ func conform(to protocols: [String], with environment: Environment, aboutType: B
 }
 private func conform(to clauses: [ClauseLiteral], with environment: Environment, aboutType: Bool = false) -> JpfObject? {
     for clause in clauses {
-        if aboutType != clause.isTypeMember {continue}
+        guard aboutType == clause.isTypeMember else {continue}
         guard let target = environment[clause.identifier.value] else {return designatedObjectNotFound + "指定値：\(clause.identifier.value)(\(clause.type))"}  // 対象のオブジェクト
         guard clause.type == target.type else {return designatedTypeNotMatch + "(指定型：\(clause.type)"}
         if let function = target as? JpfFunction {  // メンバー関数パラメタチェック

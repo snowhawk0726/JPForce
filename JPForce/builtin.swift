@@ -87,7 +87,7 @@ extension JpfObject {
     var cannotSortByFunc: String{"「\(type)」を並べ替えることはできない。仕様：<配列>を<関数>で並べ替える。"}
     var cannotSortByOrder: String{"「\(type)」を並べ替えることはできない。仕様：<配列>を(「昇順」に、または「降順」に)並べ替える。"}
     var cannotReverse: String   {"「\(type)」は逆順にすることはできない。仕様：<配列、文字列>を逆順にする。"}
-    var cannotAssign: String    {"「\(type)に代入することはできない。"}
+    var cannotAssign: String    {"「\(type)」に代入することはできない。"}
     var identifierNotAvailable: String  {"(識別子)は利用可能でない。"}
     var arrayPositionError: String      {"指定位置が、配列内に無い。"}
     var identifierNotFound: String      {"指定した識別子名が見つからない。"}

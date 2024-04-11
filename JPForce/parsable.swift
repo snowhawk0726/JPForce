@@ -362,7 +362,6 @@ extension Parsable {
             error(message: "\(type)で、「入力が〜」の解析に失敗した。")
             return nil
         }
-        if currentToken != .symbol(.RBBRACKET) {skipNextEols()}
         return (paramenters.map {$0.0}, parseSignature(from: paramenters.map {$0.1}))
     }
     /// 定義部： <ブロック名>は(が)、【<定義>】
