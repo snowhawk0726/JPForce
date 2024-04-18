@@ -230,6 +230,7 @@ struct JpfType : JpfObject {
 }
 struct JpfInstance : JpfObject {
     static let type = "インスタンス"
+    static let SELF = "自身"
     var type: String = ""
     var name: String = ""
     var environment: Environment    // 要素(メンバー)を含む環境

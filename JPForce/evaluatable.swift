@@ -554,7 +554,7 @@ extension JpfComputation {
     /// 算出(取得)を行う。
     /// - Parameter environment: 実行中の(通常もしくは算出の)環境
     /// - Returns: エラーかアンラップされた返り値、なければnil
-    func retrieved(with environment: Environment) -> JpfObject? {
+    func getter(with environment: Environment) -> JpfObject? {
         guard !getters.isEmpty else {return getterNotFound}
         let local = Environment(outer: self.environment)    // 環境を拡張
         return environment.execute(getters, with: local)
@@ -562,7 +562,7 @@ extension JpfComputation {
     /// 算出(設定)を行う。
     /// - Parameter environment: 実行中の(通常もしくは算出の)環境
     /// - Returns: エラーかアンラップされた返り値、なければnil
-    func setup(with environment: Environment) -> JpfObject? {
+    func setter(with environment: Environment) -> JpfObject? {
         guard !setters.isEmpty else {return setterNotFound}
         let local = Environment(outer: self.environment)    // 環境を拡張
         return environment.execute(setters, with: local)
@@ -576,7 +576,7 @@ extension TypeLiteral : Evaluatable {
             let local = Environment(outer: environment)
             if let members = typeMembers,
                let result = Evaluator(from: members, with: local).object, result.isError {return result}
-            if let result = conform(to: all, with: local, aboutType: true), result.isError {return result}
+            if let result = local.conform(to: all, isTypeMember: true), result.isError {return result}
             return JpfType(initializers: initializers, environment: local, protocols: all, body: body)
         case .failure(let error):
             return error.message

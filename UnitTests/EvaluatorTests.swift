@@ -509,16 +509,16 @@ final class EvaluatorTests: XCTestCase {
     }
     func testProtocolOperation() throws {
         let input = """
-            挨拶ルールは、規約であって、挨拶は「関数」。
-            挨拶ルールは、さらに、型であって、挨拶は関数で、「こんにちは。」。
-            日中挨拶は、型であって、準拠する規約は、挨拶ルール。
-            朝挨拶は、型であって、規約は、挨拶ルール。挨拶は関数【「おはよう。」】。
+            『挨拶の仕方』は、規約であって、挨拶は「関数」。
+            『挨拶の仕方』は、さらに、型であって、挨拶は関数で、「こんにちは。」。
+            『日中の挨拶』は、型であって、準拠する規約は、『挨拶の仕方』。
+            『朝の挨拶』は、型であって、規約は、『挨拶の仕方』。挨拶は関数で、「おはよう。」。
         """
         let testPatterns: [(input: String, expected: Any)] = [
-            ("挨拶ルールの型。", "規約"),
-            ("日中挨拶の型。", "型"),
-            ("日中挨拶を生成し、挨拶する。", "こんにちは。"),
-            ("朝挨拶を生成し、挨拶する。", "おはよう。"),
+            ("『挨拶の仕方』の型。", "規約"),
+            ("『日中の挨拶』の型。", "型"),
+            ("『日中の挨拶』から生成した挨拶をする。", "こんにちは。"),
+            ("『朝の挨拶』から生成した挨拶をする。", "おはよう。"),
         ]
         print("テストパターン: \(input)")
         let environment = Environment()
@@ -536,7 +536,7 @@ final class EvaluatorTests: XCTestCase {
         }
         print("テスト終了")
     }
-    func testProtocolConfomity() throws {
+    func testProtocolConformities() throws {
         let input = """
             甲は、規約であって、己は「数値」。
             乙は、規約であって、準拠する規約が、甲。
@@ -562,6 +562,44 @@ final class EvaluatorTests: XCTestCase {
             try testObject(result, with: test.expected)
             print("テスト(\(result))終了")
         }
+        print("テスト終了")
+    }
+    func testParameterConformity() throws {
+        let input = """
+            <規約>は、規約であって、【
+                <関数>は、関数【入力がa「数値」】
+                <取得>は、算出【入力がb「文字列」】
+                <設定>は、算出【
+                    設定は、【入力がc「配列」】
+                】
+                <算出>は、算出【
+                    設定は、【入力がd「と」】
+                    取得は、【入力がe「で」】
+                】
+            】
+            <型>は、型【
+                準拠する規約が<規約>。
+                本体が、【
+                    <関数>は、関数【入力がa「数値」。aを返す。】
+                    <関数>は、さらに、関数【１を返す。】
+                    <取得>は、算出【入力がb「数値」。bを返す。】
+                    <取得>は、さらに、算出【入力がb「文字列」。bを返す。】
+                    <設定>は、算出【
+                        設定は、【入力がc「配列」。cの最初を返す。】
+                    】
+                    <算出>は、算出【
+                        設定は、【入力がd「と」。dを返す。】
+                        取得は、【入力がe「で」。eを返す。】
+                    】
+                】
+            】
+            <インスタンス>は、<型>から生成する。
+            <インスタンス>。
+        """
+        print("テストパターン: \(input)")
+        let result = try XCTUnwrap(testEvaluator(input))
+        if result.isError {print("テスト失敗：\(result.string)")}
+        print("<インスタンス>は、\(result.string)")
         print("テスト終了")
     }
     func testBuiltinOperations() throws {

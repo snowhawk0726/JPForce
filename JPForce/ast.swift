@@ -248,12 +248,38 @@ struct ProtocolLiteral : Expression {
 struct ClauseLiteral {
     var identifier: Identifier      // 識別子
     var type: String                // 型の文字列
-    var parameters: [Identifier]    // 関数のパラメータ
-    var signature: InputFormat?     // 関数の入力
+    var functionParams: ParameterClauseLiteral?
+    var getterParams: ParameterClauseLiteral?
+    var setterParams: ParameterClauseLiteral?
     var isTypeMember: Bool = false  // 型の要素
     //
-    var string: String {identifier.string + DefineStatement.wa + "、" +
-        ((signature.map {"関数であって、【入力が、\(zip(parameters, $0.strings).map {$0.string + $1}.joined(separator: "と"))】"}) ?? "「\(type)」") + "。"
+    var string: String {identifier.string + DefineStatement.wa + "、" + typeString(type) + "。"}
+    private func typeString(_ type: String) -> String {
+        switch type {
+        case JpfFunction.type:
+            if let string = functionParams?.string {
+                return type + ExpressionStatement.deatte + "【\(string)】"
+            }
+        case JpfComputation.type:
+            let setter = setterParams?.string
+            let getter = getterParams?.string
+            if setter != nil || getter != nil {
+                let string = 
+                    (setter.map {"設定は、【\($0)】。"} ?? "") +
+                    (getter.map {"取得は、【\($0)】。"} ?? "")
+                return type + ExpressionStatement.deatte + "【\(string)】"
+            }
+        default:
+            break
+        }
+        return "「\(type)」"
+    }
+}
+struct ParameterClauseLiteral {
+    var parameters: [Identifier]    // 引数
+    var signature: InputFormat?     // シグネチャ
+    var string: String {
+        signature.map {"入力が、\(zip(parameters, $0.strings).map {$0.string + $1}.joined(separator: "と"))"} ?? ""
     }
 }
 struct TypeLiteral : Expression {
@@ -349,6 +375,26 @@ struct FunctionBlocks : Collection {
     }
     /// 再定義している(多重定義でない関数ブロックが含まれる)
     var hasRedefine: Bool {self.array.contains {$0.isOverloaded == false}}
+    /// 規約の条項の引数部と同じ形式の定義有無
+    /// - Parameter params: 条項の引数部
+    /// - Returns: true: 有る
+    func hasParamaeter(to params: ParameterClauseLiteral) -> Bool {
+        for definition in array.reversed() {
+            guard params.parameters.count == definition.parameters.count else {continue}  // 引数の数
+            for pairs in zip(params.parameters, definition.parameters) {                  // 全識別子名
+                guard pairs.0.value == pairs.1.value else {continue}
+            }
+            if let signature = params.signature {                                       // シグネチャ
+                guard signature.numberOfInputs == definition.signature.numberOfInputs else {continue}
+                for pairs in zip(signature.formats, definition.signature.formats) {
+                    guard pairs.0.type == pairs.1.type &&
+                            pairs.0.particle == pairs.1.particle else {continue}
+                }
+            }
+            return true
+        }
+        return false
+    }
     /// 既定値を考慮して、入力数のバリエーションを算出する。
     /// - Parameter functionBlock: 対象の関数ブロック
     /// - Returns: 取り得る入力数のバリエーション(可変長の場合、[-1]）
@@ -391,47 +437,3 @@ struct EnumLiteral : Expression {
         (elements.isEmpty ? "" : "要素が、\(elements.map {$0.string}.joined(separator: "と、"))".withoutPeriod) + "】"
     }
 }
-//
-func conform(to protocols: [JpfProtocol], with environment: Environment, aboutType: Bool = false) -> JpfObject? {
-    for p in protocols {
-        if let result = conform(to: p.clauses, with: environment, aboutType: aboutType), result.isError {return result}  // 準拠エラー
-    }
-    return nil
-}
-func conform(to protocols: [String], with environment: Environment, aboutType: Bool = false) -> JpfObject? {
-    for s in protocols {
-        guard let p = environment[s] as? JpfProtocol else {return designatedObjectNotFound}
-        if let result = conform(to: p.clauses, with: environment, aboutType: aboutType), result.isError {return result}  // 準拠エラー
-    }
-    return nil
-}
-private func conform(to clauses: [ClauseLiteral], with environment: Environment, aboutType: Bool = false) -> JpfObject? {
-    for clause in clauses {
-        guard aboutType == clause.isTypeMember else {continue}
-        guard let target = environment[clause.identifier.value] else {return designatedObjectNotFound + "指定値：\(clause.identifier.value)(\(clause.type))"}  // 対象のオブジェクト
-        guard clause.type == target.type else {return designatedTypeNotMatch + "(指定型：\(clause.type)"}
-        if let function = target as? JpfFunction {  // メンバー関数パラメタチェック
-            guard let fb = function.functions.array.first else {return functionDefineError}
-            guard clause.parameters.count == fb.parameters.count else {return numberOfParamsNotMatch + "(指定数：\(clause.parameters.count)"}
-            for pairs in zip(clause.parameters, fb.parameters) {
-                guard pairs.0.value == pairs.1.value else {return nameOfParamsNotMatch + "(指定値：\(pairs.0.value)"}
-            }
-            if let result = compareSignature(clause.signature, with: fb.signature), result.isError {return result}
-        }
-    }
-    return nil
-}
-private func compareSignature(_ lhs: InputFormat?, with rhs: InputFormat) -> JpfObject? {
-    guard let left = lhs else {return nil}          // チェックするシグネチャーが無い
-    guard left.numberOfInputs == rhs.numberOfInputs else {return formatOfParamsNotMatch + "(指定入力数：\(left.numberOfInputs.map {"\($0)"} ?? "無し"))"}
-    for pairs in zip(left.formats, rhs.formats) {
-        guard pairs.0.type == pairs.1.type && pairs.0.particle == pairs.1.particle else {return formatOfParamsNotMatch + "(指定形式：「\(pairs.0.type)\(pairs.0.particle)」)"}
-    }
-    return nil
-}
-private var designatedObjectNotFound: JpfError {JpfError("指定した識別子名が見つからない。")}
-private var designatedTypeNotMatch: JpfError{JpfError("指定した型が規約に準拠していない。")}
-private var functionDefineError: JpfError{JpfError("関数の定義が誤っている(多重定義はできない)。")}
-private var numberOfParamsNotMatch: JpfError{JpfError("関数の引数の数が規約に準拠していない。")}
-private var nameOfParamsNotMatch: JpfError  {JpfError("関数の引数の名前が規約に準拠していない。")}
-private var formatOfParamsNotMatch: JpfError{JpfError("関数の引数の形式が規約に準拠していない。")}

@@ -645,7 +645,7 @@ struct CreateOperator : PredicateOperable {
         let local = Environment(outer: self.environment)    // 型の環境を拡張
         defer {environment.push(local.pullAll())}           // スタックを戻す
         var instance = JpfInstance(type: type.name, environment: local, protocols: type.protocols, available: [])
-        local["自身"] = instance                              // selfを仮登録
+        local[JpfInstance.SELF] = instance                  // selfを仮登録
         if let result = initialize(instance, with: environment), result.isError {return result} // 初期化
         var protocols: [JpfProtocol] = []                   // 規約(型)登録
         for ident in type.protocols {
@@ -658,14 +658,14 @@ struct CreateOperator : PredicateOperable {
         }
         if let body = type.body,                            // 定義ブロック
            let result = Evaluator(from: body, with: local).object, result.isError {return result}       // メンバ登録
-        if let result = conform(to: protocols, with: local), result.isError {return result}             // 規約チェック
+        if let result = local.conform(to: protocols), result.isError {return result}             // 規約チェック
         var members = (local.peek as? JpfArray).map {$0.elements.compactMap {$0 as? JpfString}.map {$0.value}} ?? []  // 利用可能なメンバーリスト
         local.drop()
         for p in protocols {    // 規約条項のメンバーリストを利用可能なメンバーリストに追加
             p.clauses.forEach {members.append($0.identifier.value)}
         }
         instance = JpfInstance(type: type.name, environment: local, protocols: type.protocols, available: members)
-        local["自身"] = instance  // selfを本登録
+        local[JpfInstance.SELF] = instance                  // selfを本登録
         return instance
     }
     private func createEnumerator(from type: JpfEnum) -> JpfObject? {

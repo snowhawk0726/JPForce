@@ -51,7 +51,7 @@ extension JpfObject {
         guard let name = target as? JpfString, environment.contains(name.value) else {return JpfError(identifierNotFound + ":\(target.string)")}
         if let computation = environment[name.value] as? JpfComputation {   // 算出の設定を行う
             environment.push(value)                                         // 設定値
-            if let result = computation.setup(with: environment), result.isError {return result}
+            if let result = computation.setter(with: environment), result.isError {return result}
         } else {
             environment[name.value] = value
         }

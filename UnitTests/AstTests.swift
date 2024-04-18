@@ -24,6 +24,6 @@ final class AstTests: XCTestCase {
         )]
         let program = Program(statements: statements)
         XCTAssertEqual(program.string, testPattern.reduce("") {$0 + $1})
-        print("テスト(\(program.string))成功！！")
+        print("テスト(\(program.string))成功")
     }
 }

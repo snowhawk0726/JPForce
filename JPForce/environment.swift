@@ -140,7 +140,7 @@ class Environment {
         if functions.count == 1 {   // 単体の定義の場合、エラーメッセージを作成する
             return errorMessage(to: functions.array.last!)
         }
-        return noMatchingSignature
+        return InputFormatError.noMatchingSignature.message
     }
     /// 関数のローカル環境で、関数を実行する。
     /// - Parameters:
@@ -305,14 +305,118 @@ class Environment {
         case numberOfParameters(Int)
         case type(String)
         case particle(String)
+        case noMatchingSignature
         /// エラーメッセージ
         var message: JpfError {
             switch self {
             case .numberOfParameters(let number):  return JpfError("入力の数が足りていない。必要数：\(number)")
             case .type(let type):                  return JpfError("入力の型が異なる。入力の型：\(type)")
             case .particle(let particle):          return JpfError("入力の格が異なる。入力の格：\(particle)")
+            case .noMatchingSignature:             return JpfError("入力形式が一致する関数が見つからなかった。")
             }
         }
     }
-    let noMatchingSignature = JpfError("入力形式が一致する関数が見つからなかった。")
+    /// 規約(protocols)に違反していたら、エラーを返す。
+    func conform(to protocols: [JpfProtocol], isTypeMember: Bool = false) -> JpfError? {
+        for p in protocols {
+            if let result = conform(to: p.clauses, isTypeMember: isTypeMember), result.isError {return result}  // 準拠エラー
+        }
+        return nil
+    }
+    /// 規約(protocols)に違反していたら、エラーを返す。
+    func conform(to protocols: [String], isTypeMember: Bool = false) -> JpfError? {
+        for s in protocols {
+            guard let p = self[s] as? JpfProtocol else {return ConformityViolation.identifier(s).error}
+            if let result = conform(to: p.clauses, isTypeMember: isTypeMember), result.isError {return result}  // 準拠エラー
+        }
+        return nil
+    }
+    /// 条項(clauses)に違反していたら、エラーを返す。
+    private func conform(to clauses: [ClauseLiteral],  isTypeMember: Bool = false) -> JpfError? {
+        for clause in clauses {
+            guard isTypeMember == clause.isTypeMember else {continue}
+            let name = clause.identifier.value, type = clause.type
+            guard let target = self[name] else {return ConformityViolation.identifier(name + "\(type)").error}  // 対象のオブジェクト
+            guard type == target.type else {return ConformityViolation.type(type).error}
+            switch target {
+            case let function as JpfFunction:                                   // 関数の引数チェック
+                guard let params = clause.functionParams else {return nil}      // 引数無し
+                if function.functions.hasParamaeter(to: params) {return nil}    // 引数準拠
+                // エラー処理(引数準拠違反)
+                guard let f = function.functions.array.last else {return ConformityViolation.targetNotFound.error}
+                return errorMessage(of: clause.functionParams, with: f)
+            case let computation as JpfComputation:                             // 算出の引数チェック
+                if clause.getterParams == nil && clause.setterParams == nil {
+                    return nil                                                  // 引数無し
+                }
+                if let params1 = clause.getterParams, let params2 = clause.setterParams,
+                   computation.getters.hasParamaeter(to: params1) &&
+                   computation.setters.hasParamaeter(to: params2) {
+                    return nil                                                  // 設定と取得、両方の引数が準拠
+                }                             
+                if let params = clause.getterParams,
+                   computation.getters.hasParamaeter(to: params) {return nil}   // 取得の引数が準拠
+                if let params = clause.setterParams,
+                   computation.setters.hasParamaeter(to: params) {return nil}   // 設定の引数が準拠
+                // エラー処理(いずれかの引数が準拠違反)
+                if let getter = computation.getters.array.last {
+                    return errorMessage(of: clause.functionParams, with: getter)
+                }
+                if let setter = computation.setters.array.last {
+                    return errorMessage(of: clause.functionParams, with: setter)
+                }
+                return ConformityViolation.targetNotFound.error
+            default:
+                break
+            }
+        }
+        return nil
+    }
+    private func errorMessage(of params: ParameterClauseLiteral?, with f: FunctionBlock) -> JpfError {
+        // 規約に引数の指定が無い
+        guard let parameters = params?.parameters else {
+            return ConformityViolation.degignatedError.error
+        }
+        // 引数の数が一致しない
+        guard parameters.count == f.parameters.count else {return ConformityViolation.numberOfParams(parameters.count).error}
+        for pairs in zip(parameters, f.parameters) {
+            guard pairs.0.value == pairs.1.value else {return ConformityViolation.nameOfParams(pairs.0.value).error}
+        }
+        // シグネチャが一致しない
+        return compareSignature(params?.signature, to: f.signature)
+    }
+    /// シグネチャに一致しなければ、エラーを返す。
+    private func compareSignature(_ lhs: InputFormat?, to rhs: InputFormat) -> JpfError {
+        // チェックするシグネチャーが無い
+        guard let target = lhs else {return ConformityViolation.degignatedError.error}
+        // 入力の数が一致しない
+        guard target.numberOfInputs == rhs.numberOfInputs else {return ConformityViolation.formatOfParams(target.numberOfInputs.map {"\($0)"} ?? "無し").error}
+        // 入力の形式が一致しない
+        for pairs in zip(target.formats, rhs.formats) {
+            guard pairs.0.type == pairs.1.type && pairs.0.particle == pairs.1.particle else {return ConformityViolation.formatOfParams("「\(pairs.0.type)\(pairs.0.particle)」").error}
+        }
+        return ConformityViolation.degignatedError.error
+    }
+    /// 準拠違反
+    enum ConformityViolation : Error {
+        case identifier(String)
+        case type(String)
+        case numberOfParams(Int)
+        case nameOfParams(String)
+        case formatOfParams(String)
+        case targetNotFound             // 準拠対象
+        case degignatedError            // 指定形式のエラー
+        /// エラーメッセージ
+        var error: JpfError {
+            switch self {
+            case .identifier(let s):        return JpfError("指定した識別子が見つからない。識別子名:" + s)
+            case .type(let s):              return JpfError("指定した型が規約に準拠していない。型名：" + s)
+            case .numberOfParams(let n):    return JpfError("引数の数が規約に準拠していない。指定数：" + String(n))
+            case .nameOfParams(let s):      return JpfError("引数の名前が規約に準拠していない。指定値：" + s)
+            case .formatOfParams(let s):    return JpfError("引数の形式が規約に準拠していない。指定形式：" + s)
+            case .targetNotFound:           return JpfError("対象となる定義がみつからない。")
+            case .degignatedError:          return JpfError("規約の指定が間違っている。")
+            }
+        }
+    }
 }
