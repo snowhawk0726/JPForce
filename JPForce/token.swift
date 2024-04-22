@@ -100,7 +100,7 @@ enum Token : Equatable {
         case BREAK      = "中止"
         case MAP        = "写像"
         case REDUCE     = "まとめる"
-        case FILTER     = "フィルター"
+        case FILTER     = "絞り込む"
         case SORT       = "並べ替える"
         case REVERSE    = "逆順"
         case CONTAINS   = "含む"

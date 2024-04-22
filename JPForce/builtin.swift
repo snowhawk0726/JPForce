@@ -83,7 +83,7 @@ extension JpfObject {
     var cannotRepeat: String    {"「\(type)」を「関数」で、繰り返すことはできない。仕様：<配列、辞書、範囲>を<関数>で繰り返す。"}
     var cannotReduce: String    {"「\(type)」を「関数」で、まとめることはできない。仕様：<配列、辞書>を<初期値>と<関数>でまとめる。"}
     var cannotMapping: String   {"「\(type)」を「関数」で、写像することはできない。仕様：<配列、辞書>を<関数>で写像する。"}
-    var cannotFilter: String   {"「\(type)」を「関数」で、フィルターすることはできない。仕様：<配列、辞書>を<関数>でフィルターする。"}
+    var cannotFilter: String   {"「\(type)」を「関数」で、絞り込むことはできない。仕様：<配列、辞書>を<関数>で絞り込む。"}
     var cannotSortByFunc: String{"「\(type)」を並べ替えることはできない。仕様：<配列>を<関数>で並べ替える。"}
     var cannotSortByOrder: String{"「\(type)」を並べ替えることはできない。仕様：<配列>を(「昇順」に、または「降順」に)並べ替える。"}
     var cannotReverse: String   {"「\(type)」は逆順にすることはできない。仕様：<配列、文字列>を逆順にする。"}

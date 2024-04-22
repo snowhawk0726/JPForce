@@ -281,7 +281,7 @@ struct JpfDictionary : JpfObject {
     static let type = "辞書"
     var name: String = ""
     /// キーがハッシュ化されているため、元のキーも値として保持しておく｀
-    var pairs: [JpfHashKey: (key: JpfObject, value: JpfObject)]
+    var pairs: [JpfHashKey : (key: JpfObject, value: JpfObject)]
     var string: String {type.color(.magenta) + "であって、【" +
         (pairs.isEmpty ? "" : "要素が、\(pairs.map {"\($0.value.key.string)が\($0.value.value.string)"}.joined(separator: "と、"))") +
         "】"

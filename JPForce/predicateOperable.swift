@@ -68,6 +68,8 @@ struct PredicateOperableFactory {
         }
     }
 }
+/// stringをsplit()により、[String]に分解する。
+/// また、\『<識別子>』もしくは、\(<識別子>)を識別子の内容に置き換える。
 struct Splitter {
     init(of string: String, with environment: Environment, terminator: String = "\\末尾") {self.string = string; self.environment = environment; self.terminator = terminator}
     let string: String
@@ -168,9 +170,9 @@ extension PredicateOperable {
     var rangeCheckUsage: JpfError       {JpfError("仕様：<数値>が範囲【<範囲式>】に")}
     var determineUsage: JpfError        {JpfError("仕様：〜が<配列、範囲>に")}
     var containsUsage: JpfError         {JpfError("仕様：<配列、辞書、範囲>が<要素>を含む。")}
-    var foreachUsage: JpfError          {JpfError("仕様：<配列、辞書、範囲>を<関数>で繰り返す。")}
+    var foreachUsage: JpfError          {JpfError("仕様：<配列、辞書、範囲>で<関数>を繰り返す。")}
     var mapUsage: JpfError              {JpfError("仕様：<配列、辞書、範囲>を<関数>で写像する。または、<範囲>写像する。")}
-    var filterUsage: JpfError           {JpfError("仕様：<配列、辞書>を<関数>でフィルターする。")}
+    var filterUsage: JpfError           {JpfError("仕様：<配列、辞書>を<関数>で絞り込む。")}
     var reduceUsage: JpfError           {JpfError("仕様：<配列、辞書、範囲>を<初期値>と<関数>でまとめる。")}
     var sortUsage: JpfError             {JpfError("仕様：<配列>を<関数>で並べ替える。または、<配列>を（「昇順」に、または「降順」に）並べ替える。")}
     var reverseUsage: JpfError          {JpfError("仕様：<配列、文字列>を逆順にする。")}
@@ -242,7 +244,7 @@ struct PrintOperator : PredicateOperable {
     /// 「\改行なし」が文字列の後尾にある場合、改行をせずに表示する。
     /// 　(\は、そのまま使えるが、Swiftに合わせた。(「"」とか「'」は合わせてない))
     private func replaced(_ string: String) -> String {
-        let codes = [("\\t","\t"),("\\n","\n"),("\\r","\r"),("\\0","\0"),("\\\\","\\"),("\\改行なし","\\末尾")]
+        let codes = [("\\t","\t"),("\\n","\n"),("\\r","\r"),("\\0","\0"),("\\\\","\\"),("\\「","「"),("\\」","」"),("\\改行なし","\\末尾")]
         return codes.reduce(string) {$0.replacingOccurrences(of: $1.0, with: $1.1)}
     }
 }
@@ -805,8 +807,8 @@ struct ForeachOperator : PredicateOperable {
     let environment: Environment, op: Token
     func operated() -> JpfObject? {
         guard let params = environment.peek(2),
-              (params[0].particle == .particle(.WO) || params[0].particle == nil),
-              params[1].particle == .particle(.DE) else {return "「\(op.literal) 」" + twoParamsNeeded + foreachUsage}
+              (params[0].particle == .particle(.DE) || params[0].particle == nil),
+              params[1].particle == .particle(.WO) else {return "「\(op.literal) 」" + twoParamsNeeded + foreachUsage}
         guard let left = params[0].value, let right = params[1].value as? JpfFunction else {return foreachUsage}
         environment.drop(2)
         return left.foreach(right, with: environment)
@@ -1140,7 +1142,7 @@ struct SwapOperator : PredicateOperable {
 struct IdentifiersOperator : PredicateOperable {
     init(_ environment: Environment, by op: Token) {self.environment = environment; self.op = op}
     let environment: Environment, op: Token
-    /// 識別子の一覧を配列して返す。
-    /// - Returns: 識別子(JpfString)の配列
-    func operated() -> JpfObject? {JpfArray(elements: environment.enumerated.map {JpfString(value: $0.key)})}
+    /// 識別子の一覧を辞書にして返す。
+    /// - Returns: 識別子(JpfString)と定義内容(JpfString)の辞書
+    func operated() -> JpfObject? {environment.stringDictionary}
 }

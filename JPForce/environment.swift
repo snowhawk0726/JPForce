@@ -29,6 +29,12 @@ class Environment {
             JpfString(value: $0.key + "が" + $0.value.string)
         })
     }
+    /// storeを、JpfDictionaryに変換する。(値は、store[key].stirng)
+    var stringDictionary: JpfDictionary {
+        let keys = store.keys.map {JpfString(value: $0).hashKey}
+        let values = store.map {(key: JpfString(value: $0), value: JpfString(value: $1.string))}
+        return JpfDictionary(pairs: Dictionary(uniqueKeysWithValues: zip(keys, values)))
+    }
     func contains(_ name: String) -> Bool {store.keys.contains(name)}
     /// 辞書にオブジェクトを追加する。
     ///     未登録のオブジェクトであれば、そのまま辞書に登録

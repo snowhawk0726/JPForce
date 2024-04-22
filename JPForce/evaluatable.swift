@@ -510,7 +510,7 @@ extension ArrayLiteral : Evaluatable {
 }
 extension DictionaryLiteral : Evaluatable {
     func evaluated(with environment: Environment) -> JpfObject? {
-        var results: [JpfHashKey: (key: JpfObject, value: JpfObject)] = [:]
+        var results: [JpfHashKey : (key: JpfObject, value: JpfObject)] = [:]
         for expression in pairs {
             guard let key = expression.pair.key.evaluated(with: environment) else {return nil}
             guard !key.isError else {return key}
