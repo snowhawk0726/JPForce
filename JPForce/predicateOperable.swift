@@ -169,12 +169,12 @@ extension PredicateOperable {
     var removeUsage: JpfError           {JpfError("仕様：(〜から)〜を削除する。")}
     var rangeCheckUsage: JpfError       {JpfError("仕様：<数値>が範囲【<範囲式>】に")}
     var determineUsage: JpfError        {JpfError("仕様：〜が<配列、範囲>に")}
-    var containsUsage: JpfError         {JpfError("仕様：<配列、辞書、範囲>が<要素>を含む。")}
+    var containsUsage: JpfError         {JpfError("仕様：<配列、辞書、範囲>が<値/要素>を含む。")}
     var foreachUsage: JpfError          {JpfError("仕様：<配列、辞書、範囲>で<関数>を繰り返す。")}
-    var mapUsage: JpfError              {JpfError("仕様：<配列、辞書、範囲>を<関数>で写像する。または、<範囲>写像する。")}
+    var mapUsage: JpfError              {JpfError("仕様：<配列、辞書、範囲>を<関数>で写像する。または、<範囲>を写像する。")}
     var filterUsage: JpfError           {JpfError("仕様：<配列、辞書>を<関数>で絞り込む。")}
     var reduceUsage: JpfError           {JpfError("仕様：<配列、辞書、範囲>を<初期値>と<関数>でまとめる。")}
-    var sortUsage: JpfError             {JpfError("仕様：<配列>を<関数>で並べ替える。または、<配列>を（「昇順」に、または「降順」に）並べ替える。")}
+    var sortUsage: JpfError             {JpfError("仕様：<配列>を<関数>で並べ替える。または、<配列>を(「昇順」/「降順」に）並べ替える。")}
     var reverseUsage: JpfError          {JpfError("仕様：<配列、文字列>を逆順にする。")}
     var pullDupUsage: JpfError          {JpfError("仕様：(識別子「<識別子>」と…)(識別子「<識別子>」に）(「数値」または「値」を)(<数値>個)")}
     var assignUsage: JpfError           {JpfError("仕様：〜(を)「<識別子>」に代入する。または、「<識別子>」に〜を代入する。")}

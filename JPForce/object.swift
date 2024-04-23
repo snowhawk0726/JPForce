@@ -168,7 +168,7 @@ struct JpfFunction : JpfObject {
     var environment: Environment
     var string: String {
         let s = functions.array.reduce("") {$0 +
-            "\($1.isOverloaded ? "さらに、" : "")\(type.color(.magenta))であって、【\($1.string)】。"
+            "\($1.isOverloaded ? "さらに、" : "")\(type.color(.magenta))であって、【\($1.string)】"
         }
         return s.replacingOccurrences(of: "。】", with: "】")
     }

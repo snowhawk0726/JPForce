@@ -311,22 +311,6 @@
       <BreakpointProxy
          BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
          <BreakpointContent
-            uuid = "4F0A281F-73A4-476D-8EAE-6F3B142E00AC"
-            shouldBeEnabled = "No"
-            ignoreCount = "0"
-            continueAfterRunningActions = "No"
-            filePath = "JPForce/predicateOperable.swift"
-            startingColumnNumber = "9223372036854775807"
-            endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "864"
-            endingLineNumber = "864"
-            landmarkName = "operated()"
-            landmarkType = "7">
-         </BreakpointContent>
-      </BreakpointProxy>
-      <BreakpointProxy
-         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
-         <BreakpointContent
             uuid = "0A16FBE4-7934-4B62-9E11-32D7E954D55D"
             shouldBeEnabled = "No"
             ignoreCount = "0"
