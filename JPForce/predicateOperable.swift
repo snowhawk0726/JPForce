@@ -199,8 +199,7 @@ struct PrintOperator : PredicateOperable {
             objects.append(leftOperand!.value!)
         }
         for object in objects.reversed() {
-            let result = printWithTerminator(object.string)
-            if result.isError {return result}
+            if let result = printWithTerminator(object.string), result.isError {return result}
         }
         return nil
     }
@@ -210,21 +209,21 @@ struct PrintOperator : PredicateOperable {
     /// 「\末尾」は、文字列の末尾を改行の代わりに表示する。
     /// 例： 「こんにちは\末尾、」と「みなさん。」を表示する。
     ///     → こんにちは、みなさん。
-    private func printWithTerminator(_ string: String) -> JpfObject {
+    private func printWithTerminator(_ string: String) -> JpfError? {
         switch string {
         case Token.Keyword.IDENTIFIER.rawValue: // 識別子をエスケープ文字制御なしで表示する。
             guard let identifier = environment[string] as? JpfString else {break}
             guard let object = environment[identifier.value] else {return JpfError("『\(identifier.value)』(識別子)が定義されていない。")}
             print(object.string)
             environment[string] = nil
-            return JpfBoolean.TRUE
+            return nil
         case Token.Keyword.FILE.rawValue:       // ファイルの内容をエスケープ文字制御なしで表示する。
             guard let filename = environment[string] as? JpfString else {break}
             let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
             guard let contents = try? String(contentsOfFile: url.path() + filename.value, encoding: .utf8) else {return fileReadError}
             print(contents)
             environment[string] = nil
-            return JpfBoolean.TRUE
+            return nil
         default:
             break
         }                                       // エスケープ文字制御した結果を表示する。
@@ -238,7 +237,7 @@ struct PrintOperator : PredicateOperable {
                 print(s)
             }
         }
-        return JpfBoolean.TRUE
+        return nil
     }
     /// エスケープ文字を(Swiftの)制御コードに変換する。
     /// 「\改行なし」が文字列の後尾にある場合、改行をせずに表示する。
@@ -265,33 +264,32 @@ struct ReadOperator : PredicateOperable {
             objects.append(leftOperand!.value!)
         }
         for object in objects.reversed() {
-            let result = readWithoutTerminator(object.string)
-            if result.isError {return result}
+            if let result = readWithoutTerminator(object.string), result.isError {return result}
         }
         return nil
     }
-    private func readWithoutTerminator(_ string: String) -> JpfObject {
+    private func readWithoutTerminator(_ string: String) -> JpfError? {
         switch string {
         case Token.Keyword.IDENTIFIER.rawValue: // 識別子をエスケープ文字制御なしで表示する。
             guard let identifier = environment[string] as? JpfString else {break}
             guard let object = environment[identifier.value] else {return JpfError("『\(identifier.value)』(識別子)が定義されていない。")}
             read(object.string)
             environment[string] = nil
-            return JpfBoolean.TRUE
+            return nil
         case Token.Keyword.FILE.rawValue:       // ファイルの内容をエスケープ文字制御なしで表示する。
             guard let filename = environment[string] as? JpfString else {break}
             let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
             guard let contents = try? String(contentsOfFile: url.path() + filename.value, encoding: .utf8) else {return fileReadError}
             read(contents)
             environment[string] = nil
-            return JpfBoolean.TRUE
+            return nil
         default:
             break
         }
         var splitter = Splitter(of: string, with: environment, terminator: "")
         guard let splitted = splitter.split() else {return splitter.error!}
         splitted.forEach {read($0)}
-        return JpfBoolean.TRUE
+        return nil
     }
     private func read(_ string: String) {
         let utterance = AVSpeechUtterance(string: string)

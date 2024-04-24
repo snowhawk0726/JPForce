@@ -431,8 +431,8 @@ extension LoopExpression : Evaluatable {
     private func evaluatedLoop(of range: JpfRange, with environment: Environment) -> JpfObject? {
         guard parameters.count == 1 else {return loopParameterError + rangeLoopUsage}
         guard let lowerBound = range.lowerBound?.0.number,
-              var upperBound = range.upperBound?.0.number,
-              range.checked.isTrue else {return rangeLoopUsage}         // 上下限があり、形式が正しいこと
+              var upperBound = range.upperBound?.0.number else {return rangeLoopUsage}
+        if let formatError = range.error {return formatError}
         environment.drop()
         if range.upperBound?.1 == .keyword(.UNDER) {upperBound -= 1}    // 未満なので、上限 - 1
         return evaluatedLoop(from: lowerBound, through: upperBound, with: environment)  // 下限から、上限までループ

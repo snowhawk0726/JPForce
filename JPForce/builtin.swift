@@ -158,26 +158,27 @@ extension JpfRange {
         }
         return JpfBoolean.object(of: result)
     }
-    /// 範囲の形式チェック(正しい、真。間違い、エラー)
-    var checked: JpfObject {
+    /// 範囲の形式チェック(nil: エラー無し)
+    var error: JpfError? {
         switch (lowerBound?.0.number, lowerBound?.1,
                 upperBound?.0.number, upperBound?.1) {
         case (.some(_), Token(.KARA),    .some(_), Token(.MADE)),
              (.some(_), Token(.GTEQUAL), .some(_), Token(.LTEQUAL)):
-            return JpfBoolean.TRUE
+            break
         case (.some(_), Token(.GTEQUAL), .some(_), Token(.UNDER)):
-            return JpfBoolean.TRUE
+            break
         case (.some(_), Token(.KARA),    nil, nil),
              (.some(_), Token(.GTEQUAL), nil, nil):
-            return JpfBoolean.TRUE
+            break
         case (nil, nil, .some(_), Token(.MADE)),
              (nil, nil, .some(_), Token(.LTEQUAL)):
-            return JpfBoolean.TRUE
+            break
         case (nil, nil, .some(_), Token(.UNDER)):
-            return JpfBoolean.TRUE
+            break
         default:
             return JpfError(rangeFormatError)
         }
+        return nil
     }
     // 要素アクセス
     func foreach(_ function: JpfFunction, with environment: Environment) -> JpfObject? {
