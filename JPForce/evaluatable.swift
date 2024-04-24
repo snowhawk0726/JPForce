@@ -25,6 +25,7 @@ extension Node {
     var predicateNotSupported: JpfError     {JpfError("「述語」に対応する定義が見つからなかった。")}
     var identifierNotFound: JpfError        {JpfError("(識別子)が定義されていない。")}
     var caseConditionError: JpfError        {JpfError("「場合」の条件(真偽値)が見つからなかった。")}
+    var conditionalOperationError: JpfError {JpfError("「によって」の条件(真偽値)が見つからなかった。")}
     var logicalConditionError: JpfError     {JpfError("の前に条件(真偽値)が見つからなかった。")}
     var logicalRightEvaluationError: JpfError   {JpfError("の後に条件(真偽値)の評価に失敗した。")}
     var logicalOperatorError: JpfError      {JpfError("は、論理式の演算に使えない。")}
@@ -360,6 +361,15 @@ extension LogicalExpression : Evaluatable {
         default:
             return "「\(tokenLiteral)」" + logicalOperatorError
         }
+    }
+}
+extension ConditionalOperation : Evaluatable {
+    func evaluated(with environment: Environment) -> (any JpfObject)? {
+        guard let condition = environment.unwrappedPeek else {return conditionalOperationError}
+        environment.drop()
+        return condition.isTrue ?
+            consequence.evaluated(with: environment) :
+            alternative.evaluated(with: environment)
     }
 }
 extension LoopExpression : Evaluatable {

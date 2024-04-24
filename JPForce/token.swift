@@ -79,6 +79,8 @@ enum Token : Equatable {
         case ASWELLAS   = "および"
         case RETURN     = "返す"
         case CASE       = "場合"
+        case QUESTION   = "か"
+        case CONDITIONAL = "よって"
         case LOOP       = "反復"
         case FUNCTION   = "関数"
         case EXECUTE    = "実行"

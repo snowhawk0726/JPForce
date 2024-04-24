@@ -262,7 +262,7 @@ extension Parsable {
         let token = currentToken
         while true {
             skipEols()
-            guard let expression = ExpressionPareser(parser).parse() else {
+            guard let expression = ExpressionParser(parser).parse() else {
                 error(message: "配列で、式の解析に失敗した。")
                 return nil
             }
@@ -287,7 +287,7 @@ extension Parsable {
             let valueToken = nextToken
             repeat {
                 getNext()
-                guard let expression = ExpressionPareser(parser).parse() else {
+                guard let expression = ExpressionParser(parser).parse() else {
                     error(message: "列挙で、値の式の解析に失敗した。")
                     return nil
                 }
@@ -299,7 +299,7 @@ extension Parsable {
             return DefineStatement(token: defineToken, name: ident, value: ExpressionStatement(token: valueToken, expressions: expressions))
         }
         let token = currentToken
-        guard var expression = ExpressionPareser(parser).parse() else {
+        guard var expression = ExpressionParser(parser).parse() else {
             error(message: "列挙で、識別子の解析に失敗した。")
             return nil
         }
@@ -315,7 +315,7 @@ extension Parsable {
         var beginOfValueExpressions = 0     // 値の開始位置
         while true {
             skipEols()
-            guard let expression = ExpressionPareser(parser).parse() else {
+            guard let expression = ExpressionParser(parser).parse() else {
                 error(message: "辞書で、式の解析に失敗した。")
                 return nil
             }
@@ -493,7 +493,7 @@ struct ExpressionStatementParser : StatementParsable {
         let token = currentToken
         while !isEndOfStatement && !currentToken.isEof {
             skipEols()
-            guard let expression = ExpressionPareser(parser).parse() else {
+            guard let expression = ExpressionParser(parser).parse() else {
                 error(message: "式文で、式の解析に失敗した。")
                 return nil
             }
@@ -562,7 +562,7 @@ enum Precedence : Int {
     ]
     static subscript(tokenType: Token.TokenType) -> Self {precedences[tokenType] ?? .lowest}
 }
-struct ExpressionPareser : ExpressionParsable {
+struct ExpressionParser : ExpressionParsable {
     init(_ parser: Parser, precedence: Precedence = .lowest) {self.parser = parser; self.precedence = precedence}
     let parser: Parser, precedence: Precedence
     func parse() -> Expression? {
@@ -609,6 +609,7 @@ struct PrefixExpressionParserFactory {
         case .keyword(.RANGE):      return RangeLiteralParser(parser)
         case .keyword(.CASE):       return CaseExpressionParser(parser)
         case .keyword(.LOOP):       return LoopExpressionParser(parser)
+        case .keyword(.CONDITIONAL):return ConditionalOperationParser(parser)
         case .keyword(.IDENTIFIER),.keyword(.FILE),.keyword(.POSITION):
                                     return LabelExpressionParser(parser)
         case .keyword(_):           return PredicateExpressionParser(parser)
@@ -973,7 +974,7 @@ struct LogicalExpressionParser : ExpressionParsable {
         let token = currentToken
         while !isEndOfStatement && !isEndOfBlock && !currentToken.isEof {
             skipEols()
-            guard let expression = ExpressionPareser(parser).parse() else {
+            guard let expression = ExpressionParser(parser).parse() else {
                 error(message: "条件式で、右辺の解析に失敗した。")
                 return nil
             }
@@ -993,6 +994,32 @@ struct LogicalExpressionParser : ExpressionParsable {
     /// - Returns: 条件式か否か
     private func isEndOfLogicalExpression(_ expression: Expression) -> Bool {
         expression is PredicateExpression
+    }
+}
+/// 条件演算「よって」
+/// <条件>(か)によって、<式１>か<式２>
+struct ConditionalOperationParser : ExpressionParsable {
+    init(_ parser: Parser) {self.parser = parser}
+    let parser: Parser
+    func parse() -> (any Expression)? {
+        let token = currentToken                            // よって
+        _ = getNext(whenNextIs: .COMMA)                     // (、)
+        getNext()
+        guard let consequence = ExpressionParser(parser).parse() else {
+            error(message: "「(か)によって」のに続く式の解析に失敗した。")
+            return nil
+        }
+        guard getNext(whenNextIs: ExpressionStatement.ka) else {    // か
+            error(message: "「(か)によって」の後続に「か」が見つからない。")
+            return nil
+        }
+        _ = getNext(whenNextIs: .COMMA)                     // (、)
+        getNext()
+        guard let alternative = ExpressionParser(parser).parse() else {
+            error(message: "「(か)によって」の「か」に続く式の解析に失敗した。")
+            return nil
+        }
+        return ConditionalOperation(token: token, consequence: consequence, alternative: alternative)
     }
 }
 ///「反復」で始まる式を解析する。
@@ -1029,7 +1056,7 @@ struct LoopExpressionParser : ExpressionParsable {
         var expressions: [Expression] = []
         while true {
             skipEols()
-            guard let expression = ExpressionPareser(parser).parse() else {
+            guard let expression = ExpressionParser(parser).parse() else {
                 error(message: "反復で、条件式の解析に失敗した。")
                 return nil
             }
@@ -1065,7 +1092,7 @@ struct InfixExpressionParser : ExpressionParsable {
         _ = getNext(whenNextIs: .COMMA)
         getNext()
         let precedence = Precedence[currentToken.type]
-        guard let right = ExpressionPareser(parser, precedence: precedence).parse() else {
+        guard let right = ExpressionParser(parser, precedence: precedence).parse() else {
             error(message: "中間置式(\(op)で、右辺の解析に失敗した。")
             return nil
         }

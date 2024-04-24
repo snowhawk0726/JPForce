@@ -120,6 +120,23 @@ final class EvaluatorTests: XCTestCase {
             }
         }
     }
+    func testConditionalOperations() throws {
+        let testPatterns: [(input: String, exptected: Any?)] = [
+            ("甲は、1が2より大きいかによって、10か20。甲。", 20),
+            ("条件は、1が2より小さい。甲は、条件によって、10か20。甲。", 10),
+            ("年齢は17歳。入場者は、年齢が18以上であるかによって、「成人」か「未成年」。入場者。", "未成年"),
+        ]
+        for test in testPatterns {
+            print("テストパターン: \(test.input)")
+            if let evaluated = testEvaluator(test.input) {
+                try testObject(evaluated, with: test.exptected)
+                print("テスト(\(evaluated))終了")
+            } else {
+                XCTAssertNil(test.exptected, "構文解析、または評価失敗")
+                print("テスト(nil)終了")
+            }
+        }
+    }
     func testReturnExpressions() throws {
         let testPatterns: [(input: String, exptected: Int)] = [
             ("10を返す。", 10), ("10を返し、9個", 10), ("２と5を掛けたものを返し、9人", 10), ("3と3を掛ける。２と5を掛けたものを返し、10から1を引く。", 10),

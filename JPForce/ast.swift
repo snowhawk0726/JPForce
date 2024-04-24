@@ -87,6 +87,7 @@ struct ExpressionStatement : Statement {
     static let ga = "が"
     static let wa = "は"
     static let to = "と"
+    static let ka = "か"
     static let de = "で"
     static let ari = "あり"
     static let aida = "間"
@@ -196,6 +197,16 @@ struct LogicalExpression : Expression {
     //
     var tokenLiteral: String {token.literal}
     var string: String {"\(token.coloredLiteral)、【\(right.string)】"}
+}
+struct ConditionalOperation : Expression {
+    var token: Token                // .CONDITIONALキーワード(よって)
+    var consequence: Expression     // 成立時の値(式)
+    var alternative: Expression     // 不成立の値(式)
+    //
+    var tokenLiteral: String {token.literal}
+    var string: String {
+        "\(token.coloredLiteral)、\(consequence.string)か、\(alternative.string)"
+    }
 }
 struct LoopExpression : Expression {
     var token: Token                // .LOOPキーワード(反復)
