@@ -906,7 +906,11 @@ struct SetOperator : PredicateOperable {
                 fallthrough
             case (Token(.WO),Token(.NO),Token(.NI)):    // 値を、対象の要素「m」に設定
                 guard let value = params[0].value, let object = params[1].value else {break}
-                let result = object.assign(value, to: params[2].value!)
+                guard let label = params[2].value as? JpfString,
+                      label.value == Token.Keyword.MEMBER.rawValue,
+                      let member = environment.retrieve(name: label.value) else {break}
+                let result = object.assign(value, to: member.value!)
+                environment.remove(name: label.value)
                 guard !result.isError else {return result}
                 environment.drop(3)
                 return nil
@@ -1049,6 +1053,15 @@ struct EmptyOperator : PredicateOperable {
         return nil
     }
 }
+/// 1. 配列に代入(引数３)
+/// <配列>の位置<数値>に<値>を代入する (<値>を<配列>の位置<数値>に代入する)
+/// <配列>の位置「<識別子>」に<値>を代入する (<値>を<配列>の位置「<識別子>」に代入する)
+/// 2.列挙子に代入(引数２)
+/// <列挙子>に<値>を代入 (<値>を<列挙子>に代入)
+/// 3. 識別子に代入(引数２)
+/// <識別子>に<値>を代入 (<値>を<識別子>に代入)
+/// 4.識別子に計算して代入(引数１)
+/// <識別子>(に)<計算し>て代入
 struct AssignOperator : PredicateOperable {
     init(_ environment: Environment, by op: Token) {self.environment = environment; self.op = op}
     let environment: Environment, op: Token
