@@ -71,7 +71,7 @@ extension Parsable {
     /// - 形式1: 入力が、識別子1（「型格」）と 識別子2（「型格」）と...、であり、
     /// - 形式2: 入力が、識別子1（「型格」）と 識別子2（「型格」）と...識別子n（「型格」）。
     func parseParameters() -> [(Identifier, String)]? {
-        guard getNext(whenNextIs: ExpressionStatement.input) else {return []}  // 空のパラメータ
+        guard getNext(whenNextIs: FunctionBlock.input) else {return []} // 空のパラメータ
         _ = getNext(whenNextIs: ExpressionStatement.ga + ExpressionStatement.wa, matchAll: false)   // 入力が、(入力は、)
         _ = getNext(whenNextIs: .COMMA)
         var parameters: [(Identifier, String)] = []
@@ -83,7 +83,7 @@ extension Parsable {
             _ = getNext(whenNextIs: .TO)                        // と
             guard !nextToken.isEof else {return nil}
         } while !isEndOfParameter
-        _ = getNext(whenNextIs: ExpressionStatement.ari)        // (あり)
+        _ = getNext(whenNextIs: FunctionBlock.ari)              // (あり)
         _ = getNext(whenNextIs: .COMMA)                         // (、)
         return parameters
     }
@@ -108,8 +108,8 @@ extension Parsable {
     func parseProtocols() -> [String]? {
         var protocols: [String] = []
         skipNextEols()
-        _ = getNext(whenNextIs: ExpressionStatement.junkyosuru) // 準拠する
-        if getNext(whenNextIs: ExpressionStatement.kiyaku) {    // 規約は、(規約が、)
+        _ = getNext(whenNextIs: ProtocolLiteral.junkyosuru)     // 準拠する
+        if getNext(whenNextIs: ProtocolLiteral.kiyaku) {        // 規約は、(規約が、)
             _ = getNext(whenNextIs: ExpressionStatement.wa + ExpressionStatement.ga, matchAll: false)
             _ = getNext(whenNextIs: .COMMA)
             repeat {
@@ -709,7 +709,7 @@ struct ComputationLiteralParser : ExpressionParsable {
         skipNextEols(suppress: endOfType == .EOL)
         // Setter block
         var setters = FunctionBlocks()
-        switch parseFunctionBlocks(of: ExpressionStatement.settei, in: token.literal) {
+        switch parseFunctionBlocks(of: ComputationLiteral.settei, in: token.literal) {
         case .success(let blocks):
             setters = blocks
             _ = getNext(whenNextIs: .PERIOD)        // 設定ブロックの句点を飛ばす
@@ -721,7 +721,7 @@ struct ComputationLiteralParser : ExpressionParsable {
         // Getter block
         var getters = FunctionBlocks()
         if !isEndOfBlock(of: endOfType) {
-            switch parseFunctionBlocks(of: ExpressionStatement.syutoku, in: token.literal) {
+            switch parseFunctionBlocks(of: ComputationLiteral.syutoku, in: token.literal) {
             case .success(let blocks):
                 getters = blocks
                 _ = getNext(whenNextIs: .PERIOD)    // 取得ブロックの句点を飛ばす
@@ -764,14 +764,14 @@ struct ProtocolLiteralParser : ExpressionParsable {
     }
     private func parseClauses(until symbol: Token.Symbol) -> [ClauseLiteral]? {
         var clauses: [ClauseLiteral] = []
-        _ = getNext(whenNextIs: ExpressionStatement.joukouga + ExpressionStatement.joukouwa, matchAll: false)   // 条項が、(条項は、)
+        _ = getNext(whenNextIs: ClauseLiteral.joukouga + ClauseLiteral.joukouwa, matchAll: false)   // 条項が、(条項は、)
         while nextToken != .symbol(symbol) && !nextToken.isEof {
             var functionParams: ParameterClauseLiteral?
             var getterParams: ParameterClauseLiteral?
             var setterParams: ParameterClauseLiteral?
             //
             skipNextEols(suppress: symbol == .EOL)
-            let isTyped = getNext(whenNextIs: ExpressionStatement.katano)   // 型の要素(メンバー)か
+            let isTyped = getNext(whenNextIs: TypeLiteral.katano)   // 型の要素(メンバー)か
             getNext()
             let ident = Identifier(from: currentToken)
             guard getNext(whenNextIs: DefineStatement.wa) else {
@@ -836,7 +836,7 @@ struct TypeLiteralParser : ExpressionParsable {
         skipNextEols(suppress: endOfType == .EOL)
         // Type member block
         var members: BlockStatement?
-        switch parseOptionalBlock(of: ExpressionStatement.typemembers, in: token.literal) {
+        switch parseOptionalBlock(of: TypeLiteral.typemembers, in: token.literal) {
         case .success(let block):
             members = block
             skipNextEols(suppress: endOfType == .EOL)
@@ -845,7 +845,7 @@ struct TypeLiteralParser : ExpressionParsable {
         }
         // Initializers block
         var initializers: FunctionBlocks
-        switch parseFunctionBlocks(of: ExpressionStatement.syokika, in: token.literal) {
+        switch parseFunctionBlocks(of: TypeLiteral.syokika, in: token.literal) {
         case .success(let inits):
             initializers = inits
             skipNextEols(suppress: endOfType == .EOL)
@@ -939,7 +939,7 @@ struct CaseExpressionParser : ExpressionParsable {
         }
         _ = getNext(whenNextIs: .COMMA)                     // (、)のみ読み飛ばす
         var alternative: BlockStatement? = nil
-        if getNext(whenNextIs: ExpressionStatement.soreigai) {// それ以外
+        if getNext(whenNextIs: CaseExpression.soreigai) {   // それ以外
             _ = getNext(whenNextIs: ExpressionStatement.wa) // (は)
             _ = getNext(whenNextIs: .COMMA)                 // (、)
             endSymbol = getNext(whenNextIs: .LBBRACKET) ? .RBBRACKET : .EOL
@@ -1016,7 +1016,7 @@ struct ConditionalOperationParser : ExpressionParsable {
             error(message: "「(か)によって」のに続く式の解析に失敗した。")
             return nil
         }
-        guard getNext(whenNextIs: ExpressionStatement.ka) else {    // か
+        guard getNext(whenNextIs: ConditionalOperation.ka) else {   // か
             error(message: "「(か)によって」の後続に「か」が見つからない。")
             return nil
         }
@@ -1048,7 +1048,7 @@ struct LoopExpressionParser : ExpressionParsable {
             return nil
         }
         // Body block
-        _ = getNext(whenNextIs: ExpressionStatement.syoriga + ExpressionStatement.syoriwa, matchAll: false)   // 処理が、(処理は、)
+        _ = getNext(whenNextIs: LoopExpression.syoriga + LoopExpression.syoriwa, matchAll: false)   // 処理が、(処理は、)
         guard let body = BlockStatementParser(parser, symbol: endSymbol).blockStatement else {
             error(message: "反復で、処理の解析に失敗した。")
             return nil
@@ -1056,7 +1056,7 @@ struct LoopExpressionParser : ExpressionParsable {
         return LoopExpression(token: token, parameters: identifiers, condition: condition, body: body)
     }
     private func parseCondition(endSymbol: Token.Symbol) -> [Expression]? {
-        guard getNext(whenNextIs: ExpressionStatement.condition) else {return []}  // 空のパラメータ
+        guard getNext(whenNextIs: LoopExpression.condition) else {return []}    // 空のパラメータ
         _ = getNext(whenNextIs: ExpressionStatement.ga + ExpressionStatement.wa, matchAll: false)   // 条件が、(条件は、)
         _ = getNext(whenNextIs: .COMMA)
         getNext()
@@ -1068,7 +1068,7 @@ struct LoopExpressionParser : ExpressionParsable {
                 return nil
             }
             expressions.append(expression)
-            _ = getNext(whenNextIs: ExpressionStatement.aida)
+            _ = getNext(whenNextIs: LoopExpression.aida)
             if isEndOfElements {break}
             getNext()
         }

@@ -64,33 +64,15 @@ struct ExpressionStatement : Statement {
                 .replacingOccurrences(of: "が。", with: "が、")
     }
     //
-    static let input = "入力"
-    static let condition = "条件"
     static let yousoga = "要素が、"
     static let yousowa = "要素は、"
     static let hontaiga = "本体が、"
     static let hontaiwa = "本体は、"
-    static let syoriga = "処理が、"
-    static let syoriwa = "処理は、"
-    static let joukouga = "条項が、"
-    static let joukouwa = "条項は、"
-    static let syokika = "初期化"
-    static let kiyaku = "規約"
-    static let typemembers = "型の要素"
-    static let katano = "型の"
-    static let junkyosuru = "準拠する"
-    static let settei = "設定"
-    static let syutoku = "取得"
     static let deatte = "であって、"
     static let deari = "であり、"
-    static let soreigai = "それ以外"
     static let ga = "が"
     static let wa = "は"
     static let to = "と"
-    static let ka = "か"
-    static let de = "で"
-    static let ari = "あり"
-    static let aida = "間"
 }
 struct BlockStatement: Statement {
     var token: Token                // 【トークン
@@ -182,6 +164,7 @@ struct InfixExpression : Expression {
     var string: String {left.string + "、" + tokenLiteral + "、" + right.string}
 }
 struct CaseExpression : Expression {
+    static let soreigai = "それ以外"
     var token: Token                // .CASEキーワード(場合)
     var consequence: BlockStatement
     var alternative: BlockStatement?// 「それ以外は」(else)
@@ -200,6 +183,7 @@ struct LogicalExpression : Expression {
     var string: String {"\(token.coloredLiteral)、【\(right.string)】"}
 }
 struct ConditionalOperation : Expression {
+    static let ka = "か"
     var token: Token                // .CONDITIONALキーワード(よって)
     var consequence: Expression     // 成立時の値(式)
     var alternative: Expression     // 不成立の値(式)
@@ -210,6 +194,10 @@ struct ConditionalOperation : Expression {
     }
 }
 struct LoopExpression : Expression {
+    static let condition = "条件"
+    static let aida = "間"
+    static let syoriga = "処理が、"
+    static let syoriwa = "処理は、"
     var token: Token                // .LOOPキーワード(反復)
     var parameters: [Identifier]    // カウンターまたは要素
     var condition: [Expression]     // 条件式
@@ -233,6 +221,8 @@ struct FunctionLiteral : Expression {
     }
 }
 struct ComputationLiteral : Expression {
+    static let settei = "設定"
+    static let syutoku = "取得"
     var token: Token                // 算出トークン
     var setters: FunctionBlocks     // 設定ブロック
     var getters: FunctionBlocks     // 取得ブロック
@@ -246,6 +236,8 @@ struct ComputationLiteral : Expression {
     }
 }
 struct ProtocolLiteral : Expression {
+    static let kiyaku = "規約"
+    static let junkyosuru = "準拠する"
     var token: Token                // 規約トークン
     var protocols: [String]         // 準拠する規約
     var clauses: [ClauseLiteral]    // 規約条項
@@ -258,6 +250,8 @@ struct ProtocolLiteral : Expression {
     }
 }
 struct ClauseLiteral {
+    static let joukouga = "条項が、"
+    static let joukouwa = "条項は、"
     var identifier: Identifier      // 識別子
     var type: String                // 型の文字列
     var functionParams: ParameterClauseLiteral?
@@ -295,6 +289,9 @@ struct ParameterClauseLiteral {
     }
 }
 struct TypeLiteral : Expression {
+    static let syokika = "初期化"
+    static let typemembers = "型の要素"
+    static let katano = "型の"
     var token: Token                // 型トークン
     var protocols: [String]         // 準拠する規約
     var typeMembers: BlockStatement?// 型の要素
@@ -319,6 +316,8 @@ struct InputFormat {
     var strings: [String] {formats.map {!($0.type.isEmpty && $0.particle.isEmpty) ? "「\($0.type + $0.particle)」" : ""}}
 }
 struct FunctionBlock {
+    static let input = "入力"
+    static let ari = "あり"
     var parameters: [Identifier]    // 入力パラメータ
     var signature: InputFormat      // 入力形式
     var body: BlockStatement?       // 処理本体
