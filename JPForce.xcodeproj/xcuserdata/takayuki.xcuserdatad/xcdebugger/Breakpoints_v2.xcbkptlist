@@ -110,8 +110,8 @@
             filePath = "JPForce/predicateOperable.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "468"
-            endingLineNumber = "468"
+            startingLineNumber = "475"
+            endingLineNumber = "475"
             landmarkName = "determined(_:_:_:)"
             landmarkType = "7">
          </BreakpointContent>
@@ -129,22 +129,6 @@
             startingLineNumber = "13"
             endingLineNumber = "13"
             landmarkName = "subscript(name:particle:)"
-            landmarkType = "7">
-         </BreakpointContent>
-      </BreakpointProxy>
-      <BreakpointProxy
-         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
-         <BreakpointContent
-            uuid = "65146AFC-7FAA-431F-8E64-055E867370C7"
-            shouldBeEnabled = "No"
-            ignoreCount = "0"
-            continueAfterRunningActions = "No"
-            filePath = "JPForce/predicateOperable.swift"
-            startingColumnNumber = "9223372036854775807"
-            endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "318"
-            endingLineNumber = "318"
-            landmarkName = "operated()"
             landmarkType = "7">
          </BreakpointContent>
       </BreakpointProxy>
@@ -254,8 +238,8 @@
             filePath = "JPForce/predicateOperable.swift"
             startingColumnNumber = "9223372036854775807"
             endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "457"
-            endingLineNumber = "457"
+            startingLineNumber = "464"
+            endingLineNumber = "464"
             landmarkName = "operated()"
             landmarkType = "7">
          </BreakpointContent>
@@ -274,22 +258,6 @@
             endingLineNumber = "136"
             landmarkName = "JpfNull"
             landmarkType = "14">
-         </BreakpointContent>
-      </BreakpointProxy>
-      <BreakpointProxy
-         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
-         <BreakpointContent
-            uuid = "714A50C6-40CE-422B-A7D9-3E0EE7D4112C"
-            shouldBeEnabled = "No"
-            ignoreCount = "0"
-            continueAfterRunningActions = "No"
-            filePath = "JPForce/predicateOperable.swift"
-            startingColumnNumber = "9223372036854775807"
-            endingColumnNumber = "9223372036854775807"
-            startingLineNumber = "902"
-            endingLineNumber = "902"
-            landmarkName = "operated()"
-            landmarkType = "7">
          </BreakpointContent>
       </BreakpointProxy>
       <BreakpointProxy

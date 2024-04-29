@@ -121,11 +121,12 @@ struct StringLiteral : ValueExpression {
     //
     var string: String {"「\(value)」".color(token.color)}
 }
-struct Label : ValueExpression {
+struct Label : Expression {
     var token: Token                // ラベル(.keyword())トークン
-    var value: String               // 値(文字列)
-    init(token: Token, value: String) {self.token = token; self.value = value}
+    var value: Token                // 値(文字列または識別子)
+    init(token: Token, value: Token) {self.token = token; self.value = value}
     //
+    var tokenLiteral: String {token.literal}
     var string: String {token.coloredLiteral + "「\(value)」".color(token.color)}
 }
 struct IntegerLiteral : ValueExpression {

@@ -480,21 +480,24 @@ extension LoopExpression : Evaluatable {
     private func isTerminated(by evaluated: JpfObject) -> Bool {evaluated.isReturnValue && !evaluated.hasValue}
 }
 extension Label : Evaluatable {
-    /// 1. ラベルに割り当てられた識別子を辞書に格納する。
-    /// 2. ラベルが「位置」である場合は、数値、または識別子から数値を取り出し、返す。
+    /// 1. ラベルに割り当てられた識別子(名)を辞書に格納する。
+    /// 2. ラベルが「位置」である場合は、数値、または識別子から取り出した数値、を返す。
     /// - Parameter environment: 格納先
-    /// - Returns: ラベルの文字列、または位置の数値
+    /// - Returns: 識別子名、または位置の数値 (オブジェクトの識別子名は、ラベル名)
     func evaluated(with environment: Environment) -> JpfObject? {
+        var object: JpfObject
         if token == .keyword(.POSITION) {
-            if let integer = Int(value) {
-                return JpfInteger(name: tokenLiteral, value: integer)
+            if let integer = Int(value.literal) {
+                object = JpfInteger(name: tokenLiteral, value: integer)
+            } else {
+                guard let integer = environment[value.literal] as? JpfInteger else {return "『\(value.literal)』" + identifierNotFound}
+                object = JpfInteger(name: tokenLiteral, value: integer.value)
             }
-            guard var integer = environment[value] as? JpfInteger else {return "『\(value)』" + identifierNotFound}
-            integer.name = tokenLiteral
-            return integer
+        } else {
+            object = JpfString(name: tokenLiteral, value: value.literal)
+            environment.append(object, to: tokenLiteral)
         }
-        environment.append(JpfString(value: value), to: tokenLiteral)
-        return JpfString(value: tokenLiteral)
+        return object
     }
 }
 extension ArrayLiteral : Evaluatable {

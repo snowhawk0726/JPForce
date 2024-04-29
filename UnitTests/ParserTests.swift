@@ -694,7 +694,7 @@ final class ParserTests: XCTestCase {
             let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
             let label = try XCTUnwrap(statement.expressions.first as? Label)
             XCTAssertEqual(label.tokenLiteral, test.label)
-            XCTAssertEqual(label.value, test.name)
+            XCTAssertEqual(label.value.literal, test.name)
             print("テスト終了: \(statement.string)")
         }
     }

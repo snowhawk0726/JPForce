@@ -657,11 +657,11 @@ struct LabelExpressionParser : ExpressionParsable {
     func parse() -> Expression? {
         let token = currentToken           // Token.Keyword
         guard nextToken.type == .string || nextToken.type == .ident || nextToken.type == .int else {
-            error(message: "「\(token.literal)」の後続が「文字列」(または「識別子」)でなかった。)")
+            error(message: "「\(token.literal)」の後続が<文字列>、<識別子>、または、<数値>でなかった。)")
             return nil
         }
         getNext()
-        return Label(token: token, value: currentToken.literal)
+        return Label(token: token, value: currentToken)
     }
 }
 // 1. 範囲【<範囲式><キーワード>】

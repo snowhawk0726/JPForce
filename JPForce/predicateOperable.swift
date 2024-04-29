@@ -199,7 +199,7 @@ struct PrintOperator : PredicateOperable {
             objects.append(leftOperand!.value!)
         }
         for object in objects.reversed() {
-            if let result = printWithTerminator(object.string), result.isError {return result}
+            if let result = printWithTerminator(object), result.isError {return result}
         }
         return nil
     }
@@ -209,25 +209,25 @@ struct PrintOperator : PredicateOperable {
     /// 「\末尾」は、文字列の末尾を改行の代わりに表示する。
     /// 例： 「こんにちは\末尾、」と「みなさん。」を表示する。
     ///     → こんにちは、みなさん。
-    private func printWithTerminator(_ string: String) -> JpfError? {
-        switch string {
+    private func printWithTerminator(_ object: JpfObject) -> JpfError? {
+        switch object.name {
         case Token.Keyword.IDENTIFIER.rawValue: // 識別子をエスケープ文字制御なしで表示する。
-            guard let identifier = environment[string] as? JpfString else {break}
-            guard let object = environment[identifier.value] else {return JpfError("『\(identifier.value)』(識別子)が定義されていない。")}
-            print(object.string)
-            environment[string] = nil
+            guard let identifier = object as? JpfString else {break}
+            guard let definition = environment[identifier.value] else {return JpfError("『\(identifier.value)』(識別子)が定義されていない。")}
+            print(definition.string)
+            environment.remove(name: object.name)
             return nil
         case Token.Keyword.FILE.rawValue:       // ファイルの内容をエスケープ文字制御なしで表示する。
-            guard let filename = environment[string] as? JpfString else {break}
+            guard let filename = object as? JpfString else {break}
             let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
             guard let contents = try? String(contentsOfFile: url.path() + filename.value, encoding: .utf8) else {return fileReadError}
             print(contents)
-            environment[string] = nil
+            environment.remove(name: object.name)
             return nil
         default:
             break
         }                                       // エスケープ文字制御した結果を表示する。
-        var splitter = Splitter(of: replaced(string), with: environment)
+        var splitter = Splitter(of: replaced(object.string), with: environment)
         guard let strings = splitter.split() else {return splitter.error!}
         strings.forEach { s in
             if let range = s.firstRange(of: "\\末尾") {
@@ -264,29 +264,29 @@ struct ReadOperator : PredicateOperable {
             objects.append(leftOperand!.value!)
         }
         for object in objects.reversed() {
-            if let result = readWithoutTerminator(object.string), result.isError {return result}
+            if let result = readWithoutTerminator(object), result.isError {return result}
         }
         return nil
     }
-    private func readWithoutTerminator(_ string: String) -> JpfError? {
-        switch string {
+    private func readWithoutTerminator(_ object: JpfObject) -> JpfError? {
+        switch object.name {
         case Token.Keyword.IDENTIFIER.rawValue: // 識別子をエスケープ文字制御なしで表示する。
-            guard let identifier = environment[string] as? JpfString else {break}
-            guard let object = environment[identifier.value] else {return JpfError("『\(identifier.value)』(識別子)が定義されていない。")}
-            read(object.string)
-            environment[string] = nil
+            guard let identifier = object as? JpfString else {break}
+            guard let definition = environment[identifier.value] else {return JpfError("『\(identifier.value)』(識別子)が定義されていない。")}
+            read(definition.string)
+            environment.remove(name: object.name)
             return nil
         case Token.Keyword.FILE.rawValue:       // ファイルの内容をエスケープ文字制御なしで表示する。
-            guard let filename = environment[string] as? JpfString else {break}
+            guard let filename = object as? JpfString else {break}
             let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
             guard let contents = try? String(contentsOfFile: url.path() + filename.value, encoding: .utf8) else {return fileReadError}
             read(contents)
-            environment[string] = nil
+            environment.remove(name: object.name)
             return nil
         default:
             break
         }
-        var splitter = Splitter(of: string, with: environment, terminator: "")
+        var splitter = Splitter(of: object.string, with: environment, terminator: "")
         guard let splitted = splitter.split() else {return splitter.error!}
         splitted.forEach {read($0)}
         return nil
@@ -317,6 +317,13 @@ struct FilesOperator : PredicateOperable {
         guard let fileNames = try? FileManager.default.contentsOfDirectory(atPath: documentUrl.path()) else {return JpfNull.object}
         return JpfArray(name: op.literal, elements: fileNames.map {JpfString(value: $0)})
     }
+}
+struct IdentifiersOperator : PredicateOperable {
+    init(_ environment: Environment, by op: Token) {self.environment = environment; self.op = op}
+    let environment: Environment, op: Token
+    /// 識別子の一覧を辞書にして返す。
+    /// - Returns: 識別子(JpfString)と定義内容(JpfString)の辞書
+    func operated() -> JpfObject? {environment.stringDictionary}
 }
 // MARK: - 算術演算
 struct AddOperator : PredicateOperable {
@@ -529,11 +536,9 @@ struct ExecuteOperator : PredicateOperable {
         case let function as JpfFunction:   // 関数を実行する
             environment.drop()
             return function.executed(with: environment)
-        case var filename as JpfString:     // ファイルを実行(解析・評価)する
-            if filename.value == Token.Keyword.FILE.rawValue,
-               let object = environment[filename.value] as? JpfString {   // ファイル「ファイル名」
-                environment[filename.value] = nil
-                filename = object
+        case let filename as JpfString:     // ファイルを実行(解析・評価)する
+            if filename.name == Token.Keyword.FILE.rawValue {   // ファイル「ファイル名」
+                environment.remove(name: filename.name)
             }
             let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
             guard let contents = try? String(contentsOfFile: url.path() + filename.value, encoding: .utf8) else {return fileReadError}
@@ -702,6 +707,115 @@ struct AvailableOperator : PredicateOperable {
     }
 }
 // MARK: - 要素アクセス
+
+/// 代入(assign)/上書き(overwrite)
+/// 1. 配列に代入(引数３)
+/// <配列>の位置<数値>に<値>を代入する (<値>を<配列>の位置<数値>に代入する)
+/// <配列>の位置「<識別子>」に<値>を代入する (<値>を<配列>の位置「<識別子>」に代入する)
+/// 2.列挙子に代入(引数２)
+/// <列挙子>に<値>を代入 (<値>を<列挙子>に代入)
+/// 3. 識別子に代入(引数２)
+/// <識別子>に<値>を代入 (<値>を<識別子>に代入)
+/// 4.識別子に計算して代入(引数１)
+/// <識別子>(に)<計算し>て代入
+struct AssignOperator : PredicateOperable {
+    init(_ environment: Environment, by op: Token) {self.environment = environment; self.op = op}
+    let environment: Environment, op: Token
+    func operated() -> JpfObject? {
+        if var params = environment.peek(3) {       // 配列の位置nに値を代入
+            switch (params[0].particle, params[1].particle, params[2].particle) {
+            case (Token(.NO),Token(.NI),Token(.WO)):
+                params.swapAt(0, 1)
+                params.swapAt(0, 2)
+                fallthrough
+            case (Token(.WO),Token(.NO),Token(.NI)):
+                guard let value = params[0].value else {break}
+                guard let array = params[1].value as? JpfArray else {break}
+                let result = array.assign(value, to: params[2])
+                guard !result.isError else {return result}
+                environment.drop(3)
+                if array.name.isEmpty {return result}// 辞書にない場合、代入した配列を返す。
+                return assign(result, to: environment, by: array.name, with: op)
+            default:
+                break
+            }
+        }
+        if var params = environment.peek(2) {
+            switch (params[0].particle, params[1].particle) {
+            case (Token(.NI),Token(.WO)):
+                params.swapAt(0, 1)
+                fallthrough
+            case (Token(.WO),Token(.NI)), (nil,Token(.NI)):
+                guard let value = params[0].value else {break}
+                if let enumerator = params[1].value as? JpfEnumerator {
+                    environment.drop(2)
+                    return JpfEnumerator(type: enumerator.type, name: enumerator.name, identifier: enumerator.identifier, rawValue: value)  // 列挙子に値を代入し返す。
+                }
+                let name = environment.getName(from: params[1])
+                guard !name.isEmpty else {break}
+                environment.drop(2)
+                return assign(value, to: environment, by: name, with: op)  // 識別子に値を代入
+            default:
+                break
+            }
+        }
+        if let param = environment.peek {
+            if let value = param.value, !value.name.isEmpty,
+               param.particle?.unwrappedLiteral == Token(.TA).literal {     // 助詞「て」
+                environment.drop()
+                return assign(value, to: environment, by: value.name, with: op)    // 識別子に計算した値を代入
+            } else {
+                return usage2
+            }
+        }
+        return usage
+    }
+    private var usage: JpfError {op == .keyword(.ASSIGN) ? assignUsage : overwriteUsage}
+    private var usage2: JpfError {op == .keyword(.ASSIGN) ? compoundAssignUsage : compoundOverwriteUsage}
+    private func assign(_ value: JpfObject, to environment: Environment, by name: String, with op: Token) -> JpfError? {
+        if op == .keyword(.ASSIGN) {
+            environment[name] = value
+        } else {
+            if let outer = environment.outer, outer.contains(name) {
+                environment.outer![name] = value
+            } else {
+                return JpfError("エラー：『\(name)』(識別子)が定義されていない。")
+            }
+        }
+        return nil
+    }
+}
+/// オブジェクトの要素に値を設定する。
+/// <値>(を)<オブジェクト>の要素「<識別子>」に設定する。
+/// <オブジェクト>の要素「<識別子>」に<値>を設定する。
+/// <オブジェクト>の要素「<識別子>」を<値>に設定する。
+struct SetOperator : PredicateOperable {
+    init(_ environment: Environment, by op: Token) {self.environment = environment; self.op = op}
+    let environment: Environment, op: Token
+    func operated() -> JpfObject? {
+        if var params = environment.peek(3) {
+            switch (params[0].particle, params[1].particle, params[2].particle) {
+            case (Token(.NO),Token(.NI),Token(.WO)),    // 対象の要素「m」に値を設定
+                 (Token(.NO),Token(.WO),Token(.NI)):    // 対象の要素「m」を値に設定
+                params.swapAt(0, 1)
+                params.swapAt(0, 2)
+                fallthrough
+            case (Token(.WO),Token(.NO),Token(.NI)):    // 値を、対象の要素「m」に設定
+                guard let value = params[0].value, let object = params[1].value else {break}
+                guard let label = params[2].value?.name,
+                      label == Token.Keyword.MEMBER.rawValue else {break}
+                environment.remove(name: label)         // ラベル「要素」を削除
+                let result = object.assign(value, to: params[2].value!)
+                guard !result.isError else {return result}
+                environment.drop(3)
+                return nil
+            default:
+                break
+            }
+        }
+        return setUsage
+    }
+}
 struct AppendOperator : PredicateOperable {
     init(_ environment: Environment, by op: Token) {self.environment = environment; self.op = op}
     let environment: Environment, op: Token
@@ -893,34 +1007,7 @@ struct ReverseOperator : PredicateOperable {
         return left.reversed()
     }
 }
-struct SetOperator : PredicateOperable {
-    init(_ environment: Environment, by op: Token) {self.environment = environment; self.op = op}
-    let environment: Environment, op: Token
-    func operated() -> JpfObject? {
-        if var params = environment.peek(3) {
-            switch (params[0].particle, params[1].particle, params[2].particle) {
-            case (Token(.NO),Token(.NI),Token(.WO)),    // 対象の要素「m」に値を設定
-                 (Token(.NO),Token(.WO),Token(.NI)):    // 対象の要素「m」を値に設定
-                params.swapAt(0, 1)
-                params.swapAt(0, 2)
-                fallthrough
-            case (Token(.WO),Token(.NO),Token(.NI)):    // 値を、対象の要素「m」に設定
-                guard let value = params[0].value, let object = params[1].value else {break}
-                guard let label = params[2].value as? JpfString,
-                      label.value == Token.Keyword.MEMBER.rawValue,
-                      let member = environment.retrieve(name: label.value) else {break}
-                let result = object.assign(value, to: member.value!)
-                environment.remove(name: label.value)
-                guard !result.isError else {return result}
-                environment.drop(3)
-                return nil
-            default:
-                break
-            }
-        }
-        return setUsage
-    }
-}
+
 // MARK: - 補助演算
 /// <式>たもの → <式>
 /// 「もの」(Keyword(.MONO))は、入力から値(式)を取り出す。
@@ -969,22 +1056,21 @@ struct PullOperator : PredicateOperable {
     let environment: Environment, op: Token
     func operated() -> JpfObject? {
         var method: String?, number = 1, identifiers: [String] = []
-        if isPeekParticle(.KO) && isPeekNumber {        // n個写す(得る)
+        if isPeekParticle(.KO) && isPeekNumber {    // n個写す(得る)
             number = leftNumber!
         }
-        if isPeekParticle(.WO), let string = environment.peek?.value as? JpfString, isMethod(string.value) {
+        if isPeekParticle(.WO), let string = environment.unwrappedPeek as? JpfString, isMethod(string.value) {
             // 取得方法(「値」をor「数値」を
             environment.drop()
             method = string.value
         }
-        let label = Token.Keyword.IDENTIFIER.rawValue
-        if isPeekParticle(.NI) && environment.peek?.value?.string == label {        // 複写or移動先の識別子(Label)
+        if isPeekParticle(.NI) {                    // 複写or移動先の識別子
             repeat {
-                guard let identifier = environment.retrieve(name: label) as? JpfString else {return pullDupUsage + op.literal + "。"}
+                let identifier = environment.getName()
+                guard !identifier.isEmpty else {return pullDupUsage + op.literal + "。"}
                 environment.drop()
-                environment.remove(name: label)
-                identifiers.append(identifier.value)
-            } while environment.isPeekParticle(.TO) && environment.peek?.value?.string == label
+                identifiers.insert(identifier, at: 0)
+            } while environment.isPeekParticle(.TO)
         }
         if identifiers.count == 1 && number > 1 {   // 「<識別子>」にn個
             environment[identifiers.first!] = getObjects(from: environment, numberOf: number, by: method)
@@ -1053,82 +1139,6 @@ struct EmptyOperator : PredicateOperable {
         return nil
     }
 }
-/// 1. 配列に代入(引数３)
-/// <配列>の位置<数値>に<値>を代入する (<値>を<配列>の位置<数値>に代入する)
-/// <配列>の位置「<識別子>」に<値>を代入する (<値>を<配列>の位置「<識別子>」に代入する)
-/// 2.列挙子に代入(引数２)
-/// <列挙子>に<値>を代入 (<値>を<列挙子>に代入)
-/// 3. 識別子に代入(引数２)
-/// <識別子>に<値>を代入 (<値>を<識別子>に代入)
-/// 4.識別子に計算して代入(引数１)
-/// <識別子>(に)<計算し>て代入
-struct AssignOperator : PredicateOperable {
-    init(_ environment: Environment, by op: Token) {self.environment = environment; self.op = op}
-    let environment: Environment, op: Token
-    func operated() -> JpfObject? {
-        if var params = environment.peek(3) {       // 配列の位置nに値を代入
-            switch (params[0].particle, params[1].particle, params[2].particle) {
-            case (Token(.NO),Token(.NI),Token(.WO)):
-                params.swapAt(0, 1)
-                params.swapAt(0, 2)
-                fallthrough
-            case (Token(.WO),Token(.NO),Token(.NI)):
-                guard let value = params[0].value else {break}
-                guard let array = params[1].value as? JpfArray else {break}
-                let result = array.assign(value, to: params[2])
-                guard !result.isError else {return result}
-                environment.drop(3)
-                if array.name.isEmpty {return result}// 辞書にない場合、代入した配列を返す。
-                return assign(result, to: environment, by: array.name, with: op)
-            default:
-                break
-            }
-        }
-        if var params = environment.peek(2) {
-            switch (params[0].particle, params[1].particle) {
-            case (Token(.NI),Token(.WO)):
-                params.swapAt(0, 1)
-                fallthrough
-            case (Token(.WO),Token(.NI)), (nil,Token(.NI)):
-                guard let value = params[0].value else {break}
-                if let enumerator = params[1].value as? JpfEnumerator {
-                    environment.drop(2)
-                    return JpfEnumerator(type: enumerator.type, name: enumerator.name, identifier: enumerator.identifier, rawValue: value)  // 列挙子に値を代入し返す。
-                }
-                let name = environment.getName(from: params[1])
-                guard !name.isEmpty else {break}
-                environment.drop(2)
-                return assign(value, to: environment, by: name, with: op)  // 識別子に値を代入
-            default:
-                break
-            }
-        }
-        if let param = environment.peek {
-            if let value = param.value, !value.name.isEmpty,
-               param.particle?.unwrappedLiteral == Token(.TA).literal {     // 助詞「て」
-                environment.drop()
-                return assign(value, to: environment, by: value.name, with: op)    // 識別子に計算した値を代入
-            } else {
-                return usage2
-            }
-        }
-        return usage
-    }
-    private var usage: JpfError {op == .keyword(.ASSIGN) ? assignUsage : overwriteUsage}
-    private var usage2: JpfError {op == .keyword(.ASSIGN) ? compoundAssignUsage : compoundOverwriteUsage}
-    private func assign(_ value: JpfObject, to environment: Environment, by name: String, with op: Token) -> JpfError? {
-        if op == .keyword(.ASSIGN) {
-            environment[name] = value
-        } else {
-            if let outer = environment.outer, outer.contains(name) {
-                environment.outer![name] = value
-            } else {
-                return JpfError("エラー：『\(name)』(識別子)が定義されていない。")
-            }
-        }
-        return nil
-    }
-}
 struct SwapOperator : PredicateOperable {
     init(_ environment: Environment, by op: Token) {self.environment = environment; self.op = op}
     let environment: Environment, op: Token
@@ -1149,11 +1159,4 @@ struct SwapOperator : PredicateOperable {
             return swapUsage
         }
     }
-}
-struct IdentifiersOperator : PredicateOperable {
-    init(_ environment: Environment, by op: Token) {self.environment = environment; self.op = op}
-    let environment: Environment, op: Token
-    /// 識別子の一覧を辞書にして返す。
-    /// - Returns: 識別子(JpfString)と定義内容(JpfString)の辞書
-    func operated() -> JpfObject? {environment.stringDictionary}
 }

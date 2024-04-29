@@ -978,22 +978,22 @@ final class EvaluatorTests: XCTestCase {
     func testStackOperations() throws {
         let testPatterns: [(input: String, expected: Any?)] = [
             ("1を積む。甲は写したもの。甲と得たものを足す。", 2),
-            ("2を積む。識別子「甲」に得る。甲の値。", 2),
+            ("2を積む。「甲」に得る。甲の値。", 2),
             ("3を積み、捨てる。甲は写したもの。甲。", nil),
             ("4と５を積み、１個捨てる。甲は得たもの。甲の値。", 4),
             ("6と7を積み、２個捨てる。入力が空。", true),
             ("8と9を積み、空にする。入力が空", true),
-            ("10と11と12を積む。識別子「甲」に３個写す。空にする。甲の最後の値。", 12),
-            ("13と14と15を積む。識別子「甲」に３個得る。甲の最初の値。", 13),
+            ("10と11と12を積む。「甲」に３個写す。空にする。甲の最後の値。", 12),
+            ("13と14と15を積む。「甲」に３個得る。甲の最初の値。", 13),
             ("16を積む。甲は3個得たもの。甲", nil),
-            ("17を積む。識別子「甲」に「数値」を得る。甲の値。", 17),
+            ("17を積む。「甲」に「数値」を得る。甲の値。", 17),
             ("「a」を積む。甲は「数値」を得たもの。甲。", nil),
-            ("「b」と「c」と「d」を積む。識別子「甲」に「数値」を3個得る。甲。", nil),
-            ("18と19と20を積む。識別子「甲」に「数値」を3個得る。甲の１番目の値。", 19),
+            ("「b」と「c」と「d」を積む。「甲」に「数値」を3個得る。甲。", nil),
+            ("18と19と20を積む。「甲」に「数値」を3個得る。甲の１番目の値。", 19),
             ("21と「a」を積む。捨てる。甲は1個得たもの。甲の格。", "と"),
             ("22と「a」を積む。捨てる。甲は「値」を1個得たもの。甲の格。", nil),
-            ("23と24を積む。識別子「甲」と識別子「乙」に得る。甲に乙を足す。", 47),
-            ("25と26を積む。識別子「甲」と識別子「乙」に写す。甲から乙を引く。", -1),
+            ("23と24を積む。「甲」と「乙」に得る。甲に乙を足す。", 47),
+            ("25と26を積む。「甲」と「乙」に写す。甲から乙を引く。", -1),
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
@@ -1268,6 +1268,5 @@ private func testEvaluatorWithLabel(_ input: String) -> JpfObject? {
     let environment = Environment()
     let eval = Evaluator(from: program, with: environment)
     guard let label = (eval.object ?? environment.peek) as? JpfString else {return nil}
-    guard let name = environment[label.value] as? JpfString else {return nil}
-    return environment[name.value]
+    return environment[label.value]
 }
