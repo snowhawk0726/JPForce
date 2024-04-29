@@ -91,6 +91,7 @@ extension JpfObject {
     var identifierNotAvailable: String  {"(識別子)は利用可能でない。"}
     var arrayPositionError: String      {"指定位置が、配列内に無い。"}
     var identifierNotFound: String      {"指定した識別子名が見つからない。"}
+    var typeNotFound: String            {"型「\(type)」の定義が見つからない。"}
     var notExecutableObject: JpfError   {JpfError("「関数」以外を実行しようとした。型：")}
     var functionParameterError: JpfError{JpfError("「関数」の入力が指定形式と一致しない。")}
     var getterNotFound: JpfError        {JpfError("「算出」の取得定義が見つからなかった。")}
@@ -622,6 +623,13 @@ extension JpfInstance {
     }
     func assign(_ value: JpfObject, to target: JpfObject) -> JpfObject {
         return assign(value, to: target, with: environment)
+    }
+    func initialize(with environment: Environment) -> JpfObject? {
+        guard let type = environment[self.type] as? JpfType else {return JpfError(typeNotFound)}
+        if !type.initializers.isEmpty,
+           let result = environment.execute(type.initializers, with: self.environment),
+           result.isError {return result}
+        return nil
     }
 }
 extension JpfEnum {

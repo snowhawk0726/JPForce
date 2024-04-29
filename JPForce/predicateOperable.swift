@@ -122,13 +122,6 @@ extension PredicateOperable {
         environment.drop()
         return number
     }
-    func initialize(_ instance: JpfInstance, with environment: Environment) -> JpfObject? {
-        guard let type = environment[instance.type] as? JpfType else {return cannotInitialize}
-        if !type.initializers.isEmpty,
-           let result = environment.execute(type.initializers, with: instance.environment),
-           result.isError {return result}
-        return nil
-    }
     // エラー
     var numerationParamError1: JpfError {JpfError("には２つの数値入力が必要。")}
     var numerationParamError2: JpfError {JpfError("には２つ以上の数値入力が必要。")}
@@ -607,7 +600,7 @@ struct CreateOperator : PredicateOperable {
             environment.push(phrase)
         }
         guard environment.isPeekParticle(.KARA) || environment.isPeekParticle(.WO) else {return createUsage}
-        switch environment.peek?.value {
+        switch environment.unwrappedPeek {
         case let instanceType as JpfType:   // 型からインスタンスを生成
             environment.drop()
             if let identifier = getIdentifier() {   // 識別子あり？
@@ -651,7 +644,7 @@ struct CreateOperator : PredicateOperable {
         defer {environment.push(local.pullAll())}           // スタックを戻す
         var instance = JpfInstance(type: type.name, environment: local, protocols: type.protocols, available: [])
         local[JpfInstance.SELF] = instance                  // selfを仮登録
-        if let result = initialize(instance, with: environment), result.isError {return result} // 初期化
+        if let result = instance.initialize(with: environment), result.isError {return result} // 初期化
         var protocols: [JpfProtocol] = []                   // 規約(型)登録
         for ident in type.protocols {
             if let rule = environment[ident] as? JpfProtocol {
@@ -689,7 +682,7 @@ struct InitializeOperator : PredicateOperable {
     func operated() -> JpfObject? {
         guard let instance = environment.unwrappedPeek as? JpfInstance else {return cannotInitialize}
         environment.drop()
-        if let result = initialize(instance, with: environment), result.isError {return result} // 初期化
+        if let result = instance.initialize(with: environment), result.isError {return result} // 初期化
         return nil
     }
 }
