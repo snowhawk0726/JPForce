@@ -69,9 +69,9 @@ struct PredicateOperableFactory {
     }
 }
 /// stringをsplit()により、[String]に分解する。
-/// また、\『<識別子>』もしくは、\(<識別子>)を識別子の内容に置き換える。
+/// \『<識別子>』もしくは、\(<識別子>)を識別子の内容に置き換える。
 struct Splitter {
-    init(of string: String, with environment: Environment, terminator: String = "\\末尾") {self.string = string; self.environment = environment; self.terminator = terminator}
+    init(of string: String, with environment: Environment, terminator: String = "") {self.string = string; self.environment = environment; self.terminator = terminator}
     let string: String
     let environment: Environment
     let terminator: String
@@ -87,6 +87,12 @@ struct Splitter {
         }
         return strings
     }
+    /// 括弧(parentheses)で囲まれた識別子を、識別子の内容(文字列)に分解し、文字列の配列に格納する。
+    /// 改行を回避するために、終端文字(terminator)を文字列に追加する。
+    /// - Parameters:
+    ///   - s: 対象の文字列
+    ///   - parentheses: 識別子を囲う記号の組
+    /// - Returns: 文字列の配列、もしくはnil (errorにエラーを出力)
     mutating private func split(_ s: String, with parentheses: (String, Character)) -> [String]? {
         let beginOfIdent = parentheses.0, endOfIdent = parentheses.1
         var splitted: [String] = []
@@ -97,11 +103,11 @@ struct Splitter {
             }
             splitted.append(String(s[s.startIndex..<range.lowerBound]) + terminator)// 識別子の前の部分を切り出す
             let name = String(s[range.upperBound..<i])
-            guard let object = environment[name] else {                             // 識別子を切り出す
+            guard let object = environment[name] else {                             // 識別子の内容を切り出す
                 error = JpfError("『\(name)』(識別子)が定義されていない。")
                 return nil
             }
-            splitted.append(object.string + terminator)
+            splitted.append(object.string + terminator)                             // 配列に追加
             let s = String(s[s.index(after: i)..<s.endIndex])
             guard let strings = split(s, with: (beginOfIdent, endOfIdent)) else {return nil}   // 残りを分割し、配列に追加
             splitted += strings
@@ -121,6 +127,47 @@ extension PredicateOperable {
         guard let number = environment.peek?.number else {return nil}
         environment.drop()
         return number
+    }
+    // Output
+    func output(_ object: JpfObject, withEscapeProcessing: Bool, out: (String) -> Void) -> JpfError? {
+        switch object.name {                    // ラベルのチェック
+        case Token.Keyword.IDENTIFIER.rawValue: // 識別子(定義)を出力
+            guard let identifier = object as? JpfString else {break}
+            guard let definition = environment[identifier.value] else {return JpfError("『\(identifier.value)』(識別子)が定義されていない。")}
+            out(definition.string)
+            environment.remove(name: object.name)
+            return nil
+        case Token.Keyword.FILE.rawValue:       // ファイル(の内容)を出力
+            guard let filename = object as? JpfString else {break}
+            let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            guard let contents = try? String(contentsOfFile: url.path() + filename.value, encoding: .utf8) else {return fileReadError}
+            out(contents)
+            environment.remove(name: object.name)
+            return nil
+        default:
+            break
+        }
+        let terminateString = "\\末尾"
+        var splitter = withEscapeProcessing ?
+            Splitter(of: replaced(object.string), with: environment, terminator: terminateString) :
+            Splitter(of: object.string, with: environment)
+        guard let strings = splitter.split() else {return splitter.error!}
+        strings.forEach { s in
+            if withEscapeProcessing, let range = s.firstRange(of: terminateString) {
+                let terminator = String(s[range.upperBound..<s.endIndex])   // 「末尾」の後の文字列
+                print(s[s.startIndex..<range.lowerBound], terminator: terminator)
+            } else {
+                out(s)
+            }
+        }
+        return nil
+    }
+    /// エスケープ文字を(Swiftの)制御コードに変換する。
+    /// 「\改行なし」が文字列の後尾にある場合、改行をせずに表示する。
+    /// 　(\は、そのまま使えるが、Swiftに合わせた。(「"」とか「'」は合わせてない))
+    private func replaced(_ string: String) -> String {
+        let codes = [("\\t","\t"),("\\n","\n"),("\\r","\r"),("\\0","\0"),("\\\\","\\"),("\\「","「"),("\\」","」"),("\\改行なし","\\末尾")]
+        return codes.reduce(string) {$0.replacingOccurrences(of: $1.0, with: $1.1)}
     }
     // エラー
     var numerationParamError1: JpfError {JpfError("には２つの数値入力が必要。")}
@@ -192,52 +239,9 @@ struct PrintOperator : PredicateOperable {
             objects.append(leftOperand!.value!)
         }
         for object in objects.reversed() {
-            if let result = printWithTerminator(object), result.isError {return result}
+            if let result = output(object, withEscapeProcessing: true, out: {print($0)}), result.isError {return result}
         }
         return nil
-    }
-    /// 文字列の中のエスケープ文字を解析して表示(print)する。
-    /// (stringが識別子として登録されている場合はエスケープせずに登録されたオブジェクトを表示する。)
-    /// - Parameter string: 制御文字を含む文字列
-    /// 「\末尾」は、文字列の末尾を改行の代わりに表示する。
-    /// 例： 「こんにちは\末尾、」と「みなさん。」を表示する。
-    ///     → こんにちは、みなさん。
-    private func printWithTerminator(_ object: JpfObject) -> JpfError? {
-        switch object.name {
-        case Token.Keyword.IDENTIFIER.rawValue: // 識別子をエスケープ文字制御なしで表示する。
-            guard let identifier = object as? JpfString else {break}
-            guard let definition = environment[identifier.value] else {return JpfError("『\(identifier.value)』(識別子)が定義されていない。")}
-            print(definition.string)
-            environment.remove(name: object.name)
-            return nil
-        case Token.Keyword.FILE.rawValue:       // ファイルの内容をエスケープ文字制御なしで表示する。
-            guard let filename = object as? JpfString else {break}
-            let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            guard let contents = try? String(contentsOfFile: url.path() + filename.value, encoding: .utf8) else {return fileReadError}
-            print(contents)
-            environment.remove(name: object.name)
-            return nil
-        default:
-            break
-        }                                       // エスケープ文字制御した結果を表示する。
-        var splitter = Splitter(of: replaced(object.string), with: environment)
-        guard let strings = splitter.split() else {return splitter.error!}
-        strings.forEach { s in
-            if let range = s.firstRange(of: "\\末尾") {
-                let terminator = String(s[range.upperBound..<s.endIndex])   // 「末尾」の後の文字列
-                print(s[s.startIndex..<range.lowerBound], terminator: terminator)
-            } else {
-                print(s)
-            }
-        }
-        return nil
-    }
-    /// エスケープ文字を(Swiftの)制御コードに変換する。
-    /// 「\改行なし」が文字列の後尾にある場合、改行をせずに表示する。
-    /// 　(\は、そのまま使えるが、Swiftに合わせた。(「"」とか「'」は合わせてない))
-    private func replaced(_ string: String) -> String {
-        let codes = [("\\t","\t"),("\\n","\n"),("\\r","\r"),("\\0","\0"),("\\\\","\\"),("\\「","「"),("\\」","」"),("\\改行なし","\\末尾")]
-        return codes.reduce(string) {$0.replacingOccurrences(of: $1.0, with: $1.1)}
     }
 }
 struct NewlineOperator : PredicateOperable {
@@ -257,31 +261,8 @@ struct ReadOperator : PredicateOperable {
             objects.append(leftOperand!.value!)
         }
         for object in objects.reversed() {
-            if let result = readWithoutTerminator(object), result.isError {return result}
+            if let result = output(object, withEscapeProcessing: false, out: {read($0)}), result.isError {return result}
         }
-        return nil
-    }
-    private func readWithoutTerminator(_ object: JpfObject) -> JpfError? {
-        switch object.name {
-        case Token.Keyword.IDENTIFIER.rawValue: // 識別子をエスケープ文字制御なしで表示する。
-            guard let identifier = object as? JpfString else {break}
-            guard let definition = environment[identifier.value] else {return JpfError("『\(identifier.value)』(識別子)が定義されていない。")}
-            read(definition.string)
-            environment.remove(name: object.name)
-            return nil
-        case Token.Keyword.FILE.rawValue:       // ファイルの内容をエスケープ文字制御なしで表示する。
-            guard let filename = object as? JpfString else {break}
-            let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            guard let contents = try? String(contentsOfFile: url.path() + filename.value, encoding: .utf8) else {return fileReadError}
-            read(contents)
-            environment.remove(name: object.name)
-            return nil
-        default:
-            break
-        }
-        var splitter = Splitter(of: object.string, with: environment, terminator: "")
-        guard let splitted = splitter.split() else {return splitter.error!}
-        splitted.forEach {read($0)}
         return nil
     }
     private func read(_ string: String) {
