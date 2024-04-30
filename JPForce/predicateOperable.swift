@@ -129,19 +129,19 @@ extension PredicateOperable {
         return number
     }
     // Output
-    func output(_ object: JpfObject, withEscapeProcessing: Bool, out: (String) -> Void) -> JpfError? {
+    func output(_ object: JpfObject, withEscapeProcessing: Bool, out: (String, String) -> Void) -> JpfError? {
         switch object.name {                    // ラベルのチェック
         case Token.Keyword.IDENTIFIER.rawValue: // 識別子(定義)を出力
             guard let identifier = object as? JpfString else {break}
             guard let definition = environment[identifier.value] else {return JpfError("『\(identifier.value)』(識別子)が定義されていない。")}
-            out(definition.string)
+            out(definition.string, "")
             environment.remove(name: object.name)
             return nil
         case Token.Keyword.FILE.rawValue:       // ファイル(の内容)を出力
             guard let filename = object as? JpfString else {break}
             let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
             guard let contents = try? String(contentsOfFile: url.path() + filename.value, encoding: .utf8) else {return fileReadError}
-            out(contents)
+            out(contents, "")
             environment.remove(name: object.name)
             return nil
         default:
@@ -155,9 +155,9 @@ extension PredicateOperable {
         strings.forEach { s in
             if withEscapeProcessing, let range = s.firstRange(of: terminateString) {
                 let terminator = String(s[range.upperBound..<s.endIndex])   // 「末尾」の後の文字列
-                print(s[s.startIndex..<range.lowerBound], terminator: terminator)
+                out(String(s[s.startIndex..<range.lowerBound]), terminator)
             } else {
-                out(s)
+                out(s, "")
             }
         }
         return nil
@@ -239,7 +239,9 @@ struct PrintOperator : PredicateOperable {
             objects.append(leftOperand!.value!)
         }
         for object in objects.reversed() {
-            if let result = output(object, withEscapeProcessing: true, out: {print($0)}), result.isError {return result}
+            if let result = output(object, withEscapeProcessing: true,
+                                   out: {$1.isEmpty ? print($0) : print($0, terminator: $1)}
+                            ), result.isError {return result}
         }
         return nil
     }
@@ -261,7 +263,7 @@ struct ReadOperator : PredicateOperable {
             objects.append(leftOperand!.value!)
         }
         for object in objects.reversed() {
-            if let result = output(object, withEscapeProcessing: false, out: {read($0)}), result.isError {return result}
+            if let result = output(object, withEscapeProcessing: false, out: {read($0 + $1)}), result.isError {return result}
         }
         return nil
     }

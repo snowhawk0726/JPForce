@@ -1223,6 +1223,60 @@ final class EvaluatorTests: XCTestCase {
         }
         print("テスト終了")
     }
+    func testOutputs() throws {
+        struct TestOperator : PredicateOperable {
+            init(_ environment: Environment) {self.environment = environment}
+            let environment: Environment
+            func operated() -> (any JpfObject)? {
+                var result = OutputString()
+                guard let object = leftOperand else {return nil}
+                if let error = output(object, withEscapeProcessing: true,
+                                      out: {result.concat($0,$1)}) {return error}
+                return JpfString(value: result.string)
+            }
+        }
+        struct OutputString {
+            var string = ""
+            mutating func concat(_ s1: String, _ s2: String) {
+                string += s1 + s2
+            }
+        }
+        let testPatterns: [(input: String, expected: String)] = [
+            ("「みなさん、こんにちは。」", "みなさん、こんにちは。"),
+            ("「みなさん、」に「こんにちは。」を足す。", "みなさん、こんにちは。"),
+            ("「こんにちは、\\改行なし」", "こんにちは、"),
+            ("「い\\nろ\\nは」", "い\nろ\nは"),
+            ("「あ\\末尾\\t」と「いうえお」を足す。", "あ\tいうえお"),
+            ("「かぎ括弧\\「\\」」", "かぎ括弧「」"),
+            ("甲は１。「答えは、\\『甲』。」", "答えは、1。"),
+            ("甲は関数【「何もしない」】。「甲は、\\(甲)。」",
+             "甲は、関数であって、【本体が、「何もしない」】。"),
+            ("二倍は、関数【入力がx、xに2を掛ける】。二倍",
+             "関数であって、【入力が、xであり、本体が、xに2を掛ける】"),
+            ("加えるは、算出【取得が【入力がa「数値」とb「数値」、aにbを足し、返す】】。識別子「加える」",
+             "算出であって、【取得は、【入力が、a「数値」とb「数値」であり、本体が、aにbを足し、返す】】"),
+            ("加えるは、算出【取得が【入力がa「数値」とb「数値」、aにbを足し、返す】】。「『加える』は、\\『加える』」",
+             "『加える』は、算出であって、【取得は、【入力が、a「数値」とb「数値」であり、本体が、aにbを足し、返す】】"),
+            ("文字列は、「い\\nろ\\nは」。識別子「文字列」", "い\\nろ\\nは"),
+        ]
+        for test in testPatterns {
+            print("テストパターン: \(test.input)")
+            let lexer = Lexer(test.input)
+            let parser = Parser(lexer)
+            guard let program = parser.parseProgram(), parser.errors.isEmpty else {
+                parser.errors.forEach {print("Parser errors: \($0)")}
+                XCTFail()
+                return
+            }
+            let environment = Environment()
+            let evaluated = Evaluator(from: program, with: environment).object
+            XCTAssertFalse(evaluated != nil && evaluated!.isError, evaluated?.string ?? "nil")
+            let testOperator = TestOperator(environment)
+            let result = try XCTUnwrap(testOperator.operated())
+            XCTAssertEqual(result.string, test.expected)
+            print("テスト(\(result.string))終了")
+        }
+    }
 }
 // MARK: - ヘルパー
 private func testObject(_ object: JpfObject, with exptected: Int) throws {
