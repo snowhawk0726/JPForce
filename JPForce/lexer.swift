@@ -35,7 +35,7 @@ class Lexer {
         /// 識別子として使用不可:  助詞を含む文字列、記号・数値で始まる文字列、記号で終わる文字列、予約語「する」「こと」「また」「以上」「以下」「未満」で終わる文字列
         switch (token, nextToken, compoundToken) {
         case (.IDENT(_),.keyword(let keyword),_):       // 識別子 + 予約語 → 合成
-            if ![.SURU,.KOTO,.MATA,.GTEQUAL,.LTEQUAL,.UNDER].contains(keyword) {
+            if ![.SURU,.KOTO,.MATA,.GTEQUAL,.LTEQUAL,.UNDER,.CASE].contains(keyword) {
                 token = Token(word: token.literal + getNext().literal)
             }   // (する、こと、また、以上、以下、未満を除く)
         case (_,_,.keyword(_)), (_,_,.particle(_)),

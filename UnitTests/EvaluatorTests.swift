@@ -1237,8 +1237,8 @@ final class EvaluatorTests: XCTestCase {
         }
         struct OutputString {
             var string = ""
-            mutating func concat(_ s1: String, _ s2: String) {
-                string += s1 + s2
+            mutating func concat(_ s1: String, _ s2: String?) {
+                string += s1 + (s2 ?? "")
             }
         }
         let testPatterns: [(input: String, expected: String)] = [
