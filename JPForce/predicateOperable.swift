@@ -128,7 +128,7 @@ extension PredicateOperable {
         environment.drop()
         return number
     }
-    // Output
+    /// object.stringをout()で出力する。
     func output(_ object: JpfObject, withEscapeProcessing: Bool, out: (String, String?) -> Void) -> JpfError? {
         switch object.name {                    // ラベルのチェック
         case Token.Keyword.IDENTIFIER.rawValue: // 識別子(定義)を出力
@@ -239,9 +239,10 @@ struct PrintOperator : PredicateOperable {
             objects.append(leftOperand!.value!)
         }
         for object in objects.reversed() {
-            if let result = output(object, withEscapeProcessing: true,
-                                   out: {if let terminator = $1 {print($0, terminator: terminator)} else {print($0)}}
-                            ), result.isError {return result}
+            let result = output(object, withEscapeProcessing: true) {
+                if let terminator = $1 {print($0, terminator: terminator)} else {print($0)}
+            }
+            if result?.isError ?? false {return result}
         }
         return nil
     }
@@ -263,9 +264,10 @@ struct ReadOperator : PredicateOperable {
             objects.append(leftOperand!.value!)
         }
         for object in objects.reversed() {
-            if let result = output(object, withEscapeProcessing: false, 
-                                   out: {if $1 == nil {read($0)}}
-                            ), result.isError {return result}
+            let result = output(object, withEscapeProcessing: false) {
+                if $1 == nil {read($0)}
+            }
+            if result?.isError ?? false {return result}
         }
         return nil
     }
