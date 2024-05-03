@@ -61,7 +61,9 @@ extension Parsable {
         nextToken.type == .symbol(.EOL) || nextToken.type == .symbol(.EOF)
     }
     /// エラー出力
-    func error(message: String) {parser.errors.append(message + "(解析位置:\(currentToken.literal))")}
+    func error(message: String) {
+        parser.errors.append(message + (currentToken.isIllegal ? "" : "(解析位置: \(currentToken.literal))"))
+    }
     /// ブロックカウンター制御
     ///  - ブロック文中のブロック記号【】とEOLをカウントし、整合性をチェックする。
     var blockCount: Parser.NestCounter {parser.nestedBlockCounter}
@@ -114,7 +116,7 @@ extension Parsable {
             _ = getNext(whenNextIs: .COMMA)
             repeat {
                 guard nextToken.isIdent || nextToken.isString else {
-                    error(message: "型で、規約が識別子以外で定義されている。")
+                    error(message: "型で、準拠する規約の型が間違っている。(\(nextToken))")
                     return nil
                 }
                 protocols.append(nextToken.literal)
@@ -618,8 +620,11 @@ struct PrefixExpressionParserFactory {
         case .keyword(.IDENTIFIER),.keyword(.FILE),.keyword(.POSITION),.keyword(.MEMBER):
                                     return LabelExpressionParser(parser)
         case .keyword(_):           return PredicateExpressionParser(parser)
+        case .illegal:              break
         default:                    return nil
         }
+        print("字句解析エラー： \(parser.currentToken.literal)。")
+        return nil
     }
 }
 struct IdentifierParser : ExpressionParsable {
