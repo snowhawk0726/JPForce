@@ -54,7 +54,8 @@ struct PredicateOperableFactory {
         case .keyword(.SORT):       return SortOperator(environment, by: token)
         case .keyword(.REVERSE):    return ReverseOperator(environment, by: token)
         case .keyword(.SET):        return SetOperator(environment, by: token)
-        case .keyword(.PRINT):      return PrintOperator(environment, by: token)
+        case .keyword(.PRINT),.keyword(.ASK):
+                                    return PrintOperator(environment, by: token)
         case .keyword(.NEWLINE):    return NewlineOperator(environment)
         case .keyword(.READ):       return ReadOperator(environment, by: token)
         case .keyword(.FILES):      return FilesOperator(environment, by: token)
@@ -195,6 +196,7 @@ extension PredicateOperable {
     var detectParserError: JpfError     {JpfError("構文解析器がエラーを検出した。")}
     // メッセージ(使い方)
     var printUsage: JpfError            {JpfError("仕様：(〜と…)〜を表示する。")}
+    var askUsage: JpfError              {JpfError("仕様：(〜と…)〜と尋ねる。")}
     var readUsage: JpfError             {JpfError("仕様：(〜と…)〜を音読する。")}
     var additionUsage: JpfError         {JpfError("仕様：(〜と…)〜を足す。")}
     var multiplicationUsage: JpfError   {JpfError("仕様：(〜と…)〜を掛ける。")}
@@ -219,8 +221,8 @@ extension PredicateOperable {
     var pullDupUsage: JpfError          {JpfError("仕様：(識別子「<識別子>」と…)(識別子「<識別子>」に）(「数値」または「値」を)(<数値>個)")}
     var assignUsage: JpfError           {JpfError("仕様：〜(を)「<識別子>」に代入する。または、「<識別子>」に〜を代入する。")}
     var overwriteUsage: JpfError        {JpfError("仕様：〜(を)「<識別子>」に上書きする。または、「<識別子>」に〜を上書きする。")}
-    var compoundAssignUsage: JpfError           {JpfError("仕様：<識別子>(を)<演算し>て代入する。")}
-    var compoundOverwriteUsage: JpfError           {JpfError("仕様：<識別子>(を)<演算し>て上書きする。")}
+    var compoundAssignUsage: JpfError           {JpfError("仕様：<識別子>(を)<計算し>て代入する。")}
+    var compoundOverwriteUsage: JpfError           {JpfError("仕様：<識別子>(を)<計算し>て上書きする。")}
     var assignArrayUsage: JpfError      {JpfError("仕様：〜(を)<配列>の位置<数値>に代入(または上書き)する。または、<配列>の位置<数値>に〜を代入(または上書き)する。")}
     var swapUsage: JpfError             {JpfError("仕様：<識別子１>と<識別子２>を入れ替える。または、<識別子１>を<識別子２>と入れ替える。")}
     var createUsage: JpfError           {JpfError("仕様：(「<識別子>」を)(<引数>で)<型>から生成する。または、<型>から(<引数>で)「<識別子>」を生成する。")}
@@ -232,7 +234,7 @@ struct PrintOperator : PredicateOperable {
     init(_ environment: Environment, by op: Token) {self.environment = environment; self.op = op}
     let environment: Environment, op: Token
     func operated() -> JpfObject? {
-        guard let object = environment.unwrappedPeek else {return "「\(op.literal)」" + atLeastOneParamError + printUsage}
+        guard let object = environment.unwrappedPeek else {return "「\(op.literal)」" + atLeastOneParamError + (op.isKeyword(.PRINT) ? printUsage : askUsage)}
         var objects: [JpfObject] = [object]
         environment.drop()
         while isPeekParticle(.TO) {             // スタックにト格があれば、中身を格納
@@ -243,6 +245,9 @@ struct PrintOperator : PredicateOperable {
                 if let terminator = $1 {print($0, terminator: terminator)} else {print($0)}
             }
             if result?.isError ?? false {return result}
+        }
+        if op.isKeyword(.ASK), let input = readLine() {
+                environment.push(JpfString(value: input))
         }
         return nil
     }
@@ -561,8 +566,9 @@ struct ReturnOperator : PredicateOperable {
     /// 入力を拾い、ラップした値を返す
     /// - Returns: 返り値。入力が空ならエラー
     func operated() -> JpfObject? {
-        guard !environment.isEmpty else {return returnParamError}
-        return JpfReturnValue(value: isPeekParticle(.WO) ? environment.unwrapPhrase() : leftOperand)
+        guard var value = isPeekParticle(.WO) ? environment.unwrapPhrase() : leftOperand else {return returnParamError}
+        value.name = ""
+        return JpfReturnValue(value: value)
     }
 }
 struct BreakOperator : PredicateOperable {
@@ -720,7 +726,7 @@ struct AssignOperator : PredicateOperable {
                 break
             }
         }
-        if var params = environment.peek(2) {
+        if var params = environment.peek(2) {       // 列挙子に代入
             switch (params[0].particle, params[1].particle) {
             case (Token(.NI),Token(.WO)):
                 params.swapAt(0, 1)
@@ -739,8 +745,9 @@ struct AssignOperator : PredicateOperable {
                 break
             }
         }
-        if let param = environment.peek {
-            if let value = param.value, !value.name.isEmpty,
+        if let param = environment.peek {           // 計算して代入
+            guard param.value?.name != "" else {return JpfError("エラー：代入先の識別子が不明。") + usage2}
+            if let value = param.value,
                param.particle?.unwrappedLiteral == Token(.TA).literal {     // 助詞「て」
                 environment.drop()
                 return assign(value, to: environment, by: value.name, with: op)    // 識別子に計算した値を代入

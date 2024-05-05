@@ -58,6 +58,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		50050A092BE4E37300989700 /* サンプル.txt */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = "サンプル.txt"; sourceTree = "<group>"; };
+		50050A0A2BE5E0ED00989700 /* test.txt */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = test.txt; path = ../../../../../Documents/test.txt; sourceTree = "<group>"; };
 		5042121329B58CA700D2EA98 /* JPForce */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = JPForce; sourceTree = BUILT_PRODUCTS_DIR; };
 		5042121E29B58DAD00D2EA98 /* token.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = token.swift; sourceTree = "<group>"; };
 		5042121F29B58DAD00D2EA98 /* lexer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = lexer.swift; sourceTree = "<group>"; };
@@ -75,10 +77,8 @@
 		5042124A29B58F0000D2EA98 /* ParserTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ParserTests.swift; sourceTree = "<group>"; };
 		5042124C29B58F0D00D2EA98 /* TokenTests.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TokenTests.swift; sourceTree = "<group>"; };
 		5042124E29B5903F00D2EA98 /* evaluatable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = evaluatable.swift; sourceTree = "<group>"; };
-		504CAD2E2A0C990800F627F1 /* サンプル関数.txt */ = {isa = PBXFileReference; lastKnownFileType = text; name = "サンプル関数.txt"; path = "../../../../../Documents/サンプル関数.txt"; sourceTree = "<group>"; };
 		50552F3C29B5B87D0061CDBE /* environment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = environment.swift; sourceTree = "<group>"; };
 		506561E829D937380016923D /* ObjectTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ObjectTests.swift; sourceTree = "<group>"; };
-		506F2FE229FBB23000F7083A /* test */ = {isa = PBXFileReference; lastKnownFileType = text; name = test; path = ../../../../../Documents/test; sourceTree = "<group>"; };
 		5070B1A729B61DDA00808FDE /* predicateOperable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = predicateOperable.swift; sourceTree = "<group>"; };
 		508BFEFA29ED3A6A00F1959A /* objectAccessible.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = objectAccessible.swift; sourceTree = "<group>"; };
 		509D910229CD85C200C22283 /* builtin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = builtin.swift; sourceTree = "<group>"; };
@@ -106,8 +106,8 @@
 		5042120A29B58CA700D2EA98 = {
 			isa = PBXGroup;
 			children = (
-				506F2FE229FBB23000F7083A /* test */,
-				504CAD2E2A0C990800F627F1 /* サンプル関数.txt */,
+				50050A092BE4E37300989700 /* サンプル.txt */,
+				50050A0A2BE5E0ED00989700 /* test.txt */,
 				5042121529B58CA700D2EA98 /* JPForce */,
 				5042123529B58E1500D2EA98 /* UnitTests */,
 				5042121429B58CA700D2EA98 /* Products */,
