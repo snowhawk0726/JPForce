@@ -1,7 +1,7 @@
 # 日本語ふぉーす(JpForce)
 
 - [言語の説明](#言語の説明)
-- [文法・言語仕様](https:./programmingLanguageGuide.md)(別ドキュメント)
+- [文法・言語仕様](./ProgrammingLanguageGuide.md)(別ドキュメント)
 - [コマンド(REPL)](#インタープリタjpforce-コマンド)
 
 ## 言語の説明
@@ -190,7 +190,7 @@ _例:_
 
 ### 仕様
 
-仕様・言語の使い方については、[「文法」](https:./programmingLanguageGuide.md)に記載しています。
+仕様・言語の使い方については、[「文法」](./ProgrammingLanguageGuide.md)に記載しています。
 
 ### 今後の見通し
 
@@ -275,7 +275,7 @@ REPL を終了するには、`Control + D`を入力します。
 
 注：xcode 上で、REPL を起動した場合、プロンプトの後に日本語を直接入力することはできません。`Control + F`で、検索を開いて、そこに入力した日本語をコピペするか、メモ帳等で書いてコピペする必要があります。
 
-[「文法」](https:./programmingLanguageGuide.md)に記載している例も、基本的にコピペで、実行できる様にしています。  
+[「文法」](./ProgrammingLanguageGuide.md)に記載している例も、基本的にコピペで、実行できる様にしています。  
 (スタックは、誤動作の原因にもなるので、不要であれば、空にしてから実行することをお勧めします。)
 
 #### REPL の実行結果の見方
