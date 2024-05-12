@@ -98,6 +98,36 @@ final class EvaluatorTests: XCTestCase {
             print("テスト(\(evaluated))終了")
         }
     }
+    func testPhraseExpressions() throws {
+        let input = """
+        『割った余り１』は、算出【入力が左辺「数値を」と右辺「数値で」、
+            左辺を右辺で割り、右辺を掛け、左辺から引き、返す。
+        】
+        『割った余り２』は、算出【入力が左辺「数値を」と右辺「数値で」、
+            左辺を右辺で割り、右辺を掛け、左辺から引く。(値を返さない)
+        】
+        """
+        let testPatterns: [(input: String, expected: Bool)] = [
+            ("1が1である。", true),
+            ("10を4で『割った余り１』が0である。", false),
+            ("10を4で『割った余り２』が0である。", false),
+        ]
+        print("テストパターン: \(input)")
+        let environment = Environment()
+        let parser = Parser(Lexer(input))
+        let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+        let result = eval.object ?? environment.pull()
+        XCTAssertFalse(result?.isError ?? false, result?.error?.message ?? "")
+        for test in testPatterns {
+            print("テストパターン: \(test.input)")
+            let parser = Parser(Lexer(test.input))
+            let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+            let result = try XCTUnwrap(eval.object ?? environment.pull())
+            try testObject(result, with: test.expected)
+            print("テスト結果(\(result.string))")
+        }
+        print("テスト終了")
+    }
     func testCaseExpressions() throws {
         let testPatterns: [(input: String, exptected: Any?)] = [
             ("真である場合、10", 10), ("偽である場合、10", nil), ("1である場合、10", 10),
@@ -1074,8 +1104,8 @@ final class EvaluatorTests: XCTestCase {
             ("""
             yは、関数【xは1。xに1を足して上書き。】
             yを実行する。
-            """, "エラー：『x』(識別子)が定義されていない。"),
-            ("fは関数【入力がa、aを返す】。xは１。xでfを実行して代入する。", "エラー：代入先の識別子が不明。仕様：<識別子>(を)<計算し>て代入する。"),
+            """, "『x』(識別子)が定義されていない。"),
+            ("fは関数【入力がa、aを返す】。xは１。xでfを実行して代入する。", "代入先の識別子が空(「」)。仕様：<識別子>(を)<計算し>て代入する。"),
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")

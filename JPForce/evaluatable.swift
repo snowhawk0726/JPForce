@@ -274,11 +274,18 @@ extension PhraseExpression : Evaluatable {
     /// 句(式+助詞)を返す。
     /// self.tokenは、助詞(Token.Particle)
     func evaluated(with environment: Environment) -> JpfObject? {
-        guard let result = left.evaluated(with: environment) else {return nil}
-        // TODO: 関数で値を返さないとnilが返り句もnilになってしまう。(スタックに値が残る)
-        // ここでエラーにすると、「空にする」の「に」等、冗長な句もエラーになってしまう。
-        guard !result.isError else {return result}
-        return JpfPhrase(value: result, particle: token)
+        var object: JpfObject
+        if let result = left.evaluated(with: environment) { // leftの評価結果が値を返した場合
+            object = result
+        } else
+        if let value = environment.unwrappedPeek {          // leftがスタックに値を出力した場合
+            environment.drop()
+            object = value
+        } else {
+            return nil
+        }
+        guard !object.isError else {return object}
+        return JpfPhrase(value: object, particle: token)
     }
 }
 extension InfixExpression : Evaluatable {

@@ -58,7 +58,6 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		50050A092BE4E37300989700 /* サンプル.txt */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = "サンプル.txt"; sourceTree = "<group>"; };
 		50050A0A2BE5E0ED00989700 /* test.txt */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = test.txt; path = ../../../../../Documents/test.txt; sourceTree = "<group>"; };
 		5042121329B58CA700D2EA98 /* JPForce */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = JPForce; sourceTree = BUILT_PRODUCTS_DIR; };
 		5042121E29B58DAD00D2EA98 /* token.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = token.swift; sourceTree = "<group>"; };
@@ -106,7 +105,6 @@
 		5042120A29B58CA700D2EA98 = {
 			isa = PBXGroup;
 			children = (
-				50050A092BE4E37300989700 /* サンプル.txt */,
 				50050A0A2BE5E0ED00989700 /* test.txt */,
 				5042121529B58CA700D2EA98 /* JPForce */,
 				5042123529B58E1500D2EA98 /* UnitTests */,

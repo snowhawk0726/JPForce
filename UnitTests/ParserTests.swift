@@ -186,10 +186,10 @@ final class ParserTests: XCTestCase {
             let caseExpression = try XCTUnwrap(statement.expressions[3] as? CaseExpression) // 場合、
             XCTAssertEqual(caseExpression.consequence.statements.count, 1, "caseExpression.consequence.statements.count")
             let consequence = try XCTUnwrap(caseExpression.consequence.statements.first as? ExpressionStatement)
-            XCTAssertEqual(consequence.expressions.count, 2, "consequence.expressions.count")
+            XCTAssertEqual(consequence.expressions.count, 3, "consequence.expressions.count")
             try testPhraseExpression(consequence.expressions[0], with: "甲", "を")
             try testKeywordLiteral(consequence.expressions[1], "表示")
-//            try testKeywordLiteral(consequence.expressions[2], "する")   //　「する」はlexerが無視
+            try testKeywordLiteral(consequence.expressions[2], "する")
             XCTAssertNil(caseExpression.alternative, "caseExpression.alternative")
             print("テスト終了: \(statement.string)")
         }
@@ -209,16 +209,16 @@ final class ParserTests: XCTestCase {
             let caseExpression = try XCTUnwrap(statement.expressions[i+1] as? CaseExpression) // 場合、
             XCTAssertEqual(caseExpression.consequence.statements.count, 1, "caseExpression.consequence.statements.count")
             let consequence = try XCTUnwrap(caseExpression.consequence.statements.first as? ExpressionStatement)
-            XCTAssertEqual(consequence.expressions.count, 2, "consequence.expressions.count")
+            XCTAssertEqual(consequence.expressions.count, 3, "consequence.expressions.count")
             try testPhraseExpression(consequence.expressions[0], with: expected.1, "を")
             try testKeywordLiteral(consequence.expressions[1], "表示")
-//            try testKeywordLiteral(consequence.expressions[2], "し")   //「し」はlexerが無視
+            try testKeywordLiteral(consequence.expressions[2], "し")
             alternative = caseExpression.alternative?.statements.first as? ExpressionStatement
         }
-        XCTAssertEqual(alternative?.expressions.count, 2, "alternative.expressions.count")
+        XCTAssertEqual(alternative?.expressions.count, 3, "alternative.expressions.count")
         try testPhraseExpression(alternative!.expressions[0], with: expecteds[2].1, "を")
         try testKeywordLiteral(alternative!.expressions[1], "表示")
-//        try testKeywordLiteral(alternative!.expressions[2], "する")  //　「する」はlexerが無視
+        try testKeywordLiteral(alternative!.expressions[2], "する")
         print("テスト終了: \(statement.string)")
     }
     func testBlockStatementParsings() throws {
@@ -333,13 +333,13 @@ final class ParserTests: XCTestCase {
             let body = try XCTUnwrap(typeLiteral.initializers.array[0].body)
             XCTAssertEqual(body.statements.count, 1)
             let initStatement = try XCTUnwrap(body.statements.first as? ExpressionStatement)
-            XCTAssertEqual(initStatement.expressions.count, 5)
+            XCTAssertEqual(initStatement.expressions.count, 6)
             try testPhraseExpression(initStatement.expressions[0], with: "x", "に")
             try testPhraseExpression(initStatement.expressions[1], with: "y", "を")
             try testKeywordLiteral(initStatement.expressions[2], "足し")
             try testPhraseExpression(initStatement.expressions[3], with: "「z」", "に")
             try testKeywordLiteral(initStatement.expressions[4], "代入")
-//            try testKeywordLiteral(initStatement.expressions[5], "する")     //　「する」はlexerが無視
+            try testKeywordLiteral(initStatement.expressions[5], "する")
             XCTAssertNotNil(typeLiteral.body)
             XCTAssertEqual(typeLiteral.body!.statements.count, 1)
             let bodyStatement = try XCTUnwrap(typeLiteral.body!.statements.first as? DefineStatement)
@@ -707,8 +707,8 @@ final class ParserTests: XCTestCase {
             ("""
                 甲を表示する。
                 乙を表示する。
-            """,2,2),   // 5. 。EOL, 12. EOL次
-            ("関数【甲を表示する】を表示する。",1,2),    // 6. 】次
+            """,2,3),   // 5. 。EOL, 12. EOL次
+            ("関数【甲を表示する】を表示する。",1,3),    // 6. 】次
             ("甲が1より小さい場合【甲を表示する。】乙を表示する。",2,4), // 6. 】次
             ("甲が1より小さい場合【甲を表示し】、それ以外は【乙を表示する】。",1,4),    // 7. 】、9. 】。
             ("関数【甲が1より小さい場合、【甲を表示する】】",1,1),    // 8. 。】

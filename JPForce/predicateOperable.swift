@@ -549,15 +549,19 @@ struct PerformOperator : PredicateOperable {
     init(_ environment: Environment) {self.environment = environment}
     let environment: Environment
     /// 入力が、関数であれば実行する。そうでない場合は、値を取り出し返す。
-    /// (入力の助詞「に」の付いた句から値(式)を取り出す。<式>にする → <式>)
     /// 例： 10を負数にする → (-10)
     /// - Returns: 実行結果、もしくは取り出した入力の値
     func operated() -> JpfObject? {
-        if let function = environment.unwrappedPeek as? JpfFunction {
+        switch environment.unwrappedPeek {
+        case let function as JpfFunction:
             environment.drop()
             return function.executed(with: environment)
+        case let value?:
+            environment.drop()
+            return value
+        default:
+            return nil
         }
-        return environment.unwrapPhrase()
     }
 }
 struct ReturnOperator : PredicateOperable {
@@ -746,7 +750,7 @@ struct AssignOperator : PredicateOperable {
             }
         }
         if let param = environment.peek {           // 計算して代入
-            guard param.value?.name != "" else {return JpfError("エラー：代入先の識別子が不明。") + usage2}
+            guard param.value?.name != "" else {return JpfError("代入先の識別子が空(「」)。") + usage2}
             if let value = param.value,
                param.particle?.unwrappedLiteral == Token(.TA).literal {     // 助詞「て」
                 environment.drop()
@@ -766,7 +770,7 @@ struct AssignOperator : PredicateOperable {
             if let outer = environment.outer, outer.contains(name) {
                 environment.outer![name] = value
             } else {
-                return JpfError("エラー：『\(name)』(識別子)が定義されていない。")
+                return JpfError("『\(name)』(識別子)が定義されていない。")
             }
         }
         return nil

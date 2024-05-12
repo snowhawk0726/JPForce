@@ -119,7 +119,7 @@ final class LexerTests: XCTestCase {
             (.INT(),"10"),(Token(.WA),"は"),(Token(.COMMA),"、"),(.INT(),"5"),(Token(.NI),"に"),(Token(.EQUAL),"等しく"),(Token(.NOT),"ない"),(Token(.PERIOD),"。"),(Token(.EOL),"\n"),
             (.IDENT(),"変数"),(Token(.NI),"に"),(Token(.COMMA),"、"),(.INT(),"2"),(Token(.WO),"を"),(Token(.ADD),"足し"),(Token(.COMMA),"、"),(.INT(),"3"),(Token(.WO),"を"),(Token(.SUBSTRACT),"引き"),(Token(.COMMA),"、"),(.INT(),"4"),(Token(.WO),"を"),(Token(.MULTIPLY),"掛け"),(Token(.COMMA),"、"),(.INT(),"5"),(Token(.DE),"で"),(Token(.DIVIDE),"割る"),(Token(.PERIOD),"。"),(Token(.EOL),"\n"),
             (Token(.INPUT),"入力"),(Token(.GA),"が"),(Token(.COMMA),"、"),(.IDENT(),"甲"),(Token(.TO),"と"),(.IDENT(),"乙"),(Token(.DE),"で"),(Token(.BE),"あり"),(Token(.COMMA),"、"),(Token(.EOL),"\n"),
-            (.INT(),"1"),(Token(.TO),"と"),(.IDENT(),"文字1"),(Token(.WO),"を"),(.IDENT(),"入力画面"),(Token(.NI),"に"),(Token(.INPUT),"入力"),/*(Token(.SURU),"する"),*/(Token(.PERIOD),"。"),(Token(.EOL),"\n"),
+            (.INT(),"1"),(Token(.TO),"と"),(.IDENT(),"文字1"),(Token(.WO),"を"),(.IDENT(),"入力画面"),(Token(.NI),"に"),(Token(.INPUT),"入力"),(Token(.SURU),"する"),(Token(.PERIOD),"。"),(Token(.EOL),"\n"),
             (.INT(),"200"),(Token(.NI),"に"),(Token(.COMMA),"、"),(.IDENT(),"鳥"),(Token(.GA),"が"),(.INT(),"2"),(Token(.EOL),"\n"),
             (.IDENT(),"二次関数"),(Token(.NO),"の"),(Token(.CASE),"場合"),(Token(.COMMA),"、"),(Token(.EOL),"\n"),
             (.IDENT(),"割った余り"),(Token(.EOL),"\n"),

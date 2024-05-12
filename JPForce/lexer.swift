@@ -42,12 +42,14 @@ class Lexer {
             (.IDENT(_),.IDENT(_),_), (.IDENT(_),.wrapped(.ident,_),_), (.IDENT(_),.INT(_),_),
             (.keyword(_),.IDENT(_),_),(.wrapped(.ident,_),.IDENT(_),_):
             token = Token(word: token.literal + getNext().literal)  // 識別子を合成
-        case (.keyword(_),.keyword(let keyword),_):     // 予約語 + 予約語
-            if [.SURU,.KOTO].contains(keyword) {
+        case (.keyword(let current),.keyword(let next),_):     // 予約語 + 予約語
+            if next == .KOTO ||                         // 「こと」
+               (current == .EXECUTE && next == .SURU) { // 「実行する」
                 _ = getNext()                           //　「する」「こと」は飛ばす
             }
-        case  (.keyword(_),.wrapped(.keyword,let literal),_): // 予約語 + 連用形
-            if ContinuativeForm(literal).plainFormType == .keyword(.SURU) {
+        case  (.keyword(let current),.wrapped(.keyword,let next),_): // 予約語 + 連用形
+            if current == .EXECUTE &&
+                ContinuativeForm(next).plainFormType == .keyword(.SURU) {   // 「実行し」
                 _ = getNext()                           // 「し」は飛ばす
             }
         case (.INT(_),.IDENT(_),_):                     // 数値 + 単位 → 単位を無視する
