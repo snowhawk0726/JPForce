@@ -60,8 +60,10 @@ struct ExpressionStatement : Statement {
         return s.replacingOccurrences(of: "。】", with: "】")
                 .replacingOccurrences(of: "、】", with: "】")
                 .replacingOccurrences(of: "、。", with: "。")
-                .replacingOccurrences(of: "、場合", with: "場合")
                 .replacingOccurrences(of: "が。", with: "が、")
+                .replacingOccurrences(of: "、場合", with: "場合")
+                .replacingOccurrences(of: "、する", with: "する")
+                .replacingOccurrences(of: "、し", with: "し")
     }
     //
     static let yousoga = "要素が、"
