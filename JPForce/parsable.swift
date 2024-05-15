@@ -131,14 +131,14 @@ extension Parsable {
     /// - Parameter expression: 式(数値、識別子)
     /// - Returns: 上限もしくは下限の範囲リテラル(もしくは元の式)
     func parseRangeExpression(with expression: Expression) -> Expression? {
-        let keyword = nextToken
-        switch keyword {
-        case .keyword(.GTEQUAL):
+        let token = nextToken
+        switch token {
+        case Token(.GTEQUAL):
             getNext()
-            return RangeLiteral(token: .keyword(.RANGE), lowerBound: ExpressionStatement(token: keyword, expressions: [expression]))
-        case .keyword(.LTEQUAL),.keyword(.UNDER):
+            return RangeLiteral(token: .keyword(.RANGE), lowerBound: ExpressionStatement(token: token, expressions: [expression]))
+        case Token(.LTEQUAL),Token(.UNDER):
             getNext()
-            return RangeLiteral(token: .keyword(.RANGE), upperBound: ExpressionStatement(token: keyword, expressions: [expression]))
+            return RangeLiteral(token: .keyword(.RANGE), upperBound: ExpressionStatement(token: token, expressions: [expression]))
         default:
             return expression
         }
@@ -169,24 +169,22 @@ extension Parsable {
         }
         return RangeLiteral(token: token, lowerBound: lowerBound, upperBound: upperBound)
     }
-    /// 解析された式の配列から、上限もしくは下限(キーワードと式)を抽出する。
-    /// *1* 「<数値>(または<識別子>)キーワード」は、範囲【<数値>(または<識別子>)キーワード】と解析されている。
-    /// *2* 「<式>から」は、カラ句に解析されている。
-    /// *3* 「<式>まで」は、マデ句に解析されている。
+    /// 解析された式の配列から、上限式もしくは下限式を抽出する。
+    /// *1* 「<式><キーワード>」は、範囲【<範囲式>】(RangeLiteral)と解析されている。(範囲式は、以上、以下、未満を含む式)
+    /// *2* 「<式>から」または「<式>まで」は、句(PhraseExpression)に解析されている。
+    /// *3* キーワードを含む「<複数式>」(解析未完了)
     /// - Parameters:
-    ///   - tokens: 上下限のトークン(*: 先頭は格「から」または「まで」)
+    ///   - tokens: 上下限のトークン
     ///   - expressions: 式の配列
-    /// - Returns: 抽出した上限もしくは下限(式文)
+    /// - Returns: 抽出した上限式もしくは下限式(式文)
     private func getBound(of tokens: [Token], from expressions: [Expression]) -> ExpressionStatement? {
         // 式がIntegerLiteralで、tokenが、RangeLiteralまたはPhraseExpressionに解析済みの場合
         if let e = expressions.first as? RangeLiteral {return isLowBound(tokens.first) ? e.lowerBound : e.upperBound}
-        if let e = expressions.first as? PhraseExpression, e.token == tokens.first {return ExpressionStatement(token: e.token, expressions: [e.left])}
+        if let e = expressions.first as? PhraseExpression, tokens.contains(e.token) {return ExpressionStatement(token: e.token, expressions: [e.left])}
         // 複数式から、キーワードを拾いだす。(index.0: 下限キーワード、index.1: 拾いだした式の位置)
         guard let index = firstIndex(of: expressions, by: tokens) else {return nil}
         var rangeExpressions = [Expression](expressions[0..<index.1])
-        if index.0 == tokens.first {
-            if let p = expressions[index.1] as? PhraseExpression {rangeExpressions.append(p.left)}
-        }
+        if let p = expressions[index.1] as? PhraseExpression {rangeExpressions.append(p.left)}  // キーワード(格)を除いた式を追加
         return ExpressionStatement(token: index.0, expressions: rangeExpressions)
     }
     /// expressionsから、es部分を除いた残りを返す。
@@ -198,9 +196,6 @@ extension Parsable {
         guard let es = es else {return expressions}
         var position = es.expressions.count
         guard position < expressions.count else {return []}
-        if let e = expressions[position] as? PredicateExpression, e.token == es.token {
-            position += 1
-        }
         return [Expression](expressions[position..<expressions.count])
     }
     /// 上下限キーワードの位置を返す。
@@ -211,8 +206,7 @@ extension Parsable {
     private func firstIndex(of expressions: [Expression], by tokens: [Token]) -> (Token, Int)? {
         for t in tokens {
             if let i = expressions.firstIndex(where: {
-                if let p = $0 as? PredicateExpression {return p.token == t} // 以上、以下、未満
-                if let p = $0 as? PhraseExpression {return p.token == t}    // から、まで
+                if let p = $0 as? PhraseExpression {return p.token == t}
                 return false
             }) {
                 return (t, i)

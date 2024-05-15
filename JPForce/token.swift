@@ -55,6 +55,9 @@ enum Token : Equatable {
         case TOWA       = "とは"  // 格助詞 + 係助詞
         case DEWA       = "では"  // ??
         case KO         = "個"   // 数助詞
+        case GTEQUAL    = "以上"
+        case LTEQUAL    = "以下"
+        case UNDER      = "未満"
     }
     /// 内部予約語。主に述語(動詞、形容詞、名詞)。
     /// - 動詞は処理、形容詞は条件、名詞はその他キーワード
@@ -67,9 +70,6 @@ enum Token : Equatable {
         case EQUAL      = "等しい"
         case LT         = "小さい"
         case GT         = "大きい"
-        case GTEQUAL    = "以上"
-        case LTEQUAL    = "以下"
-        case UNDER      = "未満"
         case WHILE      = "間"   // workaraound for 小さい間 -> IDENT("小さい間")
         case BE         = "ある"
         case NOT        = "ない"

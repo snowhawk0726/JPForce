@@ -650,6 +650,18 @@ final class ParserTests: XCTestCase {
                     try self.testKeywordLiteral(expressions[2], "割る")
                 }
             }),
+            ("範囲【甲以上乙以下】", { lowerBound, upperBound in
+                if lowerBound != nil {
+                    let expressions = lowerBound!.expressions
+                    XCTAssertEqual(lowerBound!.token, Token(.GTEQUAL))
+                    try self.testIdentifier(expressions[0], value: "甲")
+                }
+                if upperBound != nil {
+                    let expressions = upperBound!.expressions
+                    XCTAssertEqual(upperBound!.token, Token(.LTEQUAL))
+                    try self.testIdentifier(expressions[0], value: "乙")
+                }
+            }),
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")

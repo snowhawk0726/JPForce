@@ -122,14 +122,14 @@ extension JpfRange {
     private func isEqual(_ lhs: Token?, to rhs: Token?) -> Bool {
         if lhs == rhs {return true}
         guard let lhs = lhs, let rhs = rhs else {return false}
-        return lhs.isParticle(.KARA) && rhs.isKeyword(.GTEQUAL) ||
-        lhs.isKeyword(.GTEQUAL) && rhs.isParticle(.KARA) ||
-        lhs.isParticle(.MADE) && rhs.isKeyword(.LTEQUAL) ||
-        lhs.isKeyword(.LTEQUAL) && rhs.isParticle(.MADE)
+        return lhs.isParticle(.KARA) && rhs.isParticle(.GTEQUAL) ||
+        lhs.isParticle(.GTEQUAL) && rhs.isParticle(.KARA) ||
+        lhs.isParticle(.MADE) && rhs.isParticle(.LTEQUAL) ||
+        lhs.isParticle(.LTEQUAL) && rhs.isParticle(.MADE)
     }
     var count: JpfObject {
         guard let lower = lowerBound?.0.number, let upper = upperBound?.0.number else {return JpfError(cannotCountRange)}
-        let countInRange = upper - lower + ((upperBound?.1 == .keyword(.UNDER)) ? 0 : 1)
+        let countInRange = upper - lower + ((upperBound?.1 == Token(.UNDER)) ? 0 : 1)
         return JpfInteger(value: countInRange)
     }
     var isEmpty: JpfObject {

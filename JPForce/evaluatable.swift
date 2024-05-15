@@ -441,7 +441,7 @@ extension LoopExpression : Evaluatable {
               var upperBound = range.upperBound?.0.number else {return rangeLoopUsage}
         if let formatError = range.error {return formatError}
         environment.drop()
-        if range.upperBound?.1 == .keyword(.UNDER) {upperBound -= 1}    // 未満なので、上限 - 1
+        if range.upperBound?.1 == Token(.UNDER) {upperBound -= 1}       // 未満なので、上限 - 1
         return evaluatedLoop(from: lowerBound, through: upperBound, with: environment)  // 下限から、上限までループ
     }
     // <配列>を反復【入力が<識別子(値)>、<処理>】。

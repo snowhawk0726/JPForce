@@ -499,11 +499,8 @@ struct CompareOperator : PredicateOperable {
     }
     private func compared(_ left: Int, _ opType: Token.TokenType, _ right: Int) -> Bool? {
         switch opType {
-        case .keyword(.LT),
-             .keyword(.UNDER):      return left < right
+        case .keyword(.LT):         return left < right
         case .keyword(.GT):         return left > right
-        case .keyword(.GTEQUAL):    return left >= right
-        case .keyword(.LTEQUAL):    return left <= right
         default:
             return nil
         }
