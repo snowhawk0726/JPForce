@@ -252,10 +252,6 @@ _例:_
 - xcode: Version 15.3 (15E204a)
 - MacOS: 14.4.1（23E224）
 
-### リリース
-
-「[リリース](https://github.com/snowhawk0726/JPForce/releases)」にコマンド(実行ファイル)をアップロードしています。
-
 ### 実行
 
 #### REPL の起動
