@@ -194,7 +194,7 @@ extension Parsable {
     /// - Returns: 残りの式配列
     private func getRest(of expressions: [Expression], except es: ExpressionStatement?) -> [Expression] {
         guard let es = es else {return expressions}
-        var position = es.expressions.count
+        let position = es.expressions.count
         guard position < expressions.count else {return []}
         return [Expression](expressions[position..<expressions.count])
     }
@@ -242,107 +242,111 @@ extension Parsable {
     private func parseElement<T>(of token: Token) -> T? {
         switch token {
         case .keyword(.ARRAY):
-            return parseExpressionStatement() as? T
+            return parseArrayElement() as? T
         case .keyword(.DICTIONARY):
-            return parsePairExpression() as? T
+            return parseDictionaryElement() as? T
         case .keyword(.ENUM):
-            return parseStatement() as? T
+            return parseEnumElement() as? T
         default:
             return nil
         }
     }
     /// 配列の要素を解析する。
     /// - Returns: 要素を式文として返す。
-    private func parseExpressionStatement() -> ExpressionStatement? {
-        var expressions: [Expression] = []
+    private func parseArrayElement() -> ExpressionStatement? {
         let token = currentToken
-        while true {
-            skipEols()
-            guard let expression = ExpressionParser(parser).parse() else {
-                error(message: "配列で、式の解析に失敗した。")
-                return nil
-            }
-            expressions.append(expression)
-            if isEndOfElements {break}
-            getNext()
+        guard var expressions = parseElement() else {
+            error(message: "配列で、式の解析に失敗した。")
+            return nil
         }
-        if let phrase = expressions.last as? PhraseExpression, phrase.token.literal == ExpressionStatement.to {
-            expressions[expressions.count-1] = phrase.left  // 「と」を取り除く
-        }
+        _ = remove(lastParticle: .TO, from: &expressions)   // 「と」を取り除く
         return ExpressionStatement(token: token, expressions: expressions)
     }
     /// 列挙の要素を解析する。
-    /// - Returns: 要素を文として返す。
-    private func parseStatement() -> Statement? {
-        var expressions: [Expression] = []
-        if currentToken.isIdent && nextToken.literal == DefineStatement.wa {    // 値あり
-            let ident = Identifier(token: currentToken, value: currentToken.literal)
-            getNext()
-            let defineToken = currentToken
-            _ = getNext(whenNextIs: .COMMA)
-            let valueToken = nextToken
-            repeat {
-                getNext()
-                guard let expression = ExpressionParser(parser).parse() else {
-                    error(message: "列挙で、値の式の解析に失敗した。")
-                    return nil
-                }
-                expressions.append(expression)
-            } while !isEndOfElements
-            if let phrase = expressions.last as? PhraseExpression, phrase.token.literal == ExpressionStatement.to {
-                expressions[expressions.count-1] = phrase.left  // 「と」を取り除く
-            }
-            return DefineStatement(token: defineToken, name: ident, value: ExpressionStatement(token: valueToken, expressions: expressions))
-        }
+    /// - Returns: 要素を文(定義文または式文)として返す。
+    private func parseEnumElement() -> Statement? {
         let token = currentToken
-        guard var expression = ExpressionParser(parser).parse() else {
+        guard token.isIdent else {
             error(message: "列挙で、識別子の解析に失敗した。")
             return nil
         }
-        if let phrase = expression as? PhraseExpression, let ident = phrase.left as? Identifier {
-            expression = ident                                  // 「と」を取り除く
+        let ident = Identifier(from: token)
+        if getNext(whenNextIs: .WA) {  // 値あり
+            let defineToken = currentToken
+            _ = getNext(whenNextIs: .COMMA)
+            getNext()
+            let valueToken = currentToken
+            guard var expressions = parseElement() else {
+                error(message: "列挙で、値の式の解析に失敗した。")
+                return nil
+            }
+            _ = remove(lastParticle: .TO, from: &expressions)   // 「と」を取り除く
+            return DefineStatement(token: defineToken, name: ident, value: ExpressionStatement(token: valueToken, expressions: expressions))
+        } else {
+            _ = getNext(whenNextIs: .TO)
+            return ExpressionStatement(token: token, expressions: [ident])
         }
-        return ExpressionStatement(token: token, expressions: [expression])
     }
     /// 辞書の要素を解析する。
     /// - Returns: 要素を式文のペア(索引と値)として返す。
-    private func parsePairExpression() -> PairExpression? {
-        var expressions: [Expression] = []
-        var beginOfValueExpressions = 0     // 値の開始位置
-        while true {
-            skipEols()
-            guard let expression = ExpressionParser(parser).parse() else {
-                error(message: "辞書で、式の解析に失敗した。")
-                return nil
-            }
-            expressions.append(expression)
-            if let phrase = expression as? PhraseExpression, phrase.token.literal == ExpressionStatement.ga {   // 区切り「が」の検出
-                beginOfValueExpressions = expressions.count
-                _ = getNext(whenNextIs: .COMMA) // 読点(、)を読み飛ばす
-            }
-            if isEndOfElements {break}
-            getNext()
+    private func parseDictionaryElement() -> PairExpression? {
+        // 索引の解析
+        guard var expressions = parseElement(until: .GA) else {
+            error(message: "辞書で、索引の式の解析に失敗した。")
+            return nil
         }
-        guard beginOfValueExpressions > 0 else {
+        _ = getNext(whenNextIs: .COMMA)
+        guard remove(lastParticle: .GA, from: &expressions) else {  //「が」を取り除く
             error(message: "辞書で、索引と値の区切り「が」が見つからなかった。")
             return nil
         }
-        // 索引
-        if let phrase = expressions[beginOfValueExpressions-1] as? PhraseExpression {
-            expressions[beginOfValueExpressions-1] = phrase.left // 「が」を取り除く
-        }
         let keyToken = Token(word: expressions[0].tokenLiteral)
-        let keyExpressions = ExpressionStatement(token: keyToken, expressions: Array(expressions[0..<beginOfValueExpressions]))
-        // 値
-        if let phrase = expressions.last as? PhraseExpression, phrase.token.literal == ExpressionStatement.to {
-            expressions[expressions.count-1] = phrase.left       // 「と」を取り除く
+        let keyExpressions = ExpressionStatement(token: keyToken, expressions: expressions)
+        getNext()
+        // 値の解析
+        guard var expressions = parseElement() else {
+            error(message: "辞書で、値の式の解析に失敗した。")
+            return nil
         }
-        let valueToken = Token(word: expressions[beginOfValueExpressions].tokenLiteral)
-        let valueExpressions = ExpressionStatement(token: valueToken, expressions: Array(expressions[beginOfValueExpressions..<expressions.count]))
+        _ = remove(lastParticle: .TO, from: &expressions)           //「と」を取り除く
+        let valueToken = Token(word: expressions[0].tokenLiteral)
+        let valueExpressions = ExpressionStatement(token: valueToken, expressions: expressions)
         //
         return PairExpression(pair: (key: keyExpressions, value: valueExpressions))
     }
     private func skipNextEol() {_ = getNext(whenNextIs: .EOL)}
+    /// 要素式の最後尾(句)から、格を取り除く
+    /// - Parameters:
+    ///   - p: 取り除く格
+    ///   - expressions: 要素式
+    /// - Returns: 取り除いた(true)か否(false)か
+    private func remove(lastParticle p: Token.Particle, from expressions: inout [Expression]) -> Bool {
+        if let phrase = expressions.last as? PhraseExpression, phrase.token.isParticle(p) {
+            expressions[expressions.endIndex - 1] = phrase.left
+            return true
+        }
+        return false
+    }
+    /// 要素を解析する
+    /// - Parameter p: 終端の格、または無し(nil)
+    /// - Returns: 解析した式の配列、nil: 解析失敗
+    private func parseElement(until p: Token.Particle? = nil) -> [Expression]? {
+        var expressions: [Expression] = []
+        while true {
+            skipEols()
+            guard let expression = ExpressionParser(parser).parse() else {
+                return nil
+            }
+            expressions.append(expression)
+            if let phrase = expression as? PhraseExpression,
+               let particle = p, phrase.token.isParticle(particle) {
+                return expressions      // 指定格があった
+            }
+            if isEndOfElements {break}
+            getNext()
+        }
+        return expressions
+    }
     // MARK: - Literal Parser Common Procs
     /// ヘッダー部：　<型名>であって、(<型名>であり、)
     /// - Returns: <型>トークン
@@ -464,7 +468,7 @@ struct DefStatementParser : StatementParsable {
     let syntax1 = "定義文「<識別子>とは、<式(値)>ことである。」"
     let syntax2 = "定義文「<識別子>は、<式(値)>。」"
     func parse() -> Statement? {
-        let identifier = Identifier(token: currentToken, value: currentToken.literal)
+        let identifier = Identifier(from: currentToken)
         parser.insert(identifier.value)     // 識別子をLexerに登録
         getNext()
         let token = currentToken            // 「は」「とは」
