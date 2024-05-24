@@ -208,7 +208,7 @@ struct LoopExpression : Expression {
     var tokenLiteral: String {token.literal}
     var string: String {
         token.coloredLiteral + "【" +
-        (parameters.isEmpty ? "" : "入力が、\(parameters.map {$0.string}.joined(separator: "と"))であり、") +
+        (parameters.isEmpty ? "" : "入力が、\(parameters.map {$0.string}.joined(separator: "と、"))であり、") +
         (condition.isEmpty ? "" : "条件が、\(condition.map {$0.string}.joined(separator: "、"))間、") +
         "処理が、" + body.string + "】"
     }
@@ -287,7 +287,7 @@ struct ParameterClauseLiteral {
     var parameters: [Identifier]    // 引数
     var signature: InputFormat?     // シグネチャ
     var string: String {
-        signature.map {"入力が、\(zip(parameters, $0.strings).map {$0.string + $1}.joined(separator: "と"))"} ?? ""
+        signature.map {"入力が、\(zip(parameters, $0.strings).map {$0.string + $1}.joined(separator: "と、"))"} ?? ""
     }
 }
 struct TypeLiteral : Expression {
@@ -313,9 +313,23 @@ struct TypeLiteral : Expression {
     }
 }
 struct InputFormat {
+    static let threeDots = "…"                      // 可変長指定の三点リーダー
     var numberOfInputs: Int?                        // 期待するパラメータ数(可変の場合はnil)
     var formats: [(type: String, particle: String)] // 期待するパラメータ毎の型と格(無い場合は"")
-    var strings: [String] {formats.map {!($0.type.isEmpty && $0.particle.isEmpty) ? "「\($0.type + $0.particle)」" : ""}}
+    var values: [ExpressionStatement?]              // 既定値
+    var strings: [String] {
+        zip(formats, values).map { format, value in
+            let s = (!(format.type.isEmpty && format.particle.isEmpty) ? "「\(format.type + format.particle)」" : "") +
+            (value != nil ? ExpressionStatement.wa : "") + (value?.string ?? "")
+            return s.replacingOccurrences(of: "。", with: "")
+        }
+    }
+    var numberOfDefaultValues: Int {values.compactMap {$0}.count}   // 既定値の数
+}
+extension String {
+    var isThreeDots: Bool {self == InputFormat.threeDots}
+    var hasThreeDots: Bool {self.hasSuffix(InputFormat.threeDots)}
+    func removedThreeDots() -> Self {return String(self.dropLast())}
 }
 struct FunctionBlock {
     static let input = "入力"
@@ -325,11 +339,16 @@ struct FunctionBlock {
     var body: BlockStatement?       // 処理本体
     var isOverloaded: Bool = false  // 多重識別
     var string: String {
-        (parameters.isEmpty ? "" : "入力が、\(zip(parameters, signature.strings).map {$0.string + $1}.joined(separator: "と"))であり、") +
+        (parameters.isEmpty ? "" : "入力が、\(zip(parameters, signature.strings).map {$0.string + $1}.joined(separator: "と、"))であり、") +
         (body.map {"本体が、\($0.string)"} ?? "")
     }
     var overloaded: Self {
         FunctionBlock(parameters: self.parameters, signature: self.signature, body: self.body, isOverloaded: true)
+    }
+    var rangeOfInputs: ClosedRange<Int> {   // 入力数の範囲
+        guard let max = signature.numberOfInputs else {return (-1)...(-1)}
+        let min = max - signature.numberOfDefaultValues
+        return min...max
     }
 }
 /// 必要入力数ごとの関数ブロック配列(多重定義)
@@ -353,7 +372,7 @@ struct FunctionBlocks : Collection {
     /// - Parameter functionBlock: 追加する関数ブロック (isOverloaded==falseならば上書き)
     /// - Returns: 追加した自身を返す
     mutating func append(_ functionBlock: FunctionBlock) -> Self {
-        numberOfInputs(of: functionBlock).forEach {
+        functionBlock.rangeOfInputs.forEach {
             if dictionary[$0] != nil && functionBlock.isOverloaded {
                 dictionary[$0]!.append(functionBlock)
             } else {
@@ -407,13 +426,6 @@ struct FunctionBlocks : Collection {
             return true
         }
         return false
-    }
-    /// 既定値を考慮して、入力数のバリエーションを算出する。
-    /// - Parameter functionBlock: 対象の関数ブロック
-    /// - Returns: 取り得る入力数のバリエーション(可変長の場合、[-1]）
-    private func numberOfInputs(of functionBlock: FunctionBlock) -> [Int] {
-        let number = functionBlock.signature.numberOfInputs ?? -1
-        return [number]  /* とりあえず、既定値は無い前提 */
     }
 }
 struct ArrayLiteral : Expression {

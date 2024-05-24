@@ -69,43 +69,68 @@ extension Parsable {
     var blockCount: Parser.NestCounter {parser.nestedBlockCounter}
     ///  - 要素を持つ型でのブロック記号【】と読点「。」をカウントし、整合性をチェックする。
     var elementsCount: Parser.NestCounter {parser.nestedElementsCounter}
-    /// 入力部の解析
-    /// - 形式1: 入力が、識別子1（「型格」）と 識別子2（「型格」）と...、であり、
-    /// - 形式2: 入力が、識別子1（「型格」）と 識別子2（「型格」）と...識別子n（「型格」）。
-    func parseParameters() -> [(Identifier, String)]? {
-        guard getNext(whenNextIs: FunctionBlock.input) else {return []} // 空のパラメータ
-        _ = getNext(whenNextIs: ExpressionStatement.ga + ExpressionStatement.wa, matchAll: false)   // 入力が、(入力は、)
-        _ = getNext(whenNextIs: .COMMA)
-        var parameters: [(Identifier, String)] = []
+    /// 入力部(Input Block)の解析
+    /// - 形式1: 入力が、識別子1(「型格」)(は<既定値>)と 識別子2(「型格」)(は<既定値>)と...、であり、
+    /// - 形式2: 入力が、識別子1(「型格」)(は<既定値>)と 識別子2(「型格」)(は<既定値>)と...識別子n（「型格」）(は<既定値>)。
+    func parseParameters() -> [(Identifier, String, ExpressionStatement?)]? {
+        guard isInputBlock else {return []}                     // 入力部無し
+        var parameters: [(Identifier, String, ExpressionStatement?)] = []
+        var foundTerminator = false                             // 既定値式中に終端文字があったか
         repeat {
             getNext()
             let identifier = Identifier(from: currentToken)     // 識別子
-            let format = getNext(whenNextIs: .string) ? currentToken.literal : ""   // 入力形式
-            parameters.append((identifier, format))
+            let format = getNext(whenNextIs: .string) ? 
+                            currentToken.literal : ""           // 入力形式
+            var value: ExpressionStatement? = nil
+            if getNext(whenNextIs: .WA) {                       // 既定値あり
+                _ = getNext(whenNextIs: .COMMA)
+                getNext()
+                let token = currentToken
+                guard var expressions = parseElement(until: .TO) else {
+                    error(message: "入力部で、既定値の式の解析に失敗した。")
+                    return nil
+                }
+                foundTerminator = removeTerminators(from: &expressions)
+                value = ExpressionStatement(token: token, expressions: expressions)
+            }
+            parameters.append((identifier, format, value))
             _ = getNext(whenNextIs: .TO)                        // と
+            _ = getNext(whenNextIs: .COMMA)
             guard !nextToken.isEof else {return nil}
-        } while !isEndOfParameter
+        } while !(isEndOfParameter || foundTerminator)
         _ = getNext(whenNextIs: FunctionBlock.ari)              // (あり)
         _ = getNext(whenNextIs: .COMMA)                         // (、)
         return parameters
     }
     private var isEndOfParameter: Bool {
-        getNext(whenNextIs: .DE) || getNext(whenNextIs: .COMMA) ||
+        getNext(whenNextIs: .DE) ||
         getNext(whenNextIs: .PERIOD) || nextToken == .symbol(.RBBRACKET)
     }
-    func parseSignature(from strings: [String]) -> InputFormat {
-        let threeDots = "…"
+    private var isInputBlock: Bool {
+        guard getNext(whenNextIs: FunctionBlock.input) else {return false}
+        _ = getNext(whenNextIs: ExpressionStatement.ga + ExpressionStatement.wa, matchAll: false)   // 入力が、(入力は、)
+        _ = getNext(whenNextIs: .COMMA)
+        return true
+    }
+    private func removeTerminators(from expressions: inout [Expression]) -> Bool {
+        _ = remove(lastParticle: .TO, from: &expressions)       //「と」を除外
+        if expressions.last?.tokenLiteral == FunctionBlock.ari {
+            expressions.removeLast()                            //「あり」を除外
+        }
+        return remove(lastParticle: .DE, from: &expressions)    //「で」を検出、除外
+    }
+    func parseSignature(from strings: [String], _ values: [ExpressionStatement?]) -> InputFormat {
         let formats = strings.map { string in
             var type = "", particle = ""
             let lexer = Lexer(string)
             var token = lexer.getNext()
             if token.isIdent || token.isKeyword {type = token.literal;token = lexer.getNext()}
             if token.isParticle {particle = token.literal;token = lexer.getNext()}
-            if token.literal == threeDots {particle += token.literal}
+            if token.literal.isThreeDots {particle += token.literal}
             return (type, particle)
         }
-        let number = formats.map({$0.1}).contains {$0.hasSuffix(threeDots)} ? nil : strings.count
-        return InputFormat(numberOfInputs: number, formats: formats)
+        let number = formats.map({$0.1}).contains {$0.hasThreeDots} ? nil : strings.count
+        return InputFormat(numberOfInputs: number, formats: formats, values: values)
     }
     func parseProtocols() -> [String]? {
         var protocols: [String] = []
@@ -362,7 +387,9 @@ extension Parsable {
             error(message: "\(type)で、「入力が〜」の解析に失敗した。")
             return nil
         }
-        return (paramenters.map {$0.0}, parseSignature(from: paramenters.map {$0.1}))
+        return (paramenters.map {$0.0}, 
+                parseSignature(from: paramenters.map {$0.1}, paramenters.map {$0.2})
+        )
     }
     /// 定義部： <ブロック名>は(が)、【<定義>】
     /// - Returns: ブロック文、定義無し(nil)、もしくはエラー

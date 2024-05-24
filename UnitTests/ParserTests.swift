@@ -23,7 +23,7 @@ final class ParserTests: XCTestCase {
                 zは、0。
             """, 2, "z", [1, 0], false),
             ("『割った余り』は、2。",1,"割った余り",[2], false),
-            ("正しいは、さらに、関数であって、入力が甲、本体が、甲である。", 1, "正しい", ["関数であって、【入力が、甲であり、本体が、甲である。】"], true),
+            ("正しいは、さらに、関数であって、入力が甲で、本体が、甲である。", 1, "正しい", ["関数であって、【入力が、甲であり、本体が、甲である。】"], true),
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
@@ -291,6 +291,39 @@ final class ParserTests: XCTestCase {
             print("テスト(\(statement.string))終了")
         }
     }
+    func testDefaultParameterParsing() throws {
+        let testPatterns: [(input: String, expectedParameters: [String])] = [
+            ("関数【入力が、xと、yは1と、zは2。xとyとzを足す】。", ["x","y","z"]),
+            ("関数【入力が、x、yは1、zは2。xとyとzを足す】。", ["x","y","z"]),
+            ("関数【入力が、xとyは1とzは2。xとyとzを足す】", ["x","y","z"]),
+            ("関数【入力がxとyは1とzは2。xとyとzを足す】", ["x","y","z"]),
+            ("関数【入力が、xと、yは1と、zは2で、xとyとzを足す】。", ["x","y","z"]),
+            ("関数【入力が、xと、yは1と、zは2であり、xとyとzを足す】。", ["x","y","z"]),
+            ("関数【入力が、xと、yは1と、zは2】。", ["x","y","z"]),
+        ]
+        for test in testPatterns {
+            print("テストパターン: \(test.input)")
+            let program = try XCTUnwrap(parseProgram(with: test.input))
+            XCTAssertEqual(program.statements.count, 1, "program.statements.count")
+            let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
+            XCTAssertEqual(statement.expressions.count, 1, "statement.expressions.count")
+            let function = try XCTUnwrap(statement.expressions.first as? FunctionLiteral)
+            let functionBlock = try XCTUnwrap(function.functions.array.first)
+            XCTAssertEqual(functionBlock.parameters.count, test.expectedParameters.count, "関数のパラメータ数が間違っている。")
+            try zip(functionBlock.parameters, test.expectedParameters).forEach {
+                try testLiteralExpression($0, with: $1)
+            }
+            XCTAssertNil(functionBlock.signature.values[0]) // x: 既定値無し
+            let valueOfy = try XCTUnwrap(functionBlock.signature.values[1]?.expressions.first as? IntegerLiteral)
+            XCTAssertEqual(valueOfy.value, 1)               // y: 既定値1
+            let valueOfz = try XCTUnwrap(functionBlock.signature.values[2]?.expressions.first as? IntegerLiteral)
+            XCTAssertEqual(valueOfz.value, 2)               // z: 既定値2
+            zip(functionBlock.rangeOfInputs, 1...3).forEach {
+                XCTAssertEqual($0, $1)                      // パラメータ数: 1〜3
+            }
+            print("テスト(\(statement.string))終了")
+        }
+    }
     func testProtocolLiteralParsings() throws {
         let testPatterns = [
             "規約であって、【数値は「数値」。文字列は「文字列」。数値化は関数で、入力が文字列「文字列を」。】",
@@ -316,7 +349,7 @@ final class ParserTests: XCTestCase {
         let testPatterns = [
             "型であって、【初期化は、【入力が、xとyであり、xにyを足し「z」に代入する】。本体が、aは１。】",
             "型であり、初期化は、【入力が、xとyで、xにyを足し「z」に代入する】。本体が、aは１。",
-            "型【初期化【入力がxとy、xにyを足し「z」に代入する】。aは１】",
+            "型【初期化【入力がxとyで、xにyを足し「z」に代入する】。aは１】",
         ]
         for input in testPatterns {
             print("テストパターン: \(input)")
@@ -509,7 +542,7 @@ final class ParserTests: XCTestCase {
     }
     func testLoopExpressions() throws {
         let testPatterns: [(input: String, testFunc: ([Expression]) throws -> Void)] = [
-            ("1から1000まで反復【入力が数字、数字を表示する】。", { expressions in
+            ("1から1000まで反復【入力が数字で、数字を表示する】。", { expressions in
                 try self.testPhraseExpression(expressions[0], with: 1, "から")
                 try self.testPhraseExpression(expressions[1], with: 1000, "まで")
                 let loop = try XCTUnwrap(expressions[2] as? LoopExpression)
@@ -520,7 +553,7 @@ final class ParserTests: XCTestCase {
                 try self.testKeywordLiteral(body.expressions[1], "表示")
  //               try self.testKeywordLiteral(body.expressions[2], "する") //　「する」はlexerが無視
             }),
-            ("1000から1まで-1ずつ反復【入力が数字、数字を表示する】。", { expressions in
+            ("1000から1まで-1ずつ反復【入力が数字で、数字を表示する】。", { expressions in
                 try self.testPhraseExpression(expressions[0], with: 1000, "から")
                 try self.testPhraseExpression(expressions[1], with: 1, "まで")
                 try self.testIntegerLiteral(expressions[2], value: -1)
@@ -533,7 +566,7 @@ final class ParserTests: XCTestCase {
                 try self.testKeywordLiteral(body.expressions[1], "表示")
 //                try self.testKeywordLiteral(body.expressions[2], "する") //　「する」はlexerが無視
             }),
-            ("配列【１、２、３】を反復【入力が数字、数字を表示する】。", { expressions in
+            ("配列【１、２、３】を反復【入力が数字で、数字を表示する】。", { expressions in
                 let phrase = try XCTUnwrap(expressions[0] as? PhraseExpression)
                 let array = try XCTUnwrap(phrase.left as? ArrayLiteral)
                 XCTAssertEqual(array.elements.count, 3)
@@ -674,13 +707,13 @@ final class ParserTests: XCTestCase {
     }
     func testFunctionSignatures() throws {
         let testPatterns: [(input: String, number: Int?, type: String, particle: String)] = [
-            ("関数【入力が、甲、甲を表示する】", 1, "", ""),
-            ("関数【入力が、甲「の」、甲を表示する】", 1, "", "の"),
-            ("関数【入力が、甲「文字列」、甲を表示する】", 1, "文字列", ""),
-            ("関数【入力が、甲「配列を」、甲を表示する】", 1, "配列", "を"),
-            ("関数【入力が、甲と乙と丙、甲を表示する】", 3, "", ""),
-            ("関数【入力が、甲「と…」、甲を表示する】", nil, "", "と…"),
-            ("関数【入力が、甲「数値と…」、甲を表示する】", nil, "数値", "と…"),
+            ("関数【入力が、甲。甲を表示する】", 1, "", ""),
+            ("関数【入力が、甲「の」。甲を表示する】", 1, "", "の"),
+            ("関数【入力が、甲「文字列」。甲を表示する】", 1, "文字列", ""),
+            ("関数【入力が、甲「配列を」。甲を表示する】", 1, "配列", "を"),
+            ("関数【入力が、甲と乙と丙。甲を表示する】", 3, "", ""),
+            ("関数【入力が、甲「と…」。甲を表示する】", nil, "", "と…"),
+            ("関数【入力が、甲「数値と…」。甲を表示する】", nil, "数値", "と…"),
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")

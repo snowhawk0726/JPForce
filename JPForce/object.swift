@@ -30,6 +30,7 @@ protocol JpfObject : JpfObjectAccessible {
     func isParticle(_ particle: Token.Particle) -> Bool
     func isEqual(to object: JpfObject) -> Bool
     func contains(type: String) -> Bool
+    func hasProperties(type: String, particle: Token?) -> Bool
     // 演算
     func add(_ object: JpfObject) -> JpfObject
     func remove(_ object: JpfObject) -> JpfObject
@@ -68,7 +69,7 @@ extension JpfObject {
     func isEqual(to object: JpfObject) -> Bool {isTrue == object.isTrue}
     func contains(type: String) -> Bool {type == self.type}
     var hasValue: Bool {value != nil}
-
+    func hasProperties(type: String, particle: Token?) -> Bool {false}
 }
 struct JpfInteger : JpfObject, JpfHashable, Comparable {
     static let type = "数値"
@@ -152,6 +153,9 @@ struct JpfPhrase : JpfObject {
     var error: JpfError? {value?.error}
     var isError: Bool {value?.isError ?? false}
     func isParticle(_ p: Token.Particle) -> Bool {self.particle?.isParticle(p) ?? false}
+    func hasProperties(type: String, particle: Token?) -> Bool {
+        type == self.type && particle == self.particle
+    }
 }
 struct JpfReturnValue : JpfObject {
     static let type = "返り値"

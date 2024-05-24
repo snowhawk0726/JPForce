@@ -130,6 +130,11 @@ extension PredicateOperable {
         return number
     }
     /// object.stringをout()で出力する。
+    /// - Parameters:
+    ///   - object: 対象のオブジェクト
+    ///   - withEscapeProcessing: エスケープ文字の有無
+    ///   - out: 出力関数(引数１：出力文字列、引数２：terminator文字列、もしくはnil)
+    /// - Returns: エラー(nilはエラー無し)
     func output(_ object: JpfObject, withEscapeProcessing: Bool, out: (String, String?) -> Void) -> JpfError? {
         switch object.name {                    // ラベルのチェック
         case Token.Keyword.IDENTIFIER.rawValue: // 識別子(定義)を出力
