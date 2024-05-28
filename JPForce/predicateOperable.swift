@@ -78,7 +78,7 @@ struct Splitter {
     let terminator: String
     var error: JpfError?
     /// \と括弧で囲われた識別子の中身を文字列の配列に分割する。
-    let separators: [(String, Character)] = [("\\『", "』"), ("\\（", "）")]
+    let separators: [(l: String, r: Character, e: String)] = [("『", "』","\\『"), ("\\（", "）","")]
     mutating func split() -> [String]? {
         var strings: [String] = []
         guard let splitted = split(string, with: separators[0]) else {return nil}
@@ -88,34 +88,57 @@ struct Splitter {
         }
         return strings
     }
-    /// 括弧(parentheses)で囲まれた識別子を、識別子の内容(文字列)に分解し、文字列の配列に格納する。
-    /// 改行を回避するために、終端文字(terminator)を文字列に追加する。
+    /// 指定した括弧で囲まれた識別子の値(文字列)を取り出し、前後の文字列とともに配列に格納する。
+    /// (改行を回避するために、終端文字(terminator)を文字列に追加する。)
     /// - Parameters:
-    ///   - s: 対象の文字列
-    ///   - parentheses: 識別子を囲う記号の組
+    ///   - string: 対象の文字列
+    ///   - paren: 識別子を囲う記号の組(lとr)と、左(l)のエスケープ文字(e) (""の場合は無し)
     /// - Returns: 文字列の配列、もしくはnil (errorにエラーを出力)
-    mutating private func split(_ s: String, with parentheses: (String, Character)) -> [String]? {
-        let beginOfIdent = parentheses.0, endOfIdent = parentheses.1
+    mutating private func split(_ string: String, with paren: (l: String, r: Character, e: String)) -> [String]? {
         var splitted: [String] = []
-        if let range = s.firstRange(of: beginOfIdent) {
-            guard let i = s[range.upperBound..<s.endIndex].firstIndex(of: endOfIdent) else {
-                error = JpfError("識別子を囲う、閉じカッコ「\(endOfIdent)」が見つからない。")
+        if !paren.e.isEmpty, let escape = string.firstRange(of: paren.e) {  // エスケープ文字の処理
+            let (header, body) = string.divided(after: escape)
+            guard let rest = split(body, with: paren) else {return nil}     // エスケープ文字の後ろを分解
+            splitted = [header + terminator] + rest
+        } else
+        if let left = string.firstRange(of: paren.l) {                      // 左カッコの処理
+            let (header, body) = string.divided(without: left)
+            guard let right = body.firstIndex(of: paren.r) else {           // 右カッコの処理
+                error = JpfError("識別子を囲う、閉じカッコ「\(paren.r)」が見つからない。")
                 return nil
             }
-            splitted.append(String(s[s.startIndex..<range.lowerBound]) + terminator)// 識別子の前の部分を切り出す
-            let name = String(s[range.upperBound..<i])
-            guard let object = environment[name] else {                             // 識別子の内容を切り出す
-                error = JpfError("『\(name)』(識別子)が定義されていない。")
+            let (ident, rest) = body.divided(without: right)
+            guard let object = environment[ident] else {                    // 識別子の内容を切り出す
+                error = JpfError("『\(ident)』(識別子)が定義されていない。")
                 return nil
             }
-            splitted.append(object.string + terminator)                             // 配列に追加
-            let s = String(s[s.index(after: i)..<s.endIndex])
-            guard let strings = split(s, with: (beginOfIdent, endOfIdent)) else {return nil}   // 残りを分割し、配列に追加
-            splitted += strings
+            guard let rest = split(rest, with: paren) else {return nil}     // 残りを分解し、配列に追加
+            splitted = [header + object.string + terminator] + rest
         } else {
-            splitted = [s]
+            splitted = [string]
         }
         return splitted
+    }
+}
+extension String {  // 文字列を分割する。
+    /// 自身をindexを境に前後に分割する。(indexを含まない)
+    func divided(without index: String.Index) -> (String, String) {
+        (String(self[self.startIndex..<index]),
+         String(self[self.index(after: index)..<self.endIndex]))
+    }
+    ///　自身をrangeを境に分割する。(rangeは含まない)
+    func divided(without range: Range<String.Index>) -> (String, String) {
+        (String(self[self.startIndex..<range.lowerBound]),
+         String(self[range.upperBound..<self.endIndex]))
+    }
+    /// 自身をindexを境に前後に分割する。(indexを含む)
+    func divided(after index: String.Index) -> (String, String) {
+        (String(self[self.startIndex..<index]),
+         String(self[index..<self.endIndex]))
+    }
+    /// 自身をrangeの上限を境に前後に分割する。(rangeを含む)
+    func divided(after range: Range<String.Index>) -> (String, String) {
+        self.divided(after: range.upperBound)
     }
 }
 // MARK: - implements
@@ -153,17 +176,20 @@ extension PredicateOperable {
         default:
             break
         }
-        let terminateString = "\\末尾"
-        var splitter = withEscapeProcessing ?
-            Splitter(of: replaced(object.string), with: environment, terminator: terminateString) :
-            Splitter(of: object.string, with: environment)
-        guard let strings = splitter.split() else {return splitter.error!}
+        let terminator = "\\末尾"
+        var splitter = Splitter(of: object.string, with: environment, terminator: withEscapeProcessing ? terminator : "")
+        guard let strings = splitter.split() else {return splitter.error!}  // 識別子の内容を出力
         strings.forEach { s in
-            if withEscapeProcessing, let range = s.firstRange(of: terminateString) {
-                let terminator = String(s[range.upperBound..<s.endIndex])   // 「末尾」の後の文字列
-                out(String(s[s.startIndex..<range.lowerBound]), terminator)
+            if withEscapeProcessing {
+                let replaced = replaced(s)                                  // エスケープ処理(変換)
+                if let range = replaced.firstRange(of: terminator) {        // 終端を検出
+                    let (body, terminator) = replaced.divided(without: range)
+                    out(body, terminator)                                   // 終端あり出力
+                } else {
+                    out(replaced, nil)                                      // 終端なし出力
+                }
             } else {
-                out(s, nil)
+                out(s, nil)                                                 // エスケープ処理なし出力
             }
         }
         return nil
@@ -172,7 +198,7 @@ extension PredicateOperable {
     /// 「\改行なし」が文字列の後尾にある場合、改行をせずに表示する。
     /// 　(\は、そのまま使えるが、Swiftに合わせた。(「"」とか「'」は合わせてない))
     private func replaced(_ string: String) -> String {
-        let codes = [("\\t","\t"),("\\n","\n"),("\\r","\r"),("\\0","\0"),("\\\\","\\"),("\\「","「"),("\\」","」"),("\\改行なし","\\末尾")]
+        let codes = [("\\t","\t"),("\\n","\n"),("\\r","\r"),("\\0","\0"),("\\\\","\\"),("\\「","「"),("\\」","」"),("\\『","『"),("\\』","』"),("\\改行なし","\\末尾")]
         return codes.reduce(string) {$0.replacingOccurrences(of: $1.0, with: $1.1)}
     }
     // エラー
