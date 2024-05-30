@@ -100,11 +100,11 @@ final class EvaluatorTests: XCTestCase {
     }
     func testPhraseExpressions() throws {
         let input = """
-        『割った余り１』は、算出【入力が左辺「数値を」と右辺「数値で」。
-            左辺を右辺で割り、右辺を掛け、左辺から引き、返す。
+        『割った余り１』は、算出【入力が左「数値を」と右「数値で」。
+            左を右で割り、右を掛け、左から引き、返す。
         】
-        『割った余り２』は、算出【入力が左辺「数値を」と右辺「数値で」。
-            左辺を右辺で割り、右辺を掛け、左辺から引く。(値を返さない)
+        『割った余り２』は、算出【入力が左「数値を」と右「数値で」。
+            左を右で割り、右を掛け、左から引く。(値を返さない)
         】
         """
         let testPatterns: [(input: String, expected: Bool)] = [
@@ -170,6 +170,18 @@ final class EvaluatorTests: XCTestCase {
     func testReturnExpressions() throws {
         let testPatterns: [(input: String, exptected: Int)] = [
             ("10を返す。", 10), ("10を返し、9個", 10), ("２と5を掛けたものを返し、9人", 10), ("3と3を掛ける。２と5を掛けたものを返し、10から1を引く。", 10),
+            ("10。返る。11", 10), ("2と5を掛け返り、11を返す。", 10),
+        ]
+        for test in testPatterns {
+            print("テストパターン: \(test.input)")
+            let evaluated = try XCTUnwrap(testEvaluator(test.input))
+            try testObject(evaluated, with: test.exptected)
+            print("テスト(\(evaluated))終了")
+        }
+    }
+    func testLoopControlExpressions() throws {
+        let testPatterns: [(input: String, exptected: Int)] = [
+            ("10。中止。11", 10), ("2と5を掛け継続し、11を返す。", 10),
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
@@ -253,6 +265,31 @@ final class EvaluatorTests: XCTestCase {
             try testObject(evaluated, with: test.exptected)
             print("テスト(\(evaluated))終了")
         }
+    }
+    func testReturnOperations() throws {
+        let input = """
+            甲は算出【１。返る。２】。
+            乙は算出【１。２を返す。３】。
+        """
+        let testPatterns: [(input: String, expected: Int)] = [
+            ("甲。", 1),
+            ("乙。", 2),
+        ]
+        print("テストパターン: \(input)")
+        let environment = Environment()
+        let parser = Parser(Lexer(input))
+        let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+        let result = eval.object ?? environment.pull()
+        XCTAssertFalse(result?.isError ?? false, result?.error?.message ?? "")
+        for test in testPatterns {
+            print("テストパターン: \(test.input)")
+            let parser = Parser(Lexer(test.input))
+            let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+            let result = try XCTUnwrap(eval.object ?? environment.pull())
+            try testObject(result, with: test.expected)
+            print("テスト(\(result))終了")
+        }
+        print("テスト終了")
     }
     func testDefaultParameterValues() throws {
         let input = """
@@ -1029,6 +1066,45 @@ final class EvaluatorTests: XCTestCase {
             print("テスト(\(evaluated))終了")
         }
     }
+    func testLoopControls() throws {
+        let input = """
+            割り切れるは、算出【入力が左と右。左を右で割り、右を掛け、左から引いたものが０に等しい】。
+            奇数列は、配列【】。偶数列は、配列【】。
+            配列【１、２、３】を反復【入力が数。
+                数が２で割り切れない場合、【
+                    奇数列に、数を追加して代入する。
+                    継続する。
+                】
+                偶数列に、数を追加して代入する。
+            】。
+            『三の倍数』は配列。『その他』は配列。
+            範囲【1から10まで】を反復【入力が数。
+                数が３で割り切れる場合、『三の倍数』に、数を追加して代入し、中止する。
+                『その他』に、数を追加して代入する。
+            】。
+        """
+        let testPatterns: [(input: String, expected: Any)] = [
+            ("偶数列。", [2]),
+            ("奇数列。", [1,3]),
+            ("『三の倍数』。", [3]),
+            ("『その他』。", [1,2]),
+        ]
+        print("テストパターン: \(input)")
+        let environment = Environment()
+        let parser = Parser(Lexer(input))
+        let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+        let result = eval.object ?? environment.pull()
+        XCTAssertFalse(result?.isError ?? false, result?.error?.message ?? "")
+        for test in testPatterns {
+            print("テストパターン: \(test.input)")
+            let parser = Parser(Lexer(test.input))
+            let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+            let result = try XCTUnwrap(eval.object ?? environment.pull())
+            try testObject(result, with: test.expected)
+            print("テスト(\(result))終了")
+        }
+        print("テスト終了")
+    }
     func testRangeCheckings() throws {
         let testPatterns: [(input: String, expected: Bool)] = [
             ("1が範囲【１以下】にある", true),
@@ -1375,6 +1451,7 @@ private func testObject(_ object: JpfObject, with exptected: Any?) throws {
         try testObject(object, with: boolean)
     case let array as [Int]:
         let arrayObject = try XCTUnwrap(object as? JpfArray)
+        XCTAssertEqual(arrayObject.elements.count, array.count, "要素の数が期待値と異なる。")
         for (object, int) in zip(arrayObject.elements, array) {
             try testObject(object, with: int)
         }

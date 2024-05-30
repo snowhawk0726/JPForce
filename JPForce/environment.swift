@@ -160,7 +160,7 @@ class Environment {
         defer {push(local.pullAll())}           // スタックを戻す
         if let body = function.body, let result = Evaluator(from: body, with: local).object {
             if result.isError {return result}
-            if result.isReturnValue {return result.value!}
+            if result.isReturnValue {return result.value}
         }
         return nil
     }

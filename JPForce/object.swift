@@ -26,6 +26,8 @@ protocol JpfObject : JpfObjectAccessible {
     var isNumber: Bool {get}
     var isReturnValue: Bool {get}
     var hasValue: Bool {get}
+    var isBreak: Bool {get}
+    var isContinue: Bool {get}
     var isError: Bool {get}
     func isParticle(_ particle: Token.Particle) -> Bool
     func isEqual(to object: JpfObject) -> Bool
@@ -63,8 +65,10 @@ extension JpfObject {
     var isNull: Bool {false}
     var isNumber: Bool {false}
     var isReturnValue: Bool {false}
+    var isBreak: Bool {false}
+    var isContinue: Bool {false}
     var isError: Bool {false}
-    var isBreakFactor: Bool {isReturnValue || isError}
+    var isBreakFactor: Bool {isReturnValue || isBreak || isContinue || isError}
     func isParticle(_ particle: Token.Particle) -> Bool {false}
     func isEqual(to object: JpfObject) -> Bool {isTrue == object.isTrue}
     func contains(type: String) -> Bool {type == self.type}
@@ -160,10 +164,21 @@ struct JpfPhrase : JpfObject {
 struct JpfReturnValue : JpfObject {
     static let type = "返り値"
     var name: String = ""
-    var value: JpfObject?       // 中止するの場合、nil
+    var value: JpfObject?       // 返す値がない場合、nil
     var string: String {value?.string ?? ""}
     //
     var isReturnValue: Bool {true}
+}
+struct JpfLoopControl : JpfObject {
+    static let type = "反復制御"
+    var name: String = ""
+    enum Command {case BREAK, CONTINUE}
+    let control: Command
+    let value: JpfObject? = nil // 返す値がない
+    var string: String {value?.string ?? ""}
+    //
+    var isBreak: Bool {control == .BREAK}
+    var isContinue: Bool {control == .CONTINUE}
 }
 struct JpfFunction : JpfObject {
     static let type = "関数"

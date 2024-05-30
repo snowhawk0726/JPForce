@@ -410,16 +410,17 @@ extension LoopExpression : Evaluatable {
     // 反復【(条件が<条件式>(の)間、)<処理>】。
     // (条件が無い場合、処理に「中止する」があることが前提→無いと無限ループ)
     private func evaluatedLoop(with environment: Environment) -> JpfObject? {
-        var result = evaluatedCondition(with: environment)
-        while result.isTrue && !result.isError {
+        while let result = evaluatedCondition(with: environment),
+                result.isTrue && !result.isError {
             if let evaluated = body.evaluated(with: environment) {
-                if isTerminated(by: evaluated) {break}  // 「中止する」による中止
+                if evaluated.isBreak {break}        // 中止する
+                if evaluated.isContinue {continue}  // 継続する
                 if evaluated.isBreakFactor {return evaluated}
-            }   // エラーまたは中止でループ終了
-            result = evaluatedCondition(with: environment)
+            }
         }
+        guard let result = evaluatedCondition(with: environment) else {return conditionEvaluationError}
         guard !result.isError else {return result}
-        return (result.isReturnValue && result.value != nil) ? result : nil
+        return nil
     }   // 「返す」で上がってきたReturnValueであれば、そのまま返す。それ以外は処理終了
     // <数値>から<数値>まで（<数値>ずつ）反復【入力が<識別子(カウント値)>、<処理>】。
     private func evaluatedLoop(from: Int?, through: Int?, by: Int? = 1, with environment: Environment) -> JpfObject? {
@@ -428,7 +429,8 @@ extension LoopExpression : Evaluatable {
         for counter in stride(from: f, through: t, by: b) {
             environment[parameters[0].value] = JpfInteger(value: counter)   // カウンタの更新
             if let evaluated = body.evaluated(with: environment) {
-                if isTerminated(by: evaluated) {break}  // 「中止する」による中止
+                if evaluated.isBreak {break}        // 中止する
+                if evaluated.isContinue {continue}  // 継続する
                 if evaluated.isBreakFactor {return evaluated}
             }
         }
@@ -451,7 +453,8 @@ extension LoopExpression : Evaluatable {
         for element in array.elements {
             environment[parameters[0].value] = element
             if let evaluated = body.evaluated(with: environment) {
-                if isTerminated(by: evaluated) {break}  // 「中止する」による中止
+                if evaluated.isBreak {break}        // 中止する
+                if evaluated.isContinue {continue}  // 継続する
                 if evaluated.isBreakFactor {return evaluated}
             }
         }
@@ -465,14 +468,15 @@ extension LoopExpression : Evaluatable {
             environment[parameters[0].value] = pair.value.key
             environment[parameters[1].value] = pair.value.value
             if let evaluated = body.evaluated(with: environment) {
-                if isTerminated(by: evaluated) {break}  // 「中止する」による中止
+                if evaluated.isBreak {break}        // 中止する
+                if evaluated.isContinue {continue}  // 継続する
                 if evaluated.isBreakFactor {return evaluated}
             }
         }
         return nil
     }
     // 「反復」の条件を評価する。条件式が無い場合は、真オブジェクトを返す。
-    private func evaluatedCondition(with environment: Environment) -> JpfObject {
+    private func evaluatedCondition(with environment: Environment) -> JpfObject? {
         if condition.isEmpty {return JpfBoolean.TRUE}
         var result: JpfObject?
         for expression in condition {
@@ -480,11 +484,9 @@ extension LoopExpression : Evaluatable {
             if let object = result, object.isBreakFactor {break}
             result.map {environment.push($0)}
         }
-        environment.drop()                              // 真偽値を捨てる
-        return result ?? conditionEvaluationError
+        environment.drop()                          // 真偽値を捨てる
+        return result
     }
-    // ループが「中止する」で中止されたか判定
-    private func isTerminated(by evaluated: JpfObject) -> Bool {evaluated.isReturnValue && !evaluated.hasValue}
 }
 extension Label : Evaluatable {
     /// 1. ラベルに割り当てられた識別子(名)を辞書に格納する。

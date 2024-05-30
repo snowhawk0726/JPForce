@@ -34,13 +34,6 @@ extension JpfObject {
             return nil
         }
     }
-    /// 関数で返す値がラップされていたら、アンラップして返す。
-    /// (アンラップしないと、呼び出し元の処理が止まってしまう)
-    /// - Parameter object: 返す値
-    /// - Returns: アンラップされた値、またはnil (すでにスタックに積まれているはので値は返さない)
-    func unwrappedReturnValue(of object: JpfObject) -> JpfObject? {
-        object.isReturnValue ? object.value! : nil
-    }
     /// オブジェクト自身の対象に、値を設定する。対象が算出である場合は、算出の設定処理を行う。
     /// - Parameters:
     ///   - value: 設定する値

@@ -77,12 +77,15 @@ enum Token : Equatable {
         case OR         = "または"
         case MATA       = "また"  // workaround for 1または -> 1(また) .WA
         case ASWELLAS   = "および"
-        case RETURN     = "返す"
         case CASE       = "場合"
         case QUESTION   = "か"
         case CONDITIONAL = "よって"
         case LOOP       = "反復"
+        case BREAK      = "中止"
+        case CONTINUE   = "継続"
         case FUNCTION   = "関数"
+        case RETURN     = "返す"
+        case GOBACK     = "返る"
         case EXECUTE    = "実行"
         case SURU       = "する"  // irregular verb
         case KOTO       = "こと"  // end of definition
@@ -99,7 +102,6 @@ enum Token : Equatable {
         case APPEND     = "追加"
         case REMOVE     = "削除"
         case FOREACH    = "繰り返す"
-        case BREAK      = "中止"
         case MAP        = "写像"
         case REDUCE     = "まとめる"
         case FILTER     = "絞り込む"
@@ -248,8 +250,8 @@ enum Token : Equatable {
     var isEol: Bool     {self == .symbol(.EOL)}
     var isPeriod: Bool  {self == .symbol(.PERIOD)}
     var isComma: Bool   {self == .symbol(.COMMA)}
-    func isKeyword(_ k: Token.Keyword) -> Bool {self == .keyword(k)}
-    func isParticle(_ p: Token.Particle) -> Bool {self == .particle(p)}
+    func isKeyword(_ k: Token.Keyword) -> Bool {self.type == .keyword(k)}
+    func isParticle(_ p: Token.Particle) -> Bool {self.type == .particle(p)}
     //
     // MARK: - 全角半角対応の記号辞書(symbol dictionary for half/fullwidth)
     static var symbols = {

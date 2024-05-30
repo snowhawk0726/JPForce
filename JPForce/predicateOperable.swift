@@ -23,8 +23,10 @@ struct PredicateOperableFactory {
         case .keyword(.NEGATE):     return NegateOperator(environment, by: token)
         case .keyword(.POSITIVE),.keyword(.NEGATIVE):
                                     return SignOperator(environment, by: token)
-        case .keyword(.RETURN):     return ReturnOperator(environment, by: token)
-        case .keyword(.BREAK):      return BreakOperator(environment, by: token)
+        case .keyword(.RETURN):     return ReturnOperator(environment)
+        case .keyword(.GOBACK):     return GobackOperator(environment)
+        case .keyword(.BREAK),.keyword(.CONTINUE):
+                                    return LoopControlOperator(environment, by: token)
         case .keyword(.MONO):       return UnwrapOperator(environment, by: token)  // 〜たもの
         case .keyword(.NULL):       return NullOperator(environment)
         case .keyword(.INPUT):      return StackOperator(environment)
@@ -593,21 +595,31 @@ struct PerformOperator : PredicateOperable {
     }
 }
 struct ReturnOperator : PredicateOperable {
-    init(_ environment: Environment, by token: Token) {self.environment = environment; self.op = token}
-    let environment: Environment, op: Token
-    /// 入力を拾い、ラップした値を返す
-    /// - Returns: 返り値。入力が空ならエラー
+    init(_ environment: Environment) {self.environment = environment}
+    let environment: Environment
+    /// 返す：入力の値をラップしたオブジェクトを返す。
+    /// - Returns: オブジェクト(返り値)。返す値がない場合は、エラー
     func operated() -> JpfObject? {
         guard var value = isPeekParticle(.WO) ? environment.unwrapPhrase() : leftOperand else {return returnParamError}
         value.name = ""
         return JpfReturnValue(value: value)
     }
 }
-struct BreakOperator : PredicateOperable {
+struct GobackOperator : PredicateOperable {
+    init(_ environment: Environment) {self.environment = environment}
+    let environment: Environment
+    /// 返る：nilをラップしたオブジェクトを返す。
+    /// - Returns: オブジェクト(返り値)
+    func operated() -> JpfObject? {
+        return JpfReturnValue(value: nil)
+    }
+}
+struct LoopControlOperator : PredicateOperable {
     init(_ environment: Environment, by token: Token) {self.environment = environment; self.op = token}
     let environment: Environment, op: Token
-    /// 処理を中止する。
-    func operated() -> JpfObject? {JpfReturnValue(value: nil)}
+    /// 反復制御のオブジェクトを返す。
+    func operated() -> JpfObject? {
+        JpfLoopControl(control: op.isKeyword(.BREAK) ? .BREAK : .CONTINUE)}
 }
 struct CreateOperator : PredicateOperable {
     init(_ environment: Environment) {self.environment = environment}
@@ -789,10 +801,10 @@ struct AssignOperator : PredicateOperable {
         }
         return usage
     }
-    private var usage: JpfError {op == .keyword(.ASSIGN) ? assignUsage : overwriteUsage}
-    private var usage2: JpfError {op == .keyword(.ASSIGN) ? compoundAssignUsage : compoundOverwriteUsage}
+    private var usage: JpfError {op.isKeyword(.ASSIGN) ? assignUsage : overwriteUsage}
+    private var usage2: JpfError {op.isKeyword(.ASSIGN) ? compoundAssignUsage : compoundOverwriteUsage}
     private func assign(_ value: JpfObject, to environment: Environment, by name: String, with op: Token) -> JpfError? {
-        if op == .keyword(.ASSIGN) {
+        if op.isKeyword(.ASSIGN) {
             environment[name] = value
         } else {
             if let outer = environment.outer, outer.contains(name) {
@@ -1103,12 +1115,12 @@ struct PullOperator : PredicateOperable {
         if number > 1 {                             // n個 → 配列
             return getObjects(from: environment, numberOf: number, by: method)
         }
-        defer {if op.type == .keyword(.PULL) {environment.drop()}}
+        defer {if op.isKeyword(.PULL) {environment.drop()}}
         return environment.peek.map {getObject(from: $0, by: method)} ?? JpfNull.object
     }
     private func getObjects(from environment: Environment, numberOf: Int, by method: String?) -> JpfObject {
         guard let values = environment.peek(numberOf) else {return JpfNull.object}
-        if op.type == .keyword(.PULL) {environment.drop(numberOf)}
+        if op.isKeyword(.PULL) {environment.drop(numberOf)}
         guard check(values, by: method) else {return JpfNull.object}
         return JpfArray(elements: values.map {getObject(from: $0, by: method)})
     }
