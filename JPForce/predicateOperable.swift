@@ -619,7 +619,7 @@ struct LoopControlOperator : PredicateOperable {
     let environment: Environment, op: Token
     /// 反復制御のオブジェクトを返す。
     func operated() -> JpfObject? {
-        JpfLoopControl(control: op.isKeyword(.BREAK) ? .BREAK : .CONTINUE)}
+        JpfLoopControl(method: op.isKeyword(.BREAK) ? .BREAK : .CONTINUE)}
 }
 struct CreateOperator : PredicateOperable {
     init(_ environment: Environment) {self.environment = environment}

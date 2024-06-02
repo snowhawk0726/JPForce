@@ -165,20 +165,20 @@ struct JpfReturnValue : JpfObject {
     static let type = "返り値"
     var name: String = ""
     var value: JpfObject?       // 返す値がない場合、nil
-    var string: String {value?.string ?? ""}
+    var string: String {Self.type + ": " + (value?.string ?? "無し")}
     //
     var isReturnValue: Bool {true}
 }
 struct JpfLoopControl : JpfObject {
     static let type = "反復制御"
     var name: String = ""
-    enum Command {case BREAK, CONTINUE}
-    let control: Command
+    enum Method {case BREAK, CONTINUE}
+    let method: Method
     let value: JpfObject? = nil // 返す値がない
-    var string: String {value?.string ?? ""}
+    var string: String {Self.type + "方法: " + (method == .BREAK ? Token(.BREAK).literal : Token(.CONTINUE).literal)}
     //
-    var isBreak: Bool {control == .BREAK}
-    var isContinue: Bool {control == .CONTINUE}
+    var isBreak: Bool {method == .BREAK}
+    var isContinue: Bool {method == .CONTINUE}
 }
 struct JpfFunction : JpfObject {
     static let type = "関数"
