@@ -410,16 +410,17 @@ extension LoopExpression : Evaluatable {
     // 反復【(条件が<条件式>(の)間、)<処理>】。
     // (条件が無い場合、処理に「中止する」があることが前提→無いと無限ループ)
     private func evaluatedLoop(with environment: Environment) -> JpfObject? {
-        while let result = evaluatedCondition(with: environment),
-                result.isTrue && !result.isError {
-            if let evaluated = body.evaluated(with: environment) {
+        repeat {
+            if let condition = evaluatedCondition(with: environment) {  // 条件式の評価
+                guard !condition.isError else {return condition}
+                guard condition.isTrue else {break}
+            }
+            if let evaluated = body.evaluated(with: environment) {      // 本体の評価
                 if evaluated.isBreak {break}        // 中止する
                 if evaluated.isContinue {continue}  // 継続する
                 if evaluated.isBreakFactor {return evaluated}
             }
-        }
-        guard let result = evaluatedCondition(with: environment) else {return conditionEvaluationError}
-        guard !result.isError else {return result}
+        } while(true)
         return nil
     }   // 「返す」で上がってきたReturnValueであれば、そのまま返す。それ以外は処理終了
     // <数値>から<数値>まで（<数値>ずつ）反復【入力が<識別子(カウント値)>、<処理>】。
