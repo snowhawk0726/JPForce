@@ -170,8 +170,7 @@ extension PredicateOperable {
             return nil
         case Token.Keyword.FILE.rawValue:       // ファイル(の内容)を出力
             guard let filename = object as? JpfString else {break}
-            let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            guard let contents = try? String(contentsOfFile: url.path() + filename.value, encoding: .utf8) else {return fileReadError}
+            guard let contents = try? String(contentsOfFile: directoryPath + filename.value, encoding: .utf8) else {return fileReadError}
             out(contents, nil)
             environment.remove(name: object.name)
             return nil
@@ -202,6 +201,15 @@ extension PredicateOperable {
     private func replaced(_ string: String) -> String {
         let codes = [("\\t","\t"),("\\n","\n"),("\\r","\r"),("\\0","\0"),("\\\\","\\"),("\\「","「"),("\\」","」"),("\\『","『"),("\\』","』"),("\\改行なし","\\末尾")]
         return codes.reduce(string) {$0.replacingOccurrences(of: $1.0, with: $1.1)}
+    }
+    /// ディレクトリパス
+    /// 辞書に識別子「ディレクトリパス」があれば、その値を、なければ、書類フォルダのパス(文字列)を返す。
+    var directoryPath: String {
+        if let path = environment[Identifier.directoryPath] as? JpfString {
+            return URL(fileURLWithPath: path.value).path()
+        }
+        // デフォルト(書類)
+        return FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].path()
     }
     // エラー
     var numerationParamError1: JpfError {JpfError("には２つの数値入力が必要。")}
@@ -331,8 +339,7 @@ struct FilesOperator : PredicateOperable {
     /// 「書類」ディレクトリのファイル一覧を配列して返す。
     /// - Returns: ファイル名の配列、無い場合は「無」
     func operated() -> JpfObject? {
-        let documentUrl = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        guard let fileNames = try? FileManager.default.contentsOfDirectory(atPath: documentUrl.path()) else {return JpfNull.object}
+        guard let fileNames = try? FileManager.default.contentsOfDirectory(atPath: directoryPath) else {return JpfNull.object}
         return JpfArray(name: op.literal, elements: fileNames.map {JpfString(value: $0)})
     }
 }
@@ -555,8 +562,7 @@ struct ExecuteOperator : PredicateOperable {
             if filename.name == Token.Keyword.FILE.rawValue {   // ファイル「ファイル名」
                 environment.remove(name: filename.name)
             }
-            let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            guard let contents = try? String(contentsOfFile: url.path() + filename.value, encoding: .utf8) else {return fileReadError}
+            guard let contents = try? String(contentsOfFile: directoryPath + filename.value, encoding: .utf8) else {return fileReadError}
             environment.drop()
             return executed(by: contents)
         default:

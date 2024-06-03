@@ -95,6 +95,8 @@ struct Identifier : Expression {
     //
     var tokenLiteral: String {token.literal}
     var string: String {value.color(token.color)}
+    //
+    static let directoryPath = "ディレクトリパス"
 }
 struct StringLiteral : ValueExpression {
     var token: Token                // 文字列(.STRING(value))トークン
