@@ -130,6 +130,7 @@ enum Token : Equatable {
         case AVAILABLE  = "利用可能"
         case OVERWRITE  = "上書き"
         case POSITION   = "位置"
+        case KEY        = "キー"
         case MEMBER     = "要素"
         case SET        = "設定"
         case COMPUTATION = "算出"

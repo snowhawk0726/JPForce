@@ -40,8 +40,8 @@ extension JpfObject {
     ///   - target: 設定する対象識別子
     ///   - environment: オブジェクトの環境
     /// - Returns: エラーまたはオブジェクト自身
-    func assign(_ value: JpfObject, to target: JpfObject, with environment: Environment) -> JpfObject {
-        guard let name = target as? JpfString, environment.contains(name.value) else {return JpfError(identifierNotFound + ":\(target.string)")}
+    func assign(_ value: JpfObject, to target: JpfObject?, with environment: Environment) -> JpfObject {
+        guard let name = target as? JpfString, environment.contains(name.value) else {return JpfError(identifierNotFound + ":\(target?.string ?? "無し")")}
         if let computation = environment[name.value] as? JpfComputation {   // 算出の設定を行う
             environment.push(value)                                         // 設定値
             if let result = computation.setter(with: environment), result.isError {return result}
@@ -65,7 +65,7 @@ extension JpfObject {
     func sorted(by string: JpfString) -> JpfObject {JpfError(cannotSortByOrder)}
     func sorted(by function: JpfFunction, with environment: Environment) -> JpfObject {JpfError(cannotSortByFunc)}
     func reversed() -> JpfObject {JpfError(cannotReverse)}
-    func assign(_ value: JpfObject, to target: JpfObject) -> JpfObject {JpfError(cannotAssign)}
+    func assign(_ value: JpfObject, to target: JpfObject?) -> JpfObject {JpfError(cannotAssign)}
     // エラーメッセージ
     var cannotCount: String     {"\(type)型の要素の数は、数えることができない。"}
     var cannotAdd: String       {"を足すことはできない。"}
@@ -83,6 +83,7 @@ extension JpfObject {
     var cannotAssign: String    {"「\(type)」に代入することはできない。"}
     var identifierNotAvailable: String  {"(識別子)は利用可能でない。"}
     var arrayPositionError: String      {"指定位置が、配列内に無い。"}
+    var keyIsNotHashable: String        {"キーが、ハッシュ化可能な型ではない。"}
     var identifierNotFound: String      {"指定した識別子名が見つからない。"}
     var typeNotFound: String            {"型「\(type)」の定義が見つからない。"}
     var notExecutableObject: JpfError   {JpfError("「関数」以外を実行しようとした。型：")}
@@ -377,12 +378,14 @@ extension JpfArray {
         }
         return JpfError(rangeFormatError)
     }
-    func assign(_ value: JpfObject, to target: JpfObject) -> JpfObject {
-        guard let position = target.number else {return JpfError(arrayPositionError)}
-        var elements = elements
-        guard case 0..<elements.count = position else {return JpfError(arrayPositionError)}
-        elements[position] = value
-        return JpfArray(name: self.name, elements: elements)
+    func assign(_ value: JpfObject, to target: JpfObject?) -> JpfObject {
+        guard let position = target?.number,
+              case 0..<elements.count = position else {
+            return JpfError(arrayPositionError) + "位置：\(target?.string ?? "無し")"
+        }
+        var array = self
+        array.elements[position] = value
+        return array
     }
     func remove(_ object: JpfObject) -> JpfObject {
         var objects = elements
@@ -509,6 +512,12 @@ extension JpfDictionary {
     var isEmpty: JpfObject {JpfBoolean.object(of: pairs.isEmpty)}
     // 要素アクセス
     subscript(object: JpfHashable) -> JpfObject? {pairs[object.hashKey]?.value}
+    func assign(_ value: JpfObject, to target: JpfObject?) -> JpfObject {
+        guard let key = target, key is JpfHashable else {return JpfError(keyIsNotHashable + "型：\(target?.type ?? "無し")")}
+        var dictionary = self
+        dictionary[key] = value
+        return dictionary
+    }
     func remove(_ object: JpfObject) -> JpfObject {
         var objects = pairs
         let error = JpfError("「\(type)」から「\(object.string)」" + cannotRemove)
@@ -591,7 +600,7 @@ extension JpfType {
         // 名前が辞書に無いなら、デフォルト
         return getObject(from: name, with: particle)
     }
-    func assign(_ value: JpfObject, to target: JpfObject) -> JpfObject {
+    func assign(_ value: JpfObject, to target: JpfObject?) -> JpfObject {
         return assign(value, to: target, with: environment)
     }
 }
@@ -614,7 +623,7 @@ extension JpfInstance {
         // 利用可能な名前でないなら、デフォルト
         return getObject(from: name, with: particle)
     }
-    func assign(_ value: JpfObject, to target: JpfObject) -> JpfObject {
+    func assign(_ value: JpfObject, to target: JpfObject?) -> JpfObject {
         return assign(value, to: target, with: environment)
     }
     func initialize(with environment: Environment) -> JpfObject? {

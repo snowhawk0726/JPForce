@@ -46,7 +46,7 @@ protocol JpfObject : JpfObjectAccessible {
     func sorted(by string: JpfString) -> JpfObject
     func sorted(by function: JpfFunction, with environment: Environment) -> JpfObject
     func reversed() -> JpfObject
-    func assign(_ value: JpfObject, to target: JpfObject) -> JpfObject
+    func assign(_ value: JpfObject, to target: JpfObject?) -> JpfObject
     var count: JpfObject {get}
     var isEmpty: JpfObject {get}
 }

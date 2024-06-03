@@ -42,6 +42,7 @@ extension Node {
     var protocolExtentionError: JpfError    {JpfError("「規約」を「型」以外で拡張している。")}
     var cannotExtend: JpfError              {JpfError("拡張することはできない。")}
     var enumuratorError: JpfError           {JpfError("「列挙」の列挙子(識別子)が正しくない。：")}
+    var cannotUseAsKeyword: JpfError        {JpfError("は、ラベルの値として使用できない。")}
     // 仕様表示
     var strideLoopUsage: JpfError           {JpfError("仕様：<数値>から<数値>まで（<数値>ずつ）反復【入力が<識別子(カウント値)>、<処理>】。")}
     var rangeLoopUsage: JpfError            {JpfError("仕様：範囲【<下限><上限>】を反復【入力が<識別子(カウント値)>、<処理>】。")}
@@ -492,20 +493,32 @@ extension LoopExpression : Evaluatable {
 extension Label : Evaluatable {
     /// 1. ラベルに割り当てられた識別子(名)を辞書に格納する。
     /// 2. ラベルが「位置」である場合は、数値、または識別子から取り出した数値、を返す。
+    /// 3. ラベルが「キー」である場合は、数値、真偽値、文字列または識別子から取り出した値、を返す。
     /// - Parameter environment: 格納先
     /// - Returns: 識別子名、または位置の数値 (オブジェクトの識別子名は、ラベル名)
     func evaluated(with environment: Environment) -> JpfObject? {
         var object: JpfObject
-        if token == .keyword(.POSITION) {
-            if let integer = Int(value.literal) {
-                object = JpfInteger(name: tokenLiteral, value: integer)
-            } else {
-                guard let integer = environment[value.literal] as? JpfInteger else {return "『\(value.literal)』" + identifierNotFound}
-                object = JpfInteger(name: tokenLiteral, value: integer.value)
-            }
-        } else {
+        switch value.type {
+        case .int:
+            object = JpfInteger(name: tokenLiteral, value: value.number!)
+        case .string:
             object = JpfString(name: tokenLiteral, value: value.literal)
-            environment.append(object, to: tokenLiteral)
+            if !(token.isKeyword(.POSITION) || token.isKeyword(.KEY)) {
+                environment.append(object, to: tokenLiteral)
+            }
+        case .keyword(let k):
+            guard k == .TRUE || k == .FALSE else {return "『\(value.literal)』" + cannotUseAsKeyword}
+            object = JpfBoolean(name: tokenLiteral, value: k == .TRUE)
+        case .ident:
+            if token.isKeyword(.POSITION) || token.isKeyword(.KEY) {
+                guard let value = environment[value.literal] else {return "『\(value.literal)』" + identifierNotFound}
+                object = value
+            } else {
+                object = JpfString(name: tokenLiteral, value: value.literal)
+                environment.append(object, to: tokenLiteral)
+            }
+        default:
+            return "『\(value.literal)』" + cannotUseAsKeyword
         }
         return object
     }

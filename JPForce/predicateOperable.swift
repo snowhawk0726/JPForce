@@ -739,9 +739,11 @@ struct AvailableOperator : PredicateOperable {
 // MARK: - 要素アクセス
 
 /// 代入(assign)/上書き(overwrite)
-/// 1. 配列に代入(引数３)
+/// 1. 配列、辞書に代入(引数３)
 /// <配列>の位置<数値>に<値>を代入する (<値>を<配列>の位置<数値>に代入する)
-/// <配列>の位置「<識別子>」に<値>を代入する (<値>を<配列>の位置「<識別子>」に代入する)
+/// <配列>の位置『<識別子>』に<値>を代入する (<値>を<配列>の位置『<識別子>』に代入する)
+/// <辞書>のキー<キー>に<値>を代入する (<値>を<辞書>のキー<キー>に代入する)
+/// <辞書>のキー『<識別子>』に<値>を代入する (<値>を<辞書>のキー『<識別子>』に代入する)
 /// 2.列挙子に代入(引数２)
 /// <列挙子>に<値>を代入 (<値>を<列挙子>に代入)
 /// 3. 識別子に代入(引数２)
@@ -752,7 +754,7 @@ struct AssignOperator : PredicateOperable {
     init(_ environment: Environment, by op: Token) {self.environment = environment; self.op = op}
     let environment: Environment, op: Token
     func operated() -> JpfObject? {
-        if var params = environment.peek(3) {       // 配列の位置nに値を代入
+        if var params = environment.peek(3) {       // 配列または辞書に値を代入
             switch (params[0].particle, params[1].particle, params[2].particle) {
             case (Token(.NO),Token(.NI),Token(.WO)):
                 params.swapAt(0, 1)
@@ -760,12 +762,23 @@ struct AssignOperator : PredicateOperable {
                 fallthrough
             case (Token(.WO),Token(.NO),Token(.NI)):
                 guard let value = params[0].value else {break}
-                guard let array = params[1].value as? JpfArray else {break}
-                let result = array.assign(value, to: params[2])
-                guard !result.isError else {return result}
-                environment.drop(3)
-                if array.name.isEmpty {return result}// 辞書にない場合、代入した配列を返す。
-                return assign(result, to: environment, by: array.name, with: op)
+                var assigned: JpfObject? = nil
+                switch params[1].value {
+                case let array as JpfArray:
+                    assigned = array.assign(value, to: params[2].value)
+                case let dictionary as JpfDictionary:
+                    assigned = dictionary.assign(value, to: params[2].value)
+                default:
+                    break
+                }
+                if let result = assigned {
+                    guard !result.isError else {return result}
+                    environment.drop(3)
+                    guard let name = params[1].value?.name,     // 代入対象の識別子を得る。
+                          !name.isEmpty else {return result}    // 代入した結果を返す。
+                    return assign(result, to: environment,
+                                  by: name, with: op)           // 結果をさらに識別子に代入する。
+                }
             default:
                 break
             }
@@ -836,7 +849,7 @@ struct SetOperator : PredicateOperable {
                 guard let label = params[2].value?.name,
                       label == Token.Keyword.MEMBER.rawValue else {break}
                 environment.remove(name: label)         // ラベル「要素」を削除
-                let result = object.assign(value, to: params[2].value!)
+                let result = object.assign(value, to: params[2].value)
                 guard !result.isError else {return result}
                 environment.drop(3)
                 return nil
