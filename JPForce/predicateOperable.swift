@@ -767,24 +767,15 @@ struct AssignOperator : PredicateOperable {
                 params.swapAt(0, 2)
                 fallthrough
             case (Token(.WO),Token(.NO),Token(.NI)):
-                guard let value = params[0].value else {break}
-                var assigned: JpfObject? = nil
-                switch params[1].value {
-                case let array as JpfArray:
-                    assigned = array.assign(value, to: params[2].value)
-                case let dictionary as JpfDictionary:
-                    assigned = dictionary.assign(value, to: params[2].value)
-                default:
-                    break
-                }
-                if let result = assigned {
-                    guard !result.isError else {return result}
-                    environment.drop(3)
-                    guard let name = params[1].value?.name,     // 代入対象の識別子を得る。
-                          !name.isEmpty else {return result}    // 代入した結果を返す。
-                    return assign(result, to: environment,
-                                  by: name, with: op)           // 結果をさらに識別子に代入する。
-                }
+                guard let value = params[0].value,
+                      let object = params[1].value else {break}
+                let result = object.assign(value, to: params[2].value)
+                guard !result.isError else {return result}
+                environment.drop(3)
+                guard let name = params[1].value?.name,     // 代入対象の識別子を得る。
+                      !name.isEmpty else {return result}    // 代入した結果を返す。
+                return assign(result, to: environment,
+                              by: name, with: op)           // 結果をさらに識別子に代入する。
             default:
                 break
             }
@@ -932,19 +923,25 @@ struct RemoveOperator : PredicateOperable {
     init(_ environment: Environment, by op: Token) {self.environment = environment; self.op = op}
     let environment: Environment, op: Token
     func operated() -> JpfObject? {
-        guard var params = environment.peek(2) else {return "「\(op.literal) 」" + twoParamsNeeded + removeUsage}
-        switch (params[0].particle, params[1].particle) {
-        case (.particle(.KARA),.particle(.WO)), (nil,.particle(.WO)):
-            params.swapAt(0, 1)
-            fallthrough
-        case (.particle(.WO),.particle(.KARA)):
-            guard let object = params[1].value else {return removeUsage}
-            let result = object.remove(params[0])
-            guard !result.isError else {return result}
-            environment.drop(2)
-            return result
-        default:
-            break
+        if var params = environment.peek(2) {
+            switch (params[0].particle, params[1].particle) {
+            case (.particle(.KARA),.particle(.WO)), (nil,.particle(.WO)):
+                params.swapAt(0, 1)
+                fallthrough
+            case (.particle(.WO),.particle(.KARA)):
+                guard let object = params[1].value else {return removeUsage}
+                let result = object.remove(params[0])
+                guard !result.isError else {return result}
+                environment.drop(2)
+                return result
+            default:
+                break
+            }
+        }
+        if isPeekParticle(.WO), let object = environment.peek?.value, !object.name.isEmpty {
+            environment.drop()
+            environment[object.name] = nil          // 対象を辞書から消す
+            return nil
         }
         return removeUsage
     }
@@ -1179,11 +1176,6 @@ struct EmptyOperator : PredicateOperable {
     func operated() -> JpfObject? {
         if isPeekParticle(.GA), let object = leftOperand?.value {
             return object[op.literal, Token(.GA)]   // <値>が空？
-        }
-        if isPeekParticle(.WO), let object = environment.peek?.value, !object.name.isEmpty {
-            environment.drop()
-            environment[object.name] = nil          // 対象を辞書から消す
-            return nil
         }
         environment.empty()                         // 入力を空にする
         return nil
