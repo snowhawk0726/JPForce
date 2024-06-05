@@ -177,14 +177,11 @@ class Environment {
         switch number {
         case -1:                                    // 可変長引数あり
             for (format, value) in zip(signature.formats, signature.values) {
-                if format.particle.hasThreeDots,    // 可変長の入力
-                   let particle = getParticle(from: format.particle) { //
-                    if arguments.contains(where: {$0.hasProperties(type: format.type, particle: Token(particle))}) {
-                        continue                    // 型または格が引数に一致
-                    }   /* 型または格が一致しない場合、空の配列を返す仕様のため、falseにはしない。 */
+                if format.hasThreeDots {            // 可変長の入力
+                    continue                        // 引数のシグネチャにかかわらず、チェックok
                 } else {                            // 固定長の入力
                     if value != nil {continue}      // 既定値あり
-                    if !arguments.contains(where: {isTheFormat(format, sameAs: $0)}) {
+                    if !arguments.contains(where: {isSameFormat(of: $0, as: format)}) {
                         return false                // 型または格が一致する引数が無い
                     }
                 }
@@ -193,7 +190,7 @@ class Environment {
             break
         default:                                    // 固定長引数
             for (argument, format) in zip(arguments, signature.formats) {
-                if !isTheFormat(format, sameAs: argument) {
+                if !isSameFormat(of: argument, as: format) {
                     return false                    // 引数と型または格が一致しない
                 }
             }
@@ -213,14 +210,10 @@ class Environment {
         }                                           // 引数を取得
         var a = 0                                   // 引数の位置
         if numberOfArguments < 0 {                  // 可変長の識別子に対応する位置を求める
-            let t = designated.formats[0].type      // 最初の入力形式(引数は既定値で省略していない前提)
-            let s = designated.formats[0].particle
-            guard let p = getParticle(from: s) else {
-                return InputFormatError.particleFormat(s).message
+            guard let format = designated.firstParamFormat else {   // 最初の(既定値の無い)入力形式
+                return InputFormatError.notFoundFirstFormat.message
             }
-            a = arguments.firstIndex {
-                $0.hasProperties(type: t, particle: Token(p))
-            } ?? 0                                  // 型と格が一致する位置(0: 見つからなかった)
+            a = arguments.firstIndex {isSameFormat(of: $0, as: format)} ?? 0
         }
         for i in 0..<function.parameters.count {    // 入力の位置
             let argument = a < arguments.count ?
@@ -228,14 +221,11 @@ class Environment {
             let idetifier = function.parameters[i]  // 入力の識別子
             let format = designated.formats[i]      // 指定形式
             var value: JpfObject                    // 割り当てる値
-            if !format.particle.hasThreeDots {      // 固定長
+            if !format.hasThreeDots {               // 固定長
                 value = argument?.value ?? getDefaultValue(with: designated, at: i)
                 a += 1
             } else {                                // 可変長
-                guard let particle = getParticle(from: format.particle) else {
-                    return InputFormatError.particleFormat(format.particle).message
-                }                                   // 指定格
-                let length = numberOfElements(in: [JpfObject](arguments[a..<arguments.count]), withConsecutive: particle)
+                let length = numberOfElements(in: [JpfObject](arguments[a..<arguments.count]), withConsecutive: format)
                 let elements = [JpfObject](arguments[a..<(length - a)]).map {$0.value ?? JpfNull.object}    // 要素の値を取り出す。
                 // TODO: スタック中の値にnilがあった場合、エラーにすべきか？ → ありえないので、発生したら検討する。
                 value = JpfArray(elements: elements)
@@ -271,16 +261,13 @@ class Environment {
     ///   - elelments: 母集団(対象のオブジェクト配列)
     ///   - p: 指定格
     /// - Returns: オブジェクトの数
-    private func numberOfElements(in elelments: [JpfObject], withConsecutive p: Token.Particle) -> Int {
+    private func numberOfElements(in elelments: [JpfObject], withConsecutive format: InputFormat.Format) -> Int {
         var counter = 0
-        while (counter < elelments.count && elelments[counter].isParticle(p)) {counter += 1}
+        while (counter < elelments.count && isSameFormat(of: elelments[counter], as: format)) {counter += 1}
         return counter
     }
-    private func isTheFormat(_ format: (type: String, particle: String), sameAs object: JpfObject) -> Bool {
+    private func isSameFormat(of object: JpfObject, as format: InputFormat.Format) -> Bool {
         return isSameType(of: object, as: format.type) && isSameParticle(of: object, as: format.particle)
-    }
-    private func isTheFormat(_ type: String, _ particle: Token.Particle, sameAs object: JpfObject) -> Bool {
-        return isSameType(of: object, as: type) && isSameParticle(of: object, as: particle)
     }
     /// 対象のオブジェクトの型をチェック
     private func isSameType(of object: JpfObject, as type: String) -> Bool {
@@ -288,7 +275,7 @@ class Environment {
     }
     /// 対象のオブジェクトの格をチェック
     private func isSameParticle(of object: JpfObject, as particle: String) -> Bool {
-        return particle.isEmpty || isSameParticle(of: object, as: getParticle(from: particle))
+        return particle.isEmpty || object.particle == Token(word: particle)
     }
     private func isSameParticle(of object: JpfObject, as particle: Token.Particle?) -> Bool {
         if let p = particle {
@@ -302,7 +289,7 @@ class Environment {
     }
     /// 形式から格を取得
     private func getParticle(from s: String) -> Token.Particle? {
-        return Token.Particle(rawValue: s.hasThreeDots ? s.removedThreeDots() : s)
+        return Token.Particle(rawValue: s)
     }
     /// 関数ブロックのエラーをチェックし、結果を返す。
     /// - Parameter function: 対象の関数ブロック
@@ -322,8 +309,8 @@ class Environment {
             let params = self.getAll()
             var n = params.count - 1
             for (format, value) in zip(function.signature.formats.reversed(),function.signature.values.reversed()) {
-                guard n >= 0 else {break}                            // 引数が無い
-                if format.particle.hasThreeDots {                   // 可変長指定
+                guard n >= 0 else {break}                           // 引数が無い
+                if format.hasThreeDots {                            // 可変長指定
                     return errorMessage(to: params[0..<n].reversed(), with: format)
                 } else {
                     if value != nil {continue}
@@ -339,8 +326,8 @@ class Environment {
     ///   - parameters: 引数
     ///   - format: チェックする入力形式
     /// - Returns: エラー、無ければnil
-    private func errorMessage(to parameters: [JpfObject], with format: (type: String, particle: String)) -> JpfError? {
-        guard let particle = getParticle(from: format.particle) else {  // 「…」を除いた指定の格
+    private func errorMessage(to parameters: [JpfObject], with format: InputFormat.Format) -> JpfError? {
+        guard let particle = getParticle(from: format.particle) else {  // 格をチェック
             return InputFormatError.particleFormat(format.particle).message
         }
         if let index = parameters.firstIndex(where: {!isSameParticle(of: $0, as: particle)}) {
@@ -356,7 +343,7 @@ class Environment {
     ///   - parameter: 引数
     ///   - format: チェックする入力形式
     /// - Returns: エラー、無ければnil
-    private func errorMessage(to parameter: JpfObject, with format: (type: String, particle: String)) -> JpfError? {
+    private func errorMessage(to parameter: JpfObject, with format: InputFormat.Format) -> JpfError? {
         if !isSameType(of: parameter, as: format.type) {return InputFormatError.type(parameter.value?.type ?? "無").message}
         if !isSameParticle(of: parameter, as: format.particle) {return InputFormatError.particle(parameter.particle?.literal ?? "無").message}
         return nil
@@ -367,6 +354,7 @@ class Environment {
         case type(String)
         case particle(String)
         case particleFormat(String)
+        case notFoundFirstFormat
         case noMatchingSignature
         case noParameterValue
         case failedToEvaluate
@@ -379,6 +367,7 @@ class Environment {
             case .type(let type):                   return JpfError("入力の型が異なる。入力の型：\(type)")
             case .particle(let particle):           return JpfError("入力の格が異なる。入力の格：\(particle)")
             case .particleFormat(let s):            return JpfError("格の形式が誤っている。指定：\(s)")
+            case .notFoundFirstFormat:              return JpfError("可変長識別子に既定値が設定されている。")
             case .noMatchingSignature:              return JpfError("入力形式が一致する関数が見つからなかった。")
             case .noParameterValue:                 return JpfError("固定長パラメータの値が取得できなかった。")
             case .failedToEvaluate:                 return JpfError("既定値の評価に失敗した。")
@@ -464,7 +453,9 @@ class Environment {
         guard target.numberOfInputs == rhs.numberOfInputs else {return ConformityViolation.formatOfParams(target.numberOfInputs.map {"\($0)"} ?? "無し").error}
         // 入力の形式が一致しない
         for pairs in zip(target.formats, rhs.formats) {
-            guard pairs.0.type == pairs.1.type && pairs.0.particle == pairs.1.particle else {return ConformityViolation.formatOfParams("「\(pairs.0.type)\(pairs.0.particle)」").error}
+            guard pairs.0.type == pairs.1.type && pairs.0.particle == pairs.1.particle && pairs.0.threeDots == pairs.1.threeDots else {
+                return ConformityViolation.formatOfParams("「\(pairs.0.type)\(pairs.0.particle)」").error
+            }
         }
         return ConformityViolation.degignatedError.error
     }

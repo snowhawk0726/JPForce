@@ -72,14 +72,14 @@ struct PredicateOperableFactory {
     }
 }
 /// stringをsplit()により、[String]に分解する。
-/// \『<識別子>』もしくは、\(<識別子>)を識別子の内容に置き換える。
+/// 『<識別子>』もしくは、\(<識別子>)を識別子の内容に置き換える。
 struct Splitter {
     init(of string: String, with environment: Environment, terminator: String = "") {self.string = string; self.environment = environment; self.terminator = terminator}
     let string: String
     let environment: Environment
     let terminator: String
     var error: JpfError?
-    /// \と括弧で囲われた識別子の中身を文字列の配列に分割する。
+    /// 括弧(lとr)で囲われた識別子の中身を文字列の配列に分割する。
     let separators: [(l: String, r: Character, e: String)] = [("『", "』","\\『"), ("\\（", "）","")]
     mutating func split() -> [String]? {
         var strings: [String] = []
@@ -262,13 +262,13 @@ extension PredicateOperable {
     var pullDupUsage: JpfError          {JpfError("仕様：(識別子「<識別子>」と…)(識別子「<識別子>」に）(「数値」または「値」を)(<数値>個)")}
     var assignUsage: JpfError           {JpfError("仕様：〜(を)「<識別子>」に代入する。または、「<識別子>」に〜を代入する。")}
     var overwriteUsage: JpfError        {JpfError("仕様：〜(を)「<識別子>」に上書きする。または、「<識別子>」に〜を上書きする。")}
-    var compoundAssignUsage: JpfError           {JpfError("仕様：<識別子>(を)<計算し>て代入する。")}
-    var compoundOverwriteUsage: JpfError           {JpfError("仕様：<識別子>(を)<計算し>て上書きする。")}
+    var compoundAssignUsage: JpfError   {JpfError("仕様：<識別子>(を)<計算し>て代入する。")}
+    var compoundOverwriteUsage: JpfError{JpfError("仕様：<識別子>(を)<計算し>て上書きする。")}
     var assignArrayUsage: JpfError      {JpfError("仕様：〜(を)<配列>の位置<数値>に代入(または上書き)する。または、<配列>の位置<数値>に〜を代入(または上書き)する。")}
     var swapUsage: JpfError             {JpfError("仕様：<識別子１>と<識別子２>を入れ替える。または、<識別子１>を<識別子２>と入れ替える。")}
     var createUsage: JpfError           {JpfError("仕様：(「<識別子>」を)(<引数>で)<型>から生成する。または、<型>から(<引数>で)「<識別子>」を生成する。")}
     var createEnumeratorUsage: JpfError {JpfError("仕様：(「<識別子>」を)<値>で<列挙型>から生成する。または、<列挙型>から<値>で「<識別子>」を生成する。")}
-    var setUsage: JpfError      {JpfError("仕様：<値>(を)<オブジェクト>の要素「<識別子>」に設定する。または、<オブジェクト>の要素「<識別子>」に<値>を設定する。")}
+    var setUsage: JpfError              {JpfError("仕様：<値>(を)<オブジェクト>の要素「<識別子>」に設定する。または、<オブジェクト>の要素「<識別子>」に<値>を設定する。")}
 }
 // MARK: - 表示/音声
 struct PrintOperator : PredicateOperable {

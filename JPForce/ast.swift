@@ -315,23 +315,33 @@ struct TypeLiteral : Expression {
     }
 }
 struct InputFormat {
-    static let threeDots = "…"                      // 可変長指定の三点リーダー
+    struct Format {
+        let type: String, particle: String, threeDots: String
+        var hasThreeDots: Bool {threeDots.isThreeDots}
+        var string: String {
+            let concat = type + particle + threeDots
+            return concat.isEmpty ? "" : "「\(concat)」"
+        }
+    }
     var numberOfInputs: Int?                        // 期待するパラメータ数(可変の場合はnil)
-    var formats: [(type: String, particle: String)] // 期待するパラメータ毎の型と格(無い場合は"")
+    var formats: [Format]                           // 期待するパラメータ毎の型と格(無い場合は"")
     var values: [ExpressionStatement?]              // 既定値
     var strings: [String] {
         zip(formats, values).map { format, value in
-            let s = (!(format.type.isEmpty && format.particle.isEmpty) ? "「\(format.type + format.particle)」" : "") +
-            (value != nil ? ExpressionStatement.wa : "") + (value?.string ?? "")
+            let s = format.string + (value != nil ? ExpressionStatement.wa : "") + (value?.string ?? "")
             return s.replacingOccurrences(of: "。", with: "")
         }
     }
     var numberOfDefaultValues: Int {values.compactMap {$0}.count}   // 既定値の数
+    // 既定値を持たない最初の位置、形式
+    var firstParamIndex: Int? {values.firstIndex {$0 == nil}}
+    var firstParamFormat: Format? {firstParamIndex.flatMap {formats[$0]}}
 }
 extension String {
-    var isThreeDots: Bool {self == InputFormat.threeDots}
-    var hasThreeDots: Bool {self.hasSuffix(InputFormat.threeDots)}
-    func removedThreeDots() -> Self {return String(self.dropLast())}
+    var threeDots: String {"…"}
+    var isThreeDots: Bool {self == threeDots}
+    func getThreeDots() -> Self {self.hasSuffix(threeDots) ? threeDots : ""}
+    var removedThreeDots: Self {self.hasSuffix(threeDots) ? String(self.dropLast()) : self}
 }
 struct FunctionBlock {
     static let input = "入力"

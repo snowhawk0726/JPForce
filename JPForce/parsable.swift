@@ -119,17 +119,17 @@ extension Parsable {
         }
         return remove(lastParticle: .DE, from: &expressions)    //「で」を検出、除外
     }
-    func parseSignature(from strings: [String], _ values: [ExpressionStatement?]) -> InputFormat {
+    func parseSignature(of strings: [String], _ values: [ExpressionStatement?]) -> InputFormat {
         let formats = strings.map { string in
             var type = "", particle = ""
-            let lexer = Lexer(string)
+            let threeDots = string.getThreeDots()
+            let lexer = Lexer(string.removedThreeDots)
             var token = lexer.getNext()
             if token.isIdent || token.isKeyword {type = token.literal;token = lexer.getNext()}
-            if token.isParticle {particle = token.literal;token = lexer.getNext()}
-            if token.literal.isThreeDots {particle += token.literal}
-            return (type, particle)
+            if token.isParticle                 {particle = token.literal;token = lexer.getNext()}
+            return InputFormat.Format(type: type, particle: particle, threeDots: threeDots)
         }
-        let number = formats.map({$0.1}).contains {$0.hasThreeDots} ? nil : strings.count
+        let number = formats.contains {$0.hasThreeDots} ? nil : strings.count
         return InputFormat(numberOfInputs: number, formats: formats, values: values)
     }
     func parseProtocols() -> [String]? {
@@ -388,7 +388,7 @@ extension Parsable {
             return nil
         }
         return (paramenters.map {$0.0}, 
-                parseSignature(from: paramenters.map {$0.1}, paramenters.map {$0.2})
+                parseSignature(of: paramenters.map {$0.1}, paramenters.map {$0.2})
         )
     }
     /// 定義部： <ブロック名>は(が)、【<定義>】
