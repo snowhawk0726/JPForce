@@ -251,7 +251,7 @@ class Environment {
                 a += 1
             } else {                                // 可変長
                 let length = numberOfElements(in: [JpfObject](arguments[a..<arguments.count]), withConsecutive: format)
-                let elements = [JpfObject](arguments[a..<(length - a)]).map {$0.value ?? JpfNull.object}    // 要素の値を取り出す。
+                let elements = [JpfObject](arguments[a..<(a + length)]).map {$0.value ?? JpfNull.object}    // 要素の値を取り出す。
                 // TODO: スタック中の値にnilがあった場合、エラーにすべきか？ → ありえないので、発生したら検討する。
                 value = JpfArray(elements: elements)
                 a += length
