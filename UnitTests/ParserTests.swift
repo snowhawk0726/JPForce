@@ -324,6 +324,28 @@ final class ParserTests: XCTestCase {
             print("テスト(\(statement.string))終了")
         }
     }
+    func testCallExpressionParsing() throws {
+        let testPatterns = [
+//            "加えるであって、【xは１。yは２】。",
+//            "加えるであり、引数が、xは１。yは２。",              //【】省略形
+            "加える【引数が、xは１。yは２】。",                 // 省略形
+            "加える【xは１。yは２】。",                        // 省略形
+        ]
+        for input in testPatterns {
+            print("テストパターン: \(input)")
+            let program = try XCTUnwrap(parseProgram(with: input))
+            XCTAssertEqual(program.statements.count, 1, "program.statements.count")
+            let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
+            XCTAssertEqual(statement.expressions.count, 1, "statement.expressions.count")
+            let callExpression = try XCTUnwrap(statement.expressions.first as? CallExpression)
+            XCTAssertEqual(callExpression.target.tokenLiteral, "加える")
+            let args = callExpression.arguments
+            XCTAssertEqual(args.count, 2, "arguments.count")
+            XCTAssertEqual(args[0].string, "xは、1。")
+            XCTAssertEqual(args[1].string, "yは、2。")
+            print("テスト終了: \(statement.string)")
+        }
+    }
     func testProtocolLiteralParsings() throws {
         let testPatterns = [
             "規約であって、【数値は「数値」。文字列は「文字列」。数値化は関数で、入力が文字列「文字列を」。】",

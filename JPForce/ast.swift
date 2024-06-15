@@ -362,6 +362,27 @@ struct FunctionBlock {
         let min = max - signature.numberOfDefaultValues
         return min...max
     }
+    func index(of name: String) -> Int? {
+        parameters.firstIndex {$0.value == name}
+    }
+    /// 入力パラメータ(名前)の型が、指定の型と一致するか
+    /// - Parameters:
+    ///   - name: 入力パラメータの名前
+    ///   - type: 指定の型
+    /// - Returns: 一致(true), 不一致もしくは名前が見つからない(false)
+    func isSameType(of name: String, as type: String) -> Bool {
+        guard let i = index(of: name) else {
+            return false                    // 入力の名前が一致しない
+        }
+        let t = signature.formats[i].type
+        return t.isEmpty || t == type       // チェック不要、もしくは型が一致
+    }
+    func isVariable(parmeter name: String) -> Bool {
+        guard let i = index(of: name) else {
+            return false                    // 入力の名前が一致しない
+        }
+        return signature.formats[i].hasThreeDots
+    }
 }
 /// 必要入力数ごとの関数ブロック配列(多重定義)
 struct FunctionBlocks : Collection {
@@ -439,6 +460,53 @@ struct FunctionBlocks : Collection {
         }
         return false
     }
+    /// 入力と引数の形式が一致する関数ブロックを得る。
+    /// - Parameter arg: 引数
+    /// - Returns: 関数ブロック(無ければnil)
+    func function(with arg: Environment) -> FunctionBlock? {
+        let pairs = arg.removedSelf.enumerated  // 引数の名前(k)と値(v)の組
+        let vFunctions = dictionary[-1]         // 可変長の定義
+        let fFunctions = dictionary[pairs.count]// 固定長の定義
+        switch (vFunctions, fFunctions) {
+        case let (v?, f?):                      // 両方チェック
+            if let function = function(in: v, with: pairs) {return function}
+            return function(in: f, with: pairs)
+        case let (f?, nil), let (nil, f?):      // 片方チェック
+            return function(in: f, with: pairs)
+        default:
+            return nil
+        }
+    }
+    /// 候補の関数ブロック配列から、指定引数(名前と値)形式を持つ関数ブロックを返す。
+    /// - Parameters:
+    ///   - functions: 候補の関数ブロック配列
+    ///   - pairs: 指定引数(名前と値)
+    /// - Returns: 関数ブロック(見つからなければnil)
+    private func function(in functions: [FunctionBlock], with pairs: [(String, JpfObject)]) -> FunctionBlock? {
+        functions: for f in functions.reversed() {
+            arguments: for (k, v) in pairs {
+                if f.isVariable(parmeter: k) {  // 可変長識別子の値の型は配列
+                    guard v.type == JpfArray.type else {continue functions}
+                } else {                        // 固定長識別子の値の型は引数の型
+                    guard f.isSameType(of: k, as: v.type) else {continue functions}
+                }
+            }
+            return f                            // 引数名と型が全て一致
+        }
+        return nil                              // 一致する関数が無い
+    }
+}
+struct CallExpression : Expression {
+    var token: Token                // トークン
+    var target: Expression          // 呼び出し対象
+    var arguments: [DefineStatement]// 引数
+    //
+    var tokenLiteral: String {token.literal}
+    var string: String {
+        "\(target.string)【" +
+        (arguments.isEmpty ? "" : Self.arguments + arguments.reduce("") {$0 + $1.string.withoutComma}) + "】"
+    }
+    static let arguments = "引数が、"
 }
 struct ArrayLiteral : Expression {
     var token: Token                // 配列トークン

@@ -241,7 +241,7 @@ final class EvaluatorTests: XCTestCase {
         XCTAssertEqual(functionBlock.body?.string, "xに2を足す。")
         print("テスト(\(function.string))終了")
     }
-    func testFunctionApplication() throws {
+    func testFunctionApplications() throws {
         let testPatterns: [(input: String, exptected: Any)] = [
             ("同一は、関数【入力がxで、x】。５は同一である。", true),
             ("同一とは、関数【入力がxで、xを返す】こと。５は同一である。", true),
@@ -252,7 +252,7 @@ final class EvaluatorTests: XCTestCase {
             ("加算は、関数【入力がaとbで、aにbを足す】。適用は、関数【入力がaとbと演算で、aとbを演算する】。2と2に、加算を適用する。", 4),
             ("減算は、関数【入力がaとbで、aからbを引く】。適用は、関数【入力がaとbと演算で、aとbを演算する】。10と2に、減算を適用する。", 8),
             ("正しいは、算出【入力がaで、aが真である】。4が5より大きいは、正しくない。", true),
-            ("『割った余り』は、関数【入力がxとyで、xをyで割り、yを掛け、xから引いたものを返す】。23を11で割った余りは1である。", true),
+            ("『割った余り』は、算出【入力がxとyで、xをyで割り、yを掛け、xから引いたものを返す】。23を11で割った余りは1である。", true),
             ("加算は、関数【入力がa「数値に」とb「数値を」で、aにbを足し、返す】。1に2を加算する。", 3),
             ("加算は、関数【入力がa「数値」とb「数値」で、aにbを足し、返す】。1と2の加算する。", 3),
             ("加算は、関数【入力がa「数値に」とb「数値を」で、aにbを足し、返す】。「a」に「b」を加算する。", "入力の型が異なる。入力の型：文字列"),
@@ -260,6 +260,32 @@ final class EvaluatorTests: XCTestCase {
             ("加算は、関数【入力がa「数値と…」とb「数値を」で、aをbと関数【入力が初期値と値で、初期値に値を足す】でまとめ、返す】。1と2と3と4と5を加算する。", 15),
             ("加算は、関数【入力がa「数値…」で、aを0と関数【入力が初期値と値で、初期値に値を足す】でまとめ、返す】。1と2と3と4と5を加算する。", 15),
             ("加算は、関数【入力がa「…」で、aを0と関数【入力が初期値と値で、初期値に値を足す】でまとめ、返す】。1と2と3と4と5を加算する。", 15),
+        ]
+        for test in testPatterns {
+            print("テストパターン: \(test.input)")
+            let evaluated = try XCTUnwrap(testEvaluator(test.input))
+            try testObject(evaluated, with: test.exptected)
+            print("テスト(\(evaluated))終了")
+        }
+    }
+    func testFunctionCalls() throws {
+        let testPatterns: [(input: String, exptected: Any)] = [
+            ("同一は、関数【入力がxで、x】。同一【xは5】である。", true),
+            ("二倍とは、関数【入力がxで、xに2を掛ける】こと。二倍【xは5】し、二倍する。", 20),
+            ("加えるとは、関数【入力がxとyで、xとyを足す】こと。加える【xは5。yは5】。", 10),
+            ("加えるとは、関数【入力がxとyで、xとyを足す】こと。加える【xは1と2を足す。yは3と4を足す】。", 10),
+            ("加えるとは、関数【入力がxとyで、xとyを足す】こと。加える【xは1と2を足す。yは加える【xは3。yは4】。", 10),
+            ("関数【入力がxで、x】【引数が、xは5】。", 5),
+            ("算出【入力がxで、x】【引数が、xは5】。", 5),
+            ("加算は、関数【入力がaとbで、aにbを足す】。適用は、関数【入力がaとbと演算で、aとbを演算する】。適用【aは2。bは2。演算は加算。】", 4),
+            ("減算は、関数【入力がaとbで、aからbを引く】。適用は、関数【入力がaとbと演算で、aとbを演算する】。適用【aは10。bは2。演算は減算。】", 8),
+            ("正しいは、算出【入力がaで、aが真である】。正しく【aは、4が5より大きい。】ない。", true),
+            ("『割った余り』は、算出【入力がxとyで、xをyで割り、yを掛け、xから引いたものを返す】。割った余り【xは23。yは11。】が1である。", true),
+            ("加算は、関数【入力がa「数値に」とb「数値を」で、aにbを足し、返す】。加算【aは1。bは2】", 3),
+            ("加算は、関数【入力がa「数値に」とb「数値を」で、aにbを足し、返す】。加算【aは「a」。bは「b」】", "入力の型が異なる。入力の型：文字列"),
+            ("加算は、関数【入力がa「数値…」で、aを0と関数【入力が初期値と値で、初期値に値を足す】でまとめ、返す】。加算【aは配列【1,2,3,4,5】】", 15),
+            ("加算は、関数【入力がa「数値」とb「数値…」で、aと、bを0と関数【入力が初期値と値で、初期値に値を足す】でまとめたものを足し、返す】。加算【aは1。bは配列【2と3と4と5】】。", 15),
+            ("加算は、関数【入力がa「数値…」で、aを0と関数【入力が初期値と値で、初期値に値を足す】でまとめ、返す】。加算【引数が、aは1】", "可変長識別子の値が配列ではない。型：数値"),
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
@@ -309,9 +335,9 @@ final class EvaluatorTests: XCTestCase {
             】
         """
         let testPatterns: [(input: String, expected: Any)] = [
-            ("1と2と3で甲を実行。", 6),
-            ("1と2で甲を実行。", 5),
-            ("1で甲を実行。", 4),
+            ("1と2と3で甲を実行。", 6), ("甲【xは1。yは2。zは3】。", 6),
+            ("1と2で甲を実行。", 5), ("甲【xは1。yは2】。", 5),
+            ("1で甲を実行。", 4), ("甲【xは1】。", 4),
             ("「Alice」と「Bob」と「Charlie」に、「こんばんは」で挨拶。", "Alice、Bob、Charlie、こんばんは。"),
             ("「Alice」と「Bob」に挨拶。", "Alice、Bob、こんにちは。"),
             ("「Alice」に、「おはよう」で挨拶。", "Alice、おはよう。"),
@@ -443,14 +469,20 @@ final class EvaluatorTests: XCTestCase {
             甲は、「あ」と「い」を加算したもの。
             乙は、1に2を加算したもの。
             丙は、「あ」を「い」に加算したもの。
-            配列【甲、乙、丙】。
+            丁は、加算【aは5。bは5】。
+            戊は、加算【aは「あ」。bは「い」】。
+            己は、加算【aは配列【「あ」、「か」】。bは「い」】。
+            配列【甲、乙、丙、丁、戊、己】。
         """
         print("テストパターン: \(input)")
         let array = try XCTUnwrap(testEvaluator(input) as? JpfArray)
-        XCTAssertEqual(array.elements.count, 3)
+        XCTAssertEqual(array.elements.count, 6)
         XCTAssertEqual(array.elements[0].string, "あい")
         XCTAssertEqual(array.elements[1].string, "3")
         XCTAssertEqual(array.elements[2].string, "いあ")
+        XCTAssertEqual(array.elements[3].string, "10")
+        XCTAssertEqual(array.elements[4].string, "いあ")
+        XCTAssertEqual(array.elements[5].string, "あい")
         print("テスト(\(array.string))終了")
     }
     func testTypeObject() throws {
@@ -543,6 +575,9 @@ final class EvaluatorTests: XCTestCase {
             ("空にする。甲から「乙」を生成する。乙のaと乙のbを足す", 3),
             ("空にする。甲から、2で「乙」を生成する。乙のaと乙のbを足す", 5),
             ("空にする。甲から、3と4で「乙」を生成する。乙のaと乙のbを足す", 7),
+            ("空にする。乙は、甲【】。乙のaと乙のbを足す", 3),
+            ("空にする。乙は、甲【aは2】。乙のaと乙のbを足す", 5),
+            ("空にする。乙は、甲【aは3。bは4】。乙のaと乙のbを足す", 7),
         ]
         print("テストパターン: \(input)")
         let environment = Environment()
@@ -1356,7 +1391,7 @@ final class EvaluatorTests: XCTestCase {
             甲は、型であって、【
                 乙は、算出【
                     設定が、【入力がa。丁にaを上書き。】
-                    設定が、さらに、【入力がb。丁にbを上書き。】
+                    設定が、さらに、【入力がb「数値」。bに１を足し、丁に上書き。】
                     取得が、【１】
                     取得が、さらに、【入力がc。c】
                 】
@@ -1367,9 +1402,11 @@ final class EvaluatorTests: XCTestCase {
         """
         let testPatterns: [(input: String, expected: Any)] = [
             ("丙の乙", 1),
-            ("空にする。cは2。cで丙の乙", 2),
-            ("空にする。aは3。丙の要素「乙」にaを設定する。丙の丁。", 3),
-            ("空にする。bは4。丙の要素「乙」にbを設定する。丙の丁。", 4),
+            ("丙の乙【】", 1),
+            ("空にする。2で丙の乙", 2),
+            ("空にする。丙の乙【cは2】", 2),
+            ("空にする。丙の要素「乙」に「い」を設定する。丙の丁。", "い"),
+            ("空にする。bは4。丙の要素「乙」にbを設定する。丙の丁。", 5),
         ]
         print("テストパターン: \(input)")
         let environment = Environment()

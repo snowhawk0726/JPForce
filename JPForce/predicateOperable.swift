@@ -644,13 +644,23 @@ struct CreateOperator : PredicateOperable {
         }
         guard environment.isPeekParticle(.KARA) || environment.isPeekParticle(.WO) else {return createUsage}
         switch environment.unwrappedPeek {
-        case let instanceType as JpfType:   // 型からインスタンスを生成
+        case let type as JpfType:           // 型からインスタンスを生成
             environment.drop()
-            if let identifier = getIdentifier() {   // 識別子あり？
-                environment[identifier.value] = createInstance(from: instanceType)  // 生成したインスタンスを代入
-                return nil
+            switch type.create(with: environment) {
+            case let instance as JpfInstance:
+                let ident = getIdentifier() // 識別子を抽出
+                if let result = instance.initialize(with: environment),
+                   result.isError {return result}
+                if let i = ident {          // 識別子あり？
+                    environment[i.value] = instance // 生成したインスタンスを代入
+                    return nil
+                }
+                return instance
+            case let error as JpfError:
+                return error
+            default:
+                fatalError()
             }
-            return createInstance(from: instanceType)
         case let enumType as JpfEnum:       // 列挙子を値で列挙型から生成
             environment.drop()
             if let identifier = getIdentifier() {   // 識別子あり？
@@ -681,33 +691,6 @@ struct CreateOperator : PredicateOperable {
             return nil
         }
         return phrase.value as? JpfString
-    }
-    private func createInstance(from type: JpfType) -> JpfObject? {
-        let local = Environment(outer: self.environment)    // 型の環境を拡張
-        defer {environment.push(local.pullAll())}           // スタックを戻す
-        var instance = JpfInstance(type: type.name, environment: local, protocols: type.protocols, available: [])
-        local[JpfInstance.SELF] = instance                  // selfを仮登録
-        if let result = instance.initialize(with: environment), result.isError {return result} // 初期化
-        var protocols: [JpfProtocol] = []                   // 規約(型)登録
-        for ident in type.protocols {
-            if let rule = environment[ident] as? JpfProtocol {
-                protocols.append(rule)
-                if let implements = rule.body {             // 規約のデフォルト実装をlocalに登録
-                    if let result = Evaluator(from: implements, with: local).object, result.isError {return result}
-                }
-            }
-        }
-        if let body = type.body,                            // 定義ブロック
-           let result = Evaluator(from: body, with: local).object, result.isError {return result}       // メンバ登録
-        if let result = local.conform(to: protocols), result.isError {return result}             // 規約チェック
-        var members = (local.peek as? JpfArray).map {$0.elements.compactMap {$0 as? JpfString}.map {$0.value}} ?? []  // 利用可能なメンバーリスト
-        local.drop()
-        for p in protocols {    // 規約条項のメンバーリストを利用可能なメンバーリストに追加
-            p.clauses.forEach {members.append($0.identifier.value)}
-        }
-        instance = JpfInstance(type: type.name, environment: local, protocols: type.protocols, available: members)
-        local[JpfInstance.SELF] = instance                  // selfを本登録
-        return instance
     }
     private func createEnumerator(from type: JpfEnum) -> JpfObject? {
         guard environment.isPeekParticle(.DE) || environment.isPeekParticle(.KARA), let object = environment.unwrappedPeek else {return createEnumeratorUsage}

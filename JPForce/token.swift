@@ -273,6 +273,7 @@ extension String {
     var hankaku: String? {applyingTransform(.fullwidthToHalfwidth, reverse: false)} // 半角変換(Fullwidth to Halfwidth (ascii))
     var zenkaku: String? {applyingTransform(.fullwidthToHalfwidth, reverse: true)}  // 全角変換(Halfwidth to Fullwidth)
     var withoutPeriod: Self {self.replacingOccurrences(of: Token.Symbol.PERIOD.rawValue, with: "")}
+    var withoutComma: Self {self.replacingOccurrences(of: Token.Symbol.COMMA.rawValue, with: "")}
     var isPlainForm: Bool {                                                         // 終止形？(Check self if palin form)
         PlainForm.hasEnd(of: self) || PlainForm.hasIrregular(self)
     }

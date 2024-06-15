@@ -11,6 +11,7 @@ class Environment {
     var outer: Environment?     // 拡張環境
     private var store: [String: JpfObject] = [:]
     private var stack: [JpfObject] = []
+    var isExecutable: Bool = true                   // false: 実行抑止
     // MARK: - 辞書操作
     subscript(_ name: String) -> JpfObject? {
         get {store[name] ?? outer?[name]}           // 外部環境の取得は可
@@ -24,11 +25,6 @@ class Environment {
         store.map {(key: $0, value: $1)}
     }
     var values: [JpfObject] {Array(store.values) + (outer?.values ?? [])}
-    var enumeratedStringArray: JpfArray {
-        return JpfArray(elements: enumerated.map {
-            JpfString(value: $0.key + "が" + $0.value.string)
-        })
-    }
     /// storeを、JpfDictionaryに変換する。(値は、store[key].stirng)
     var stringDictionary: JpfDictionary {
         let keys = store.keys.map {JpfString(value: $0).hashKey}
@@ -75,6 +71,12 @@ class Environment {
         } else {
             self[name] = nil
         }
+    }
+    /// インスタンスの「自身」を削除した環境を返す。
+    var removedSelf: Self {
+        let removed = self
+        removed[JpfInstance.SELF] = nil
+        return removed
     }
     // MARK: - スタック操作
     func push(_ object: JpfObject)  {stack.append(object)}
@@ -129,11 +131,11 @@ class Environment {
         return name
     }
     func getName() -> String {return getName(from: peek)}
-    /// 多重定義の処理ブロックから、引数形式が一致するものを抽出し、処理を行う。
+    /// 多重定義の関数ブロックから、引数形式が一致するものを抽出し、処理を行う。
     /// - Parameters:
     ///   - functions: 処理ブロック(【入力が〜、本体が〜。】)
     ///   - local: 関数処理を行う環境 (selfは入力環境)
-    /// - Returns: 処理結果、エラー、nil
+    /// - Returns: 処理結果、エラー、またはnil
     func execute(_ functions: FunctionBlocks, with local: Environment) -> JpfObject? {
         for n in stride(from: count, through: -1, by: -1) {     // スタック上の引数の数毎
             for function in functions[n].reversed() {           // 引数の数に応じた多重定義毎
@@ -146,8 +148,31 @@ class Environment {
                 }
             }
         }
-        if functions.count == 1 {   // 単体の定義の場合、エラーメッセージを作成する
+        if functions.array.count == 1 {             // 単体の定義の場合、エラーメッセージを作成する
             return errorMessage(to: functions.array.last!)
+        }
+        return InputFormatError.noMatchingSignature.message
+    }
+    /// 多重定義の関数ブロックから、引数形式が一致するものを抽出し、実行する。
+    /// - Parameters:
+    ///   - functions: 対象の多重定義
+    ///   - local: 関数の実行環境
+    /// - Returns: 処理結果、エラー、またはnil
+    func call(_ functions: FunctionBlocks, with local: Environment) -> JpfObject? {
+        if let function = functions.function(with: local) {
+            if let error = local.apply(function) {  // 残りの引数を割り当てる
+                return error
+            }
+            return execute(function, with: local)
+        }
+        if functions.array.count == 1 {             // 単体の定義の場合、エラーメッセージを作成する
+            let f = functions.array.last!           // 最新定義
+            let n = local.store.count               // 指定引数の数
+            guard functions.dictionary.keys.contains(n) || f.signature.numberOfInputs == nil else {
+                let n = f.parameters.count - f.signature.numberOfDefaultValues
+                return InputFormatError.numberOfParameters(n).message
+            }
+            return errorMessage(to: f, with: local)
         }
         return InputFormatError.noMatchingSignature.message
     }
@@ -237,6 +262,17 @@ class Environment {
         outer.drop(a)
         return nil
     }
+    /// 辞書に登録済み引数以外を、既定値で登録する。
+    /// - Parameter function: 対象の関数ブロック
+    /// - Returns: エラー、無しはnil
+    private func apply(_ function: FunctionBlock) -> JpfError? {
+        let difference = Set(function.parameters.map {$0.value}).subtracting(Set(store.keys))
+        for name in difference {
+            let i = function.index(of: name)!   // parametersに属するので、nilにはならない。
+            store[name] = getDefaultValue(with: function.signature, at: i)
+        }
+        return nil
+    }
     /// 指定された既定値式を評価し、値を得る
     /// - Parameters:
     ///   - designated: 指定の入力形式
@@ -321,6 +357,21 @@ class Environment {
         }
         return nil
     }
+    private func errorMessage(to f: FunctionBlock, with args: Environment) -> JpfError? {
+        let pairs = args.enumerated
+        for (k, v) in pairs {
+            if f.isVariable(parmeter: k) {
+                guard v.type == JpfArray.type else {
+                    return InputFormatError.variable(v.type).message
+                }
+            } else {
+                guard f.isSameType(of: k, as: v.type) else {
+                    return InputFormatError.type(v.type).message
+                }
+            }
+        }
+        return nil
+    }
     /// 可変長の引数のエラーチェック
     /// - Parameters:
     ///   - parameters: 引数
@@ -354,6 +405,7 @@ class Environment {
         case type(String)
         case particle(String)
         case particleFormat(String)
+        case variable(String)
         case notFoundFirstFormat
         case noMatchingSignature
         case noParameterValue
@@ -367,6 +419,7 @@ class Environment {
             case .type(let type):                   return JpfError("入力の型が異なる。入力の型：\(type)")
             case .particle(let particle):           return JpfError("入力の格が異なる。入力の格：\(particle)")
             case .particleFormat(let s):            return JpfError("格の形式が誤っている。指定：\(s)")
+            case .variable(let type):               return JpfError("可変長識別子の値が配列ではない。型：\(type)")
             case .notFoundFirstFormat:              return JpfError("可変長識別子に既定値が設定されている。")
             case .noMatchingSignature:              return JpfError("入力形式が一致する関数が見つからなかった。")
             case .noParameterValue:                 return JpfError("固定長パラメータの値が取得できなかった。")

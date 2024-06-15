@@ -591,6 +591,7 @@ enum Precedence : Int {
     static let precedences: [Token.TokenType: Self] = [
         .keyword(.OR):          .or,
         .keyword(.AND):         .and,
+        .symbol(.LBBRACKET):    .block,
     ]
     static subscript(tokenType: Token.TokenType) -> Self {precedences[tokenType] ?? .lowest}
 }
@@ -1114,6 +1115,7 @@ struct InfixExpressionParserFactory {
     static func create(from parser: Parser, with left: Expression?) -> ExpressionParsable? {
         switch parser.nextToken.type {   // nextTokenに続くトークンを解析する解析器
         case .keyword(.OR):         return InfixExpressionParser(parser, with: left)
+        case .symbol(.LBBRACKET):   return CallExpressionParser(parser, with: left)
         default:                    return nil
         }
     }
@@ -1137,6 +1139,32 @@ struct InfixExpressionParser : ExpressionParsable {
             return nil
         }
         return InfixExpression(token: token, left: left, right: right)
+    }
+}
+struct CallExpressionParser : ExpressionParsable {
+    init(_ parser: Parser, with left: Expression?) {self.parser = parser; self.left = left}
+    let parser: Parser
+    let left: Expression?
+    func parse() -> (any Expression)? {
+        let token = currentToken
+        _ = getNext(whenNextIs: CallExpression.arguments)   // 引数が、
+        guard let caller = left else {
+            error(message: "呼び出し式で、左辺の解析に失敗した。")
+            return nil
+        }
+        guard let block = BlockStatementParser(parser, symbol: .RBBRACKET).blockStatement else {
+            error(message: "呼び出し式で、引数の解析に失敗した。")
+            return nil
+        }
+        var arguments: [DefineStatement] = []
+        for statement in block.statements {
+            guard let define = statement as? DefineStatement else {
+                error(message: "呼び出し式の引数が定義文で定義されていない。")
+                return nil
+            }
+            arguments.append(define)
+        }
+        return CallExpression(token: token, target: caller, arguments: arguments)
     }
 }
 // MARK: - postfix expression parsers and those instance factory

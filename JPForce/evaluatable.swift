@@ -43,6 +43,7 @@ extension Node {
     var cannotExtend: JpfError              {JpfError("拡張することはできない。")}
     var enumuratorError: JpfError           {JpfError("「列挙」の列挙子(識別子)が正しくない。：")}
     var cannotUseAsKeyword: JpfError        {JpfError("は、ラベルの値として使用できない。")}
+    var notSupportedCall: JpfError          {JpfError("呼び出し式は未対応。対象：")}
     // 仕様表示
     var strideLoopUsage: JpfError           {JpfError("仕様：<数値>から<数値>まで（<数値>ずつ）反復【入力が<識別子(カウント値)>、<処理>】。")}
     var rangeLoopUsage: JpfError            {JpfError("仕様：範囲【<下限><上限>】を反復【入力が<識別子(カウント値)>、<処理>】。")}
@@ -292,6 +293,7 @@ extension PhraseExpression : Evaluatable {
 extension InfixExpression : Evaluatable {
     func evaluated(with environment: Environment) -> JpfObject? {
         guard token == .keyword(.OR) else {return "「\(tokenLiteral)」" + keywordNotSupportedInInfixExpression}
+        // <値１>または<値２>…<格> → 配列【<値１>、<値２>…】<格>
         var array: [JpfObject] = []
         guard let value = left.evaluated(with: environment) else {return nil}
         guard !value.isError else {return value}
@@ -565,43 +567,9 @@ extension FunctionLiteral : Evaluatable {
         accessed(with: environment) ?? JpfFunction(functions: functions, environment: environment)
     }
 }
-extension JpfFunction {
-    /// 関数を実行する。
-    /// スタックの引数は、関数ローカルの辞書に登録される。(local.apply())
-    /// 本体は評価実行され、エラーかアンラップされた返り値を返す。
-    /// - Parameter environment: 実行中の(通常もしくは関数の)環境
-    /// - Returns: エラーかアンラップされた返り値、なければnil
-    func executed(with environment: Environment) -> JpfObject? {
-        let local = Environment(outer: self.environment)    // 関数の環境を拡張
-        let stackEnv = environment.isEmpty ? self.environment : environment
-        defer {environment.push(stackEnv.pullAll())}        // スタックを戻す
-        if let returnValue = stackEnv.execute(functions, with: local) {
-            return returnValue
-        }
-        return nil
-    }
-}
 extension ComputationLiteral : Evaluatable {
     func evaluated(with environment: Environment) -> JpfObject? {
         accessed(with: environment) ?? JpfComputation(setters: setters, getters: getters, environment: environment)
-    }
-}
-extension JpfComputation {
-    /// 算出(取得)を行う。
-    /// - Parameter environment: 実行中の(通常もしくは算出の)環境
-    /// - Returns: エラーかアンラップされた返り値、なければnil
-    func getter(with environment: Environment) -> JpfObject? {
-        guard !getters.isEmpty else {return getterNotFound}
-        let local = Environment(outer: self.environment)    // 環境を拡張
-        return environment.execute(getters, with: local)
-    }
-    /// 算出(設定)を行う。
-    /// - Parameter environment: 実行中の(通常もしくは算出の)環境
-    /// - Returns: エラーかアンラップされた返り値、なければnil
-    func setter(with environment: Environment) -> JpfObject? {
-        guard !setters.isEmpty else {return setterNotFound}
-        let local = Environment(outer: self.environment)    // 環境を拡張
-        return environment.execute(setters, with: local)
     }
 }
 extension TypeLiteral : Evaluatable {
@@ -677,5 +645,39 @@ extension EnumLiteral : Evaluatable {
             identifiers.append(ident)
         }
         return JpfEnum(elements: identifiers, environment: local)
+    }
+}
+extension CallExpression : Evaluatable {
+    func evaluated(with environment: Environment) -> (any JpfObject)? {
+        defer {environment.isExecutable = true}
+        environment.isExecutable = false    // targetの実行を抑止
+        switch target.evaluated(with: environment) {
+        case let f as JpfFunction:
+            let local = Environment(outer: f.environment)
+            arguments.forEach {_ = $0.evaluated(with: local)}
+            if let result = environment.call(f.functions, with: local) {
+                return result
+            }
+        case let c as JpfComputation:
+            let local = Environment(outer: c.environment)
+            arguments.forEach {_ = $0.evaluated(with: local)}
+            if let result = environment.call(c.getters, with: local) {
+                return result
+            }
+        case let t as JpfType:
+            switch t.create(with: environment) {    // インスタンスを生成
+            case let instance as JpfInstance:
+                arguments.forEach {_ = $0.evaluated(with: instance.environment)}
+                if let result = instance.initialize(with: environment, withStack: false) {return result}
+                return instance
+            case let error as JpfError:
+                return error
+            default:
+                fatalError()
+            }
+        default:
+            return notSupportedCall + "\(target.string)"
+        }
+        return nil
     }
 }

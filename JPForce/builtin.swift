@@ -626,13 +626,6 @@ extension JpfInstance {
     func assign(_ value: JpfObject, to target: JpfObject?) -> JpfObject {
         return assign(value, to: target, with: environment)
     }
-    func initialize(with environment: Environment) -> JpfObject? {
-        guard let type = environment[self.type] as? JpfType else {return JpfError(typeNotFound)}
-        if !type.initializers.isEmpty,
-           let result = environment.execute(type.initializers, with: self.environment),
-           result.isError {return result}
-        return nil
-    }
 }
 extension JpfEnum {
     var count: JpfObject {JpfInteger(value: elements.count)}
