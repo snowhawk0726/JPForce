@@ -127,6 +127,21 @@ struct JpfRange : JpfObject {
         (lowerBound.map {$0.string + $1.literal} ?? "") + comma +
         (upperBound.map {$0.string + $1.literal} ?? "") + "】"}
     private var comma: String {(lowerBound != nil && upperBound != nil) ? "、" : ""}
+    var lowerBoundNumber: Int? {
+        guard lowerBound?.1 == .particle(.KARA) || lowerBound?.1 == .particle(.GTEQUAL) else {return nil}
+        return lowerBound?.0.value
+    }
+    var upperBoundNumber: Int? {
+        switch upperBound?.1 {
+        case .particle(.MADE),.particle(.LTEQUAL):
+            return upperBound?.0.value
+        case .particle(.UNDER):
+            guard let n = upperBound?.0 else {return nil}
+            return n.value - 1
+        default:
+            return nil
+        }
+    }
 }
 struct JpfNull : JpfObject {
     static let type = "無"

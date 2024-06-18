@@ -297,16 +297,26 @@ extension InfixExpression : Evaluatable {
         var array: [JpfObject] = []
         guard let value = left.evaluated(with: environment) else {return nil}
         guard !value.isError else {return value}
-        array.append(value)
+        guard let a = toArray(from: value) else {return keywordNotSupportedInInfixExpression}
+        array += a
         guard let value = right.evaluated(with: environment) else {return nil}
         guard !value.isError else {return value}
-        guard let particle = value.particle else {return nil}
-        if let arrayObject = value.value as? JpfArray {
-            array += arrayObject.elements
-        } else {
-            array.append(value.value!)
+        guard let v = value.value, let a = toArray(from: v) else {return keywordNotSupportedInInfixExpression}
+        array += a
+        return JpfPhrase(value: JpfArray(elements: array), particle: value.particle)
+    }
+    private func toArray(from value: JpfObject) -> [JpfObject]? {
+        switch value {
+        case let array as JpfArray:
+            return array.elements
+        case let range as JpfRange:
+            guard let min = range.lowerBoundNumber else {return nil}
+            guard let max = range.upperBoundNumber else {return nil}
+            let array = Array(min...max)
+            return array.map {JpfInteger(value: $0)}
+        default:
+            return [value]
         }
-        return JpfPhrase(value: JpfArray(elements: array), particle: particle)
     }
 }
 extension CaseExpression : Evaluatable {

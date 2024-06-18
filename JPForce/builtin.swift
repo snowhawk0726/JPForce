@@ -122,9 +122,8 @@ extension JpfRange {
         lhs.isParticle(.LTEQUAL) && rhs.isParticle(.MADE)
     }
     var count: JpfObject {
-        guard let lower = lowerBound?.0.number, let upper = upperBound?.0.number else {return JpfError(cannotCountRange)}
-        let countInRange = upper - lower + ((upperBound?.1 == Token(.UNDER)) ? 0 : 1)
-        return JpfInteger(value: countInRange)
+        guard let lower = lowerBoundNumber, let upper = upperBoundNumber else {return JpfError(cannotCountRange)}
+        return JpfInteger(value: upper - lower + 1)
     }
     var isEmpty: JpfObject {
         guard let counter = self.count as? JpfInteger else {return JpfError(cannotCountRange)}
