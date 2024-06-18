@@ -655,20 +655,24 @@ extension CallExpression : Evaluatable {
         case let f as JpfFunction:
             let local = Environment(outer: f.environment)
             arguments.forEach {_ = $0.evaluated(with: local)}
+            local.storeArguments(with: local)
             if let result = environment.call(f.functions, with: local) {
                 return result
             }
         case let c as JpfComputation:
             let local = Environment(outer: c.environment)
             arguments.forEach {_ = $0.evaluated(with: local)}
+            local.storeArguments(with: local)
             if let result = environment.call(c.getters, with: local) {
                 return result
             }
         case let t as JpfType:
             switch t.create(with: environment) {    // インスタンスを生成
             case let instance as JpfInstance:
-                arguments.forEach {_ = $0.evaluated(with: instance.environment)}
-                if let result = instance.initialize(with: environment, withStack: false) {return result}
+                let args = Environment()            // 引数のみの環境
+                arguments.forEach {_ = $0.evaluated(with: args)}
+                instance.environment.storeArguments(with: args, shouldMerge: true)
+                if let result = instance.initialize(with: environment, type: t) {return result}
                 return instance
             case let error as JpfError:
                 return error

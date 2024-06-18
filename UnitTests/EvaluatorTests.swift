@@ -526,10 +526,12 @@ final class EvaluatorTests: XCTestCase {
                 】
                 「燃料量」と「給油」と「色」は利用可能。
             】
-            自動車の要素「ハンドル」に「左」を設定する。
+            自動車の要素「ハンドル」を「左」に設定する。
             黒い車は、10Lで自動車から生成する。
             30Lを黒い車に給油する。
             黒い車の要素「色」を「白」に設定する。
+            車は、自動車【残量は20L】。
+            車に給油【給油量は30L】。
         """
         let testPatterns: [(input: String, expected: Any)] = [
             ("自動車の型。", "型"),
@@ -539,6 +541,7 @@ final class EvaluatorTests: XCTestCase {
             ("黒い車の燃料量。", 40),
             ("黒い車の色。", "白"),
             ("自動車を切り替えた自動車のハンドル", "右"),
+            ("車の燃料量。", 50),
         ]
         print("テストパターン: \(input)")
         let environment = Environment()

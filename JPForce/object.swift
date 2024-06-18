@@ -395,15 +395,25 @@ extension JpfInstance {
     /// インスタンスの初期化を行う。
     /// - Parameter outer: スタックによる引数を含む環境
     /// - Returns: 成功: nil、失敗: エラー
-    func initialize(with outer: Environment, withStack: Bool = true) -> JpfError? {
+    func initialize(with outer: Environment) -> JpfError? {
         guard let type = outer[self.type] as? JpfType else {return JpfError(typeNotFound)}
-        self.environment[JpfInstance.SELF] = self
-        if !type.initializers.isEmpty {
-            if let result = withStack ?
-                outer.execute(type.initializers, with: self.environment) :
-                outer.call(type.initializers, with: self.environment),
-               result.isError {return result.error}
-        }
+        environment[JpfInstance.SELF] = self                // 自身を辞書に登録
+        if !type.initializers.isEmpty,
+           let result = outer.execute(type.initializers, with: environment),
+           result.isError {return result.error}
+        return nil
+    }
+    /// インスタンスの初期化を行う。
+    /// - Parameters:
+    ///   - arguments: 引数のみの環境
+    ///   - type: 生成元の型
+    /// - Returns: 成功: nil、失敗: エラー
+    func initialize(with arguments: Environment, type: JpfType) -> JpfError? {
+        environment[JpfInstance.SELF] = self                // 自身を辞書に登録
+        if !type.initializers.isEmpty,
+           let outer = environment.outer,
+           let result = outer.call(type.initializers, with: environment),
+           result.isError {return result.error}
         return nil
     }
 }

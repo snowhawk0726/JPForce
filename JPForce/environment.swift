@@ -8,10 +8,11 @@ import Foundation
 
 class Environment {
     init(outer: Environment? = nil) {self.outer = outer}
-    var outer: Environment?     // 拡張環境
+    let outer: Environment?     // 拡張環境
+    var isExecutable: Bool = true                   // false: 実行抑止
     private var store: [String: JpfObject] = [:]
     private var stack: [JpfObject] = []
-    var isExecutable: Bool = true                   // false: 実行抑止
+    private var arguments: [String: JpfObject] = [:]// 引数
     // MARK: - 辞書操作
     subscript(_ name: String) -> JpfObject? {
         get {store[name] ?? outer?[name]}           // 外部環境の取得は可
@@ -72,11 +73,14 @@ class Environment {
             self[name] = nil
         }
     }
-    /// インスタンスの「自身」を削除した環境を返す。
-    var removedSelf: Self {
-        let removed = self
-        removed[JpfInstance.SELF] = nil
-        return removed
+    func storeArguments(with args: Environment, shouldMerge: Bool = false) {
+        args.enumerated.forEach {
+            arguments[$0] = $1
+            if shouldMerge {self[$0] = $1}
+        }
+    }
+    var argumentPairs: [(String, JpfObject)] {
+        arguments.map {($0, $1)}
     }
     // MARK: - スタック操作
     func push(_ object: JpfObject)  {stack.append(object)}
@@ -257,7 +261,7 @@ class Environment {
                 a += length
             }
             if value.isError {return value.error}
-            store[idetifier.value] = value          // 値の割り当て
+            self[idetifier.value] = value           // 値の割り当て
         }
         outer.drop(a)
         return nil
@@ -266,10 +270,10 @@ class Environment {
     /// - Parameter function: 対象の関数ブロック
     /// - Returns: エラー、無しはnil
     private func apply(_ function: FunctionBlock) -> JpfError? {
-        let difference = Set(function.parameters.map {$0.value}).subtracting(Set(store.keys))
+        let difference = Set(function.parameters.map {$0.value}).subtracting(Set(arguments.keys))
         for name in difference {
             let i = function.index(of: name)!   // parametersに属するので、nilにはならない。
-            store[name] = getDefaultValue(with: function.signature, at: i)
+            self[name] = getDefaultValue(with: function.signature, at: i)
         }
         return nil
     }

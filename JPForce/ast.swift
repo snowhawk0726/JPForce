@@ -461,10 +461,10 @@ struct FunctionBlocks : Collection {
         return false
     }
     /// 入力と引数の形式が一致する関数ブロックを得る。
-    /// - Parameter arg: 引数
+    /// - Parameter env: 引数をもつ環境
     /// - Returns: 関数ブロック(無ければnil)
-    func function(with arg: Environment) -> FunctionBlock? {
-        let pairs = arg.removedSelf.enumerated  // 引数の名前(k)と値(v)の組
+    func function(with env: Environment) -> FunctionBlock? {
+        let pairs = env.argumentPairs           // 引数の名前(k)と値(v)の組
         let vFunctions = dictionary[-1]         // 可変長の定義
         let fFunctions = dictionary[pairs.count]// 固定長の定義
         switch (vFunctions, fFunctions) {
