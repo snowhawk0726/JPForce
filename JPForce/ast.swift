@@ -8,7 +8,7 @@
 import Foundation
 
 // MARK: interfaces
-protocol Node : Evaluatable, NodeAccessible {
+protocol Node : Evaluatable, Compilable, NodeAccessible {
     var tokenLiteral: String {get}
     var string: String {get}
 }

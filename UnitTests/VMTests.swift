@@ -8,28 +8,42 @@
 import XCTest
 
 final class VMTests: XCTestCase {
-
+    typealias VmTestCase = (input: String, expected: Any)
+    //
     override func setUpWithError() throws {
-        // Put setup code here. This method is called before the invocation of each test method in the class.
     }
-
     override func tearDownWithError() throws {
-        // Put teardown code here. This method is called after the invocation of each test method in the class.
     }
-
-    func testExample() throws {
-        // This is an example of a functional test case.
-        // Use XCTAssert and related functions to verify your tests produce the correct results.
-        // Any test you write for XCTest can be annotated as throws and async.
-        // Mark your test throws to produce an unexpected failure when your test encounters an uncaught error.
-        // Mark your test async to allow awaiting for asynchronous code to complete. Check the results with assertions afterwards.
+    func testIntegerArithmetic() throws {
+        let testPattern: [VmTestCase] = [
+            ("1", 1),
+            ("2", 2),
+            ("1と2を足す", 3),
+        ]
+        try runVmTests(with: testPattern)
     }
-
-    func testPerformanceExample() throws {
-        // This is an example of a performance test case.
-        self.measure {
-            // Put the code you want to measure the time of here.
+    // MARK: - Helpers
+    private func runVmTests(with tests: [VmTestCase]) throws {
+        for t in tests {
+            let program = parseProgram(with: t.input)
+            let compiler = Compiler(from: program)
+            XCTAssertNil(compiler.compile())
+            var vm = VM(with: compiler.bytecode)
+            XCTAssertNil(vm.run())
+            let element = vm.stackTop
+            try testExpectedObject(t.expected, element)
         }
     }
-
+    private func testExpectedObject(_ expected: Any, _ actual: JpfObject?) throws {
+        switch expected {
+        case let integer as Int:
+            try testIntegerObject(Int64(integer), actual)
+        default:
+            break
+        }
+    }
+    private func testIntegerObject(_ expected: Int64, _ actual: JpfObject?) throws {
+        let integer = try XCTUnwrap(actual as? JpfInteger)
+        XCTAssertEqual(integer.value, Int(expected))
+    }
 }

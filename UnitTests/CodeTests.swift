@@ -8,28 +8,52 @@
 import XCTest
 
 final class CodeTests: XCTestCase {
-
     override func setUpWithError() throws {
-        // Put setup code here. This method is called before the invocation of each test method in the class.
     }
-
     override func tearDownWithError() throws {
-        // Put teardown code here. This method is called after the invocation of each test method in the class.
     }
-
-    func testExample() throws {
-        // This is an example of a functional test case.
-        // Use XCTAssert and related functions to verify your tests produce the correct results.
-        // Any test you write for XCTest can be annotated as throws and async.
-        // Mark your test throws to produce an unexpected failure when your test encounters an uncaught error.
-        // Mark your test async to allow awaiting for asynchronous code to complete. Check the results with assertions afterwards.
-    }
-
-    func testPerformanceExample() throws {
-        // This is an example of a performance test case.
-        self.measure {
-            // Put the code you want to measure the time of here.
+    func testMake() throws {
+        let testPatterns: [(op: Opcode, operands: [Int], expected: [Byte]) ] = [
+            (.opConstant, [65534], [Opcode.opConstant.rawValue, 255, 254]),
+            (.opAdd, [], [Opcode.opAdd.rawValue]),
+        ]
+        for test in testPatterns {
+            let instruction = make(op: test.op, operands: test.operands)
+            XCTAssertEqual(instruction.count, test.expected.count,
+                           "instruction has wrong length. want=\(test.expected.count), got=\(instruction.count)")
+            for (i, b) in test.expected.enumerated() {
+                XCTAssertEqual(instruction[i], test.expected[i],
+                               "wrong byte at pos \(i). want=\(b.quoted), got=\(instruction[i].quoted)")
+            }
         }
     }
-
+    func testInstructionsString() throws {
+        let instructions: [Instructions] = [
+            make(op: .opAdd),
+            make(op: .opConstant, operand: 2),
+            make(op: .opConstant, operand: 65535),
+        ]
+        let expected = """
+        0000 OpAdd
+        0001 OpConstant 2
+        0004 OpConstant 65535
+        
+        """
+        let concatted = instructions.reduce(Instructions()) {$0 + $1}
+        XCTAssertEqual(concatted.string, expected, "instructions wrongly formatted.")
+    }
+    func testReadOperands() throws {
+        let testPattern: [(op: Opcode, operands: [Int], bytesRead: Int)] = [
+            (.opConstant, [65535], 2),
+        ]
+        for test in testPattern {
+            let instruction = make(op: test.op, operands: test.operands)
+            let def = try XCTUnwrap(lookUp(test.op.rawValue))
+            let (opearndsRead, n) = readOperands(with: def, from: Array(instruction[1...]))
+            XCTAssertEqual(n, test.bytesRead, "n wrong.")
+            for (i, exptected) in test.operands.enumerated() {
+                XCTAssertEqual(opearndsRead[i], exptected, "operand wrong.")
+            }
+        }
+    }
 }
