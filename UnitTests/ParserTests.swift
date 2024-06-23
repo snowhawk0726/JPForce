@@ -828,23 +828,6 @@ final class ParserTests: XCTestCase {
 
     }
     // MARK: - ヘルパー
-    private func parseProgram(with input: String) -> Program? {
-        let lexer = Lexer(input)
- /*       print("tagged:\t\t", terminator: "")
-        lexer.enumerated.forEach {print($0 + "(\($1))", terminator: "")}
-        print() */
-        let parser = Parser(lexer)
-        let program = parser.parseProgram()
-        check(parser.errors)
-        return program
-    }
-    private func check(_ errors: [String]) {
-        if errors.isEmpty {return}
-        print("Parserが、\(errors.count)個のエラーを検出した。")
-        errors.forEach {print("Parerエラー: \($0)")}
-        XCTFail()
-    }
-    //
     private func testDefStatement(_ statement: Statement?, name: String, _ string: String, with value: Any, flag: Bool = false) throws {
         let defStatement = try XCTUnwrap(statement as? DefineStatement)
         XCTAssertEqual(defStatement.token.literal, string)

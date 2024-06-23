@@ -82,3 +82,16 @@ class Parser {
         func value(of symbol: Token.Symbol) -> Int {counters[symbol]!}
     }
 }
+// MARK: - Helpers for Unit Test
+func parseProgram(with input: String) -> Program {
+    let lexer = Lexer(input)
+    let parser = Parser(lexer)
+    let program = parser.parseProgram()!
+    check(parser.errors)
+    return program
+}
+private func check(_ errors: [String]) {
+    if errors.isEmpty {return}
+    print("Parserが、\(errors.count)個のエラーを検出した。")
+    errors.forEach {print("Parerエラー: \($0)")}
+}
