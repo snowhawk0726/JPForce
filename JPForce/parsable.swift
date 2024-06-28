@@ -586,11 +586,11 @@ struct BlockStatementParser : StatementParsable {
 // MARK: - expression parser
 /// 中間置演算子の優先順位(未使用)
 enum Precedence : Int {
-    case lowest = 1, or, and, block
+    case lowest = 1, or, and, block, genitive
     static func < (lhs: Self, rhs: Self) -> Bool {lhs.rawValue < rhs.rawValue}
     static let precedences: [Token.TokenType: Self] = [
         .keyword(.OR):          .or,
-        .keyword(.AND):         .and,
+        .particle(.NO):         .genitive,
         .symbol(.LBBRACKET):    .block,
     ]
     static subscript(tokenType: Token.TokenType) -> Self {precedences[tokenType] ?? .lowest}
@@ -1115,6 +1115,7 @@ struct InfixExpressionParserFactory {
     static func create(from parser: Parser, with left: Expression?) -> ExpressionParsable? {
         switch parser.nextToken.type {   // nextTokenに続くトークンを解析する解析器
         case .keyword(.OR):         return InfixExpressionParser(parser, with: left)
+        case .particle(.NO):        return GenitiveExpressionParser(parser, with: left)
         case .symbol(.LBBRACKET):   return CallExpressionParser(parser, with: left)
         default:                    return nil
         }
@@ -1132,8 +1133,8 @@ struct InfixExpressionParser : ExpressionParsable {
             return nil
         }
         _ = getNext(whenNextIs: .COMMA)
-        getNext()
         let precedence = Precedence[currentToken.type]
+        getNext()
         guard let right = ExpressionParser(parser, precedence: precedence).parse() else {
             error(message: "中間置式(\(op)で、右辺の解析に失敗した。")
             return nil
@@ -1167,12 +1168,32 @@ struct CallExpressionParser : ExpressionParsable {
         return CallExpression(token: token, target: caller, arguments: arguments)
     }
 }
+struct GenitiveExpressionParser : ExpressionParsable {
+    init(_ parser: Parser, with left: Expression?) {self.parser = parser; self.left = left}
+    let parser: Parser
+    let left: Expression?
+    func parse() -> (any Expression)? {
+        let token = currentToken
+        guard let left = left else {
+            error(message: "属格「の」で、左辺の解析に失敗した。")
+            return nil
+        }
+        let precedence = Precedence[currentToken.type]
+        getNext()
+        guard let right = ExpressionParser(parser, precedence: precedence).parse() else {
+            error(message: "属格「の」で、右辺の解析に失敗した。")
+            return nil
+        }
+        return GenitiveExpression(token: token, left: left, right: right)
+    }
+}
 // MARK: - postfix expression parsers and those instance factory
 struct PostfixExpressionParserFactory {
     static func create(from parser: Parser, with left: Expression?) -> ExpressionParsable? {
         switch parser.nextToken.type {   // nextTokenに続くトークンを解析する解析器
-        case .particle(_):        return PhraseExpressionParser(parser, with: left)
-        default:                  return nil
+        case .particle(.NO):    return nil
+        case .particle(_):      return PhraseExpressionParser(parser, with: left)
+        default:                return nil
         }
     }
 }

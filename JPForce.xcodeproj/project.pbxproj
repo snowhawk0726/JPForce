@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		5006B6EB2C2957E700D34FDD /* accessible.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5006B6EA2C2957E700D34FDD /* accessible.swift */; };
+		5006B6EC2C2957E700D34FDD /* accessible.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5006B6EA2C2957E700D34FDD /* accessible.swift */; };
 		501240E12C23FCBC00CC2F7C /* compilable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 501240E02C23FCBC00CC2F7C /* compilable.swift */; };
 		501240E22C23FCBC00CC2F7C /* compilable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 501240E02C23FCBC00CC2F7C /* compilable.swift */; };
 		501240E42C2587B800CC2F7C /* VMTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 501240E32C2587B800CC2F7C /* VMTests.swift */; };
@@ -42,8 +44,6 @@
 		5070B1A829B61DDA00808FDE /* predicateOperable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5070B1A729B61DDA00808FDE /* predicateOperable.swift */; };
 		5070B1A929B61DDA00808FDE /* predicateOperable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5070B1A729B61DDA00808FDE /* predicateOperable.swift */; };
 		5070B1AA29BC977500808FDE /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5042122129B58DAD00D2EA98 /* main.swift */; };
-		508BFEFB29ED3A6A00F1959A /* objectAccessible.swift in Sources */ = {isa = PBXBuildFile; fileRef = 508BFEFA29ED3A6A00F1959A /* objectAccessible.swift */; };
-		508BFEFC29ED3A6A00F1959A /* objectAccessible.swift in Sources */ = {isa = PBXBuildFile; fileRef = 508BFEFA29ED3A6A00F1959A /* objectAccessible.swift */; };
 		509D11FA2C21A34B00FC0C89 /* CodeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 509D11F82C21A34B00FC0C89 /* CodeTests.swift */; };
 		509D11FF2C228AFF00FC0C89 /* CompilerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 509D11FD2C228AFF00FC0C89 /* CompilerTests.swift */; };
 		509D910329CD85C200C22283 /* builtin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 509D910229CD85C200C22283 /* builtin.swift */; };
@@ -70,6 +70,7 @@
 
 /* Begin PBXFileReference section */
 		50050A0A2BE5E0ED00989700 /* test.txt */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = test.txt; path = ../../../../../Documents/test.txt; sourceTree = "<group>"; };
+		5006B6EA2C2957E700D34FDD /* accessible.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = accessible.swift; sourceTree = "<group>"; };
 		501240E02C23FCBC00CC2F7C /* compilable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = compilable.swift; sourceTree = "<group>"; };
 		501240E32C2587B800CC2F7C /* VMTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VMTests.swift; sourceTree = "<group>"; };
 		501240E52C2590C300CC2F7C /* vm.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = vm.swift; sourceTree = "<group>"; };
@@ -93,7 +94,6 @@
 		50552F3C29B5B87D0061CDBE /* environment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = environment.swift; sourceTree = "<group>"; };
 		506561E829D937380016923D /* ObjectTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ObjectTests.swift; sourceTree = "<group>"; };
 		5070B1A729B61DDA00808FDE /* predicateOperable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = predicateOperable.swift; sourceTree = "<group>"; };
-		508BFEFA29ED3A6A00F1959A /* objectAccessible.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = objectAccessible.swift; sourceTree = "<group>"; };
 		509D11F82C21A34B00FC0C89 /* CodeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodeTests.swift; sourceTree = "<group>"; };
 		509D11FD2C228AFF00FC0C89 /* CompilerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompilerTests.swift; sourceTree = "<group>"; };
 		509D910229CD85C200C22283 /* builtin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = builtin.swift; sourceTree = "<group>"; };
@@ -146,7 +146,7 @@
 				5042122329B58DAD00D2EA98 /* ast.swift */,
 				5042122529B58DAD00D2EA98 /* evaluator.swift */,
 				5042124E29B5903F00D2EA98 /* evaluatable.swift */,
-				508BFEFA29ED3A6A00F1959A /* objectAccessible.swift */,
+				5006B6EA2C2957E700D34FDD /* accessible.swift */,
 				5070B1A729B61DDA00808FDE /* predicateOperable.swift */,
 				50552F3C29B5B87D0061CDBE /* environment.swift */,
 				5042121F29B58DAD00D2EA98 /* lexer.swift */,
@@ -283,7 +283,7 @@
 				509D910329CD85C200C22283 /* builtin.swift in Sources */,
 				50552F3D29B5B87D0061CDBE /* environment.swift in Sources */,
 				50C3CD962C22CBEB006F9957 /* compiler.swift in Sources */,
-				508BFEFB29ED3A6A00F1959A /* objectAccessible.swift in Sources */,
+				5006B6EB2C2957E700D34FDD /* accessible.swift in Sources */,
 				5042122829B58DAD00D2EA98 /* lexer.swift in Sources */,
 				5042122A29B58DAD00D2EA98 /* parser.swift in Sources */,
 				5042122C29B58DAD00D2EA98 /* parsable.swift in Sources */,
@@ -310,7 +310,7 @@
 				5042124129B58EAE00D2EA98 /* object.swift in Sources */,
 				5042124429B58EBC00D2EA98 /* repl.swift in Sources */,
 				5042123C29B58E5900D2EA98 /* AstTests.swift in Sources */,
-				508BFEFC29ED3A6A00F1959A /* objectAccessible.swift in Sources */,
+				5006B6EC2C2957E700D34FDD /* accessible.swift in Sources */,
 				5042124529B58EC000D2EA98 /* token.swift in Sources */,
 				50A6829E2C2199CC00754E45 /* code.swift in Sources */,
 				5042124329B58EB600D2EA98 /* parser.swift in Sources */,

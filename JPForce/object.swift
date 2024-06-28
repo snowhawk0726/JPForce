@@ -8,7 +8,7 @@
 import Foundation
 
 // MARK: - Interfaces
-protocol JpfObject : JpfObjectAccessible {
+protocol JpfObject : Accessible {
     static var type: String {get}
     var type: String {get}
     var name: String {get set}

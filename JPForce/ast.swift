@@ -8,7 +8,7 @@
 import Foundation
 
 // MARK: interfaces
-protocol Node : Evaluatable, Compilable, NodeAccessible {
+protocol Node : Evaluatable, Compilable {
     var tokenLiteral: String {get}
     var string: String {get}
 }
@@ -167,6 +167,17 @@ struct InfixExpression : Expression {
     var tokenLiteral: String {token.literal}
     var string: String {left.string + "、" + tokenLiteral + "、" + right.string}
 }
+/// 属格。<オブジェクト>の<要素>
+struct GenitiveExpression : Expression {
+    var token: Token                // 属格(genitive case)
+    var left: Expression
+    var right: Expression
+    //
+    var tokenLiteral: String {token.literal}
+    var string: String {left.string + tokenLiteral + right.string}
+}
+/// 場合文１： <論理式>場合【<続文>】、それ以外は【<代文>】。
+/// 場合文２：<識別子>が<値１>の場合【<文１>】、<値２>の場合【<文２>】、…それ以外は【<代文>】。
 struct CaseExpression : Expression {
     static let soreigai = "それ以外"
     var token: Token                // .CASEキーワード(場合)

@@ -12,7 +12,7 @@ extension JpfObject {
     subscript(name: String, particle: Token?) -> JpfObject? {
         get {getObject(from: name, with: particle)}
     }
-    func getObject(from name: String, with particle: Token?) -> JpfObject? {
+    func getObject(from name: String, with particle: Token? = nil) -> JpfObject? {
         switch (particle, name) {
         case (Token(.NO),"型"),(nil,"型"):
             return JpfString(value: self.type)
