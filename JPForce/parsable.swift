@@ -656,7 +656,15 @@ struct PrefixExpressionParserFactory {
 struct IdentifierParser : ExpressionParsable {
     init(_ parser: Parser) {self.parser = parser}
     let parser: Parser
-    func parse() -> Expression? {parseRangeExpression(with: Identifier(from: currentToken))}
+    func parse() -> Expression? {
+        let token = currentToken
+        let names = token.literal.components(separatedBy: EnumeratorLiteral.dot)
+        if names.count == 2 {
+            let enumerator = EnumeratorLiteral(token: token, type: names[0], name: names[1])
+            return parseRangeExpression(with: enumerator)
+        }
+        return parseRangeExpression(with: Identifier(from: token))
+    }
 }
 struct StringLiteralParser : ExpressionParsable {
     init(_ parser: Parser) {self.parser = parser}

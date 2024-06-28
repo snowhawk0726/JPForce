@@ -553,3 +553,12 @@ struct EnumLiteral : Expression {
         (elements.isEmpty ? "" : "要素が、\(elements.map {$0.string}.joined(separator: "と、"))".withoutPeriod) + "】"
     }
 }
+struct EnumeratorLiteral : Expression {
+    static let dot = "・"
+    var token: Token                // 列挙子トークン(type・name)
+    var type: String                // 列挙型の名前(空は無し)
+    var name: String                // 列挙子名
+    //
+    var tokenLiteral: String {token.literal}
+    var string: String {token.coloredLiteral}
+}

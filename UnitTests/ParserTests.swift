@@ -436,6 +436,22 @@ final class ParserTests: XCTestCase {
             print("テスト終了: \(statement.string)")
         }
     }
+    func testEnumeratorLiteralParsings() throws {
+        let testPatterns: [(input: String, type: String, name: String)] = [
+            ("列挙子は、甲・乙", "甲", "乙"),
+            ("列挙子は、・丙", "", "丙"),
+        ]
+        for test in testPatterns {
+            print("テストパターン: \(test.input)")
+            let program = try XCTUnwrap(parseProgram(with: test.input))
+            let define = try XCTUnwrap(program.statements[0] as? DefineStatement)
+            XCTAssertEqual(define.name.value, "列挙子")
+            let enumerator = try XCTUnwrap(define.value.expressions[0] as? EnumeratorLiteral)
+            XCTAssertEqual(enumerator.type, test.type)
+            XCTAssertEqual(enumerator.name, test.name)
+            print("テスト終了: \(enumerator.string)")
+        }
+    }
     func testArrayLiterals() throws {
         let input = "配列であって、【要素が、１と、2に２を掛けたものと、3に３を足したもの】。"
         print("テストパターン: \(input)")

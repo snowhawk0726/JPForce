@@ -243,32 +243,7 @@ extension Identifier : Evaluatable {
     ///   - name: キーとなる識別名
     /// - Returns: 対応するオブジェクト
     private func getObject(from environment: Environment, with name: String) -> JpfObject? {
-        if let object = getEnumerator(from: environment, with: name) {
-            return object
-        }
-        return environment[name] ?? ContinuativeForm(name).plainForm.flatMap {environment[$0]}
-    }
-    private func getEnumerator(from environment: Environment, with name: String) -> JpfObject? {
-        let dot = "・"
-        if name.contains(dot) {
-            let strings = name.components(separatedBy: dot)
-            if strings.count == 2 {         // (列挙型)・列挙子
-                guard let enumObject = getEnumObject(from: environment, with: strings) else {
-                    return "『\(strings.first!)』" + identifierNotFound
-                }
-                return JpfEnumerator(type: enumObject.name, identifier: strings.last!, rawValue: enumObject.environment[strings.last!])
-            }
-        }
-        return nil
-    }
-    private func getEnumObject(from environment: Environment, with names: [String]) -> JpfEnum? {
-        if !names[0].isEmpty, let object = environment[names[0]] as? JpfEnum {return object}
-        for value in environment.values {
-            if let object = value as? JpfEnum, object.elements.contains(names[1]) {
-                return object
-            }
-        }
-        return nil
+        environment[name] ?? ContinuativeForm(name).plainForm.flatMap {environment[$0]}
     }
 }
 extension PredicateExpression : Evaluatable {
@@ -662,6 +637,32 @@ extension EnumLiteral : Evaluatable {
             identifiers.append(ident)
         }
         return JpfEnum(elements: identifiers, environment: local)
+    }
+}
+extension EnumeratorLiteral : Evaluatable {
+    func evaluated(with environment: Environment) -> JpfObject? {
+        guard let enumObject = getEnumObject(from: environment) else {return "『\(type)』" + identifierNotFound}
+        return JpfEnumerator(type: enumObject.name, identifier: name, rawValue: enumObject.environment[name])
+    }
+    /// 環境から列挙オブジェクトを取得する。
+    /// 1. 型名があれば、辞書から型名で得る。
+    /// 2. 型名が無い場合は、
+    ///   1. 辞書で、列挙子を持つオブジェクトを探す。
+    ///   2. スタックから得る。
+    /// - Parameter e: 環境
+    /// - Returns: 列挙オブジェクト
+    private func getEnumObject(from e: Environment) -> JpfEnum? {
+        if !type.isEmpty, let object = e[type] as? JpfEnum {return object}
+        for value in e.values {
+            if let object = value as? JpfEnum, object.elements.contains(name) {
+                return object
+            }
+        }
+        if let object = e.unwrappedPeek as? JpfEnum, object.elements.contains(name) {
+            e.drop()
+            return object
+        }
+        return nil
     }
 }
 extension CallExpression : Evaluatable {
