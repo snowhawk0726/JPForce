@@ -167,14 +167,17 @@ struct InfixExpression : Expression {
     var tokenLiteral: String {token.literal}
     var string: String {left.string + "、" + tokenLiteral + "、" + right.string}
 }
-/// 属格。<オブジェクト>の<要素>
+/// 属格。<オブジェクト>の<要素>(は、<値>。)
 struct GenitiveExpression : Expression {
     var token: Token                // 属格(genitive case)
     var left: Expression
     var right: Expression
+    var value: ExpressionStatement? // 値
     //
     var tokenLiteral: String {token.literal}
-    var string: String {left.string + tokenLiteral + right.string}
+    var string: String {
+        left.string + tokenLiteral + right.string + (value.map {"、\($0.string)"} ?? "").withoutPeriod
+    }
 }
 /// 場合文１： <論理式>場合【<続文>】、それ以外は【<代文>】。
 /// 場合文２：<識別子>が<値１>の場合【<文１>】、<値２>の場合【<文２>】、…それ以外は【<代文>】。

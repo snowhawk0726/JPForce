@@ -801,7 +801,7 @@ struct AssignOperator : PredicateOperable {
             environment[name] = value
         } else {
             if let outer = environment.outer, outer.contains(name) {
-                environment.outer![name] = value
+                outer[name] = value
             } else {
                 return JpfError("『\(name)』(識別子)が定義されていない。")
             }

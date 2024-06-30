@@ -1183,16 +1183,26 @@ struct GenitiveExpressionParser : ExpressionParsable {
     func parse() -> (any Expression)? {
         let token = currentToken
         guard let left = left else {
-            error(message: "属格「の」で、左辺の解析に失敗した。")
+            error(message: "属格で、左式の解析に失敗した。")
             return nil
         }
         let precedence = Precedence[currentToken.type]
         getNext()
         guard let right = ExpressionParser(parser, precedence: precedence).parse() else {
-            error(message: "属格「の」で、右辺の解析に失敗した。")
+            error(message: "属格で、右式の解析に失敗した。")
             return nil
         }
-        return GenitiveExpression(token: token, left: left, right: right)
+        var value: ExpressionStatement? = nil
+        if let phrase = right as? PhraseExpression, phrase.token.isParticle(.WA) {
+            _ = getNext(whenNextIs: .COMMA)
+            getNext()
+            guard let parsed = ExpressionStatementParser(parser).parse() as? ExpressionStatement else {
+                error(message: "属格で、値式の解釈に失敗した。")
+                return nil
+            }
+            value = parsed
+        }
+        return GenitiveExpression(token: token, left: left, right: right, value: value)
     }
 }
 // MARK: - postfix expression parsers and those instance factory

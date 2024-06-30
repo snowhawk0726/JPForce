@@ -487,7 +487,7 @@ extension LoopExpression : Evaluatable {
     }
 }
 extension Label : Evaluatable {
-    /// 1. ラベルに割り当てられた識別子(名)を辞書に格納する。
+    /// 1. ラベルに割り当てられた識別子(名)を辞書に登録する。
     /// 2. ラベルが「位置」である場合は、数値、または識別子から取り出した数値、を返す。
     /// 3. ラベルが「キー」である場合は、数値、真偽値、文字列または識別子から取り出した値、を返す。
     /// - Parameter environment: 格納先
@@ -704,12 +704,19 @@ extension CallExpression : Evaluatable {
     }
 }
 extension GenitiveExpression : Evaluatable {
-    /// 属格：<オブジェクト>の<オブジェクト>を評価する。
+    /// 属格：<オブジェクト>の<オブジェクト>(は、<値>。)を評価する。
     /// - Parameter environment: 入力の環境
     /// - Returns: 評価結果
     func evaluated(with environment: Environment) -> (any JpfObject)? {
         guard let object = left.evaluated(with: environment) else {return nil}
         guard !object.isError else {return object}
+        if let phrase = right as? PhraseExpression, phrase.token.isParticle(.WA),
+           let value = value?.evaluated(with: environment) {
+            let element = getElement(from: phrase.left, with: environment)
+            let result = object.assign(value, to: element)              // 値を要素に代入
+            guard !result.isError else {return result}
+            return assign(result, to: environment, with: object.name)   // 結果を辞書に登録
+        }
         return evaluated(object, self.right, with: environment)
     }
     /// 属格の右を確認し、<object>の<right>を処理する。
@@ -746,5 +753,36 @@ extension GenitiveExpression : Evaluatable {
             accessor = right.evaluated(with: environment)
         }
         return object.accessed(by: accessor!, with: environment)
+    }
+    /// オブジェクトを辞書に登録する。(ローカルに識別子がない場合は、上書き)
+    /// - Parameters:
+    ///   - object: 登録するオブジェクト
+    ///   - environment: 辞書を含む環境
+    ///   - name: 識別子名
+    /// - Returns: nil: 格納、object: 格納できない、エラー: 識別子が辞書に無い
+    private func assign(_ object: JpfObject, to environment: Environment, with name: String) -> JpfObject? {
+        guard !name.isEmpty else {return object}
+        if environment.contains(name) {     // ローカルにある
+            environment[name] = object      // 代入
+        } else
+        if let outer = environment.outer,
+           outer.contains(name) {           // 外部にある
+            outer[name] = object            // 上書き
+        } else {
+            return JpfError("『\(name)』(識別子)が定義されていない。")
+        }
+        return nil
+    }
+    /// オブジェクトの要素を取り出す。
+    /// - Parameters:
+    ///   - expression: 要素を表す式
+    ///   - environment: 要素を含む環境
+    /// - Returns: 要素オブジェクト、または識別子名のオブジェクト
+    private func getElement(from expression: Expression, with environment: Environment) -> JpfObject? {
+        if let ident = expression as? Identifier {
+            if let object = environment[ident.value] {return object}
+            return JpfString(value: ident.value)
+        }
+        return expression.evaluated(with: environment)
     }
 }

@@ -536,14 +536,19 @@ final class ParserTests: XCTestCase {
         XCTAssertEqual(statement.string, expected)
         print("テスト(\(program.string))終了")
     }
-    func testGenitiveExpression() throws {
-        let input = "甲の乙の「一」の１"
-        print("テストパターン: \(input)")
-        let expected = "甲の乙の「一」の1。"
-        let program = try XCTUnwrap(parseProgram(with: input))
-        let statement = try XCTUnwrap(program.statements.first)
-        XCTAssertEqual(statement.string, expected)
-        print("テスト(\(statement.string))終了")
+    func testGenitiveExpressions() throws {
+        let testPatterns: [(input: String, expected: String)] = [
+            ("甲の乙の「一」の１", "甲の乙の「一」の1。"),
+            ("甲の乙は、１", "甲の乙は、1。"),
+            ("甲の１番目は、１と２を足す", "甲の1は、1と2を足す。"),
+        ]
+        for test in testPatterns {
+            print("テストパターン: \(test.input)")
+            let program = try XCTUnwrap(parseProgram(with: test.input))
+            let statement = try XCTUnwrap(program.statements.first)
+            XCTAssertEqual(statement.string, test.expected)
+            print("テスト(\(statement.string))終了")
+        }
     }
     func testLogicalExpressions() throws {
         let testPatterns : [(input: String, expected: String)] = [
