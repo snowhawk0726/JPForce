@@ -9,6 +9,7 @@ import Foundation
 class Environment {
     init(outer: Environment? = nil) {self.outer = outer}
     let outer: Environment?     // 拡張環境
+    static let OUTER = Token.Keyword.OUTER.rawValue // 外部
     var isExecutable: Bool = true                   // false: 実行抑止
     private var store: [String: JpfObject] = [:]
     private var stack: [JpfObject] = []
@@ -42,21 +43,21 @@ class Environment {
     ///   - name: 追加対象の識別子名
     func append(_ object: JpfObject, to name: String) {
         if contains(name) {
-            if var array = self[name] as? JpfArray {
+            if var array = store[name] as? JpfArray, array.name == name {
                 array.elements.append(object)
             } else {
-                self[name] = JpfArray(elements: [self[name]!, object])
+                self[name] = JpfArray(elements: [store[name]!, object])
             }
             return
         }
-        self[name] = object
+        store[name] = object
     }
     /// 辞書からオブジェクトを取り出す。
     /// - Parameter name: 対象の識別子名
     /// - Returns: 取り出したオブジェクト(もしくはnil)
     func retrieve(name: String) -> JpfObject? {
-        var object = self[name]
-        if let array = object as? JpfArray {
+        var object = store[name]
+        if let array = object as? JpfArray, array.name == name {
             object = array.elements.first
         }
         return object
@@ -64,14 +65,47 @@ class Environment {
     /// 辞書から識別子に対応したオブジェクトを削除する。
     /// - Parameter name: 対象の識別子名
     func remove(name: String) {
-        if var array = self[name] as? JpfArray {
+        if var array = store[name] as? JpfArray, array.name == name {
             array.elements.removeFirst()
             if array.elements.count == 1 {
-                self[name] = array.elements.first
+                store[name] = array.elements.first
             }
         } else {
             self[name] = nil
         }
+    }
+    func assign(_ value: JpfObject, with name: String) -> JpfObject? {
+        guard !name.isEmpty else {return value}
+        if contains(Self.OUTER) {           // 外部識別子
+            guard let outer = outer, outer.contains(name) else {
+                return JpfError("「外部」の辞書が無い、または、『\(name)』(識別子)が定義されていない。")
+            }
+            outer[name] = value             // 外部に代入
+            remove(name: Self.OUTER)        // 外部ラベルを削除
+        } else
+        if contains(name) {                 // ローカルにある
+            self[name] = value              // 代入
+        } else
+        if let outer = outer,
+           outer.contains(name) {           // 外部にある
+            outer[name] = value             // 外部に代入
+        } else {
+            return JpfError("『\(name)』(識別子)が定義されていない。")
+        }
+        return nil
+    }
+    func assign(_ value: JpfObject, with object: JpfObject?) -> JpfObject? {
+        guard let object = object else {return JpfError("代入先の値が存在しない。")}
+        let name = object.name
+        if !name.isEmpty {                  // 既存識別子への代入
+            return assign(value, with: name)
+        } else {                            // 定義
+            if contains(Self.OUTER) {
+                return JpfError("外部『\(name)』(識別子)が定義されていない。")
+            }
+            self[getName(from: object)] = value // 識別子に値を登録
+        }
+        return nil
     }
     func storeArguments(with args: Environment, shouldMerge: Bool = false) {
         args.enumerated.forEach {

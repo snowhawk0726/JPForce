@@ -71,6 +71,7 @@ extension ExpressionStatement : Evaluatable {
             if let object = result, object.isBreakFactor {break}
             result.map {environment.push($0)}
         }
+        environment.remove(name: Environment.OUTER)
         return result
     }
 }
@@ -490,6 +491,7 @@ extension Label : Evaluatable {
     /// 1. ラベルに割り当てられた識別子(名)を辞書に登録する。
     /// 2. ラベルが「位置」である場合は、数値、または識別子から取り出した数値、を返す。
     /// 3. ラベルが「キー」である場合は、数値、真偽値、文字列または識別子から取り出した値、を返す。
+    /// 4. ラベルが「外部」である場合は、outerから値を取り出し、返す。
     /// - Parameter environment: 格納先
     /// - Returns: 識別子名、または位置の数値 (オブジェクトの識別子名は、ラベル名)
     func evaluated(with environment: Environment) -> JpfObject? {
@@ -498,7 +500,7 @@ extension Label : Evaluatable {
         case .int:
             object = JpfInteger(name: tokenLiteral, value: value.number!)
         case .string:
-            object = JpfString(name: tokenLiteral, value: value.literal)
+            object = getObject(from: environment, with: value.literal, label: tokenLiteral)
             if !(token.isKeyword(.POSITION) || token.isKeyword(.KEY)) {
                 environment.append(object, to: tokenLiteral)
             }
@@ -507,8 +509,15 @@ extension Label : Evaluatable {
             object = JpfBoolean(name: tokenLiteral, value: k == .TRUE)
         case .ident:
             if token.isKeyword(.POSITION) || token.isKeyword(.KEY) {
-                guard let value = environment[value.literal] else {return "『\(value.literal)』" + identifierNotFound}
+                object = getValue(from: environment, with: value.literal)
+            } else
+            if token.isKeyword(.OUTER) {
+                guard let outer = environment.outer,
+                      let value = outer[value.literal] else {
+                    return "『\(value.literal)』" + identifierNotFound
+                }
                 object = value
+                environment.append(object, to: tokenLiteral)
             } else {
                 object = JpfString(name: tokenLiteral, value: value.literal)
                 environment.append(object, to: tokenLiteral)
@@ -517,6 +526,45 @@ extension Label : Evaluatable {
             return "『\(value.literal)』" + cannotUseAsKeyword
         }
         return object
+    }
+    /// 文字列が「外部『<識別子>』」かチェックし、外部の値、または文字列を返す。
+    /// - Parameters:
+    ///   - e: ローカル環境
+    ///   - s: 文字列
+    ///   - label: ラベル
+    /// - Returns: 外部識別子の値、または、文字列(JpfString)、エラー
+    private func getObject(from e: Environment, with s: String, label: String) -> JpfObject {
+        guard s.hasPrefix(Environment.OUTER),       // 外部『<識別子>』のチェック
+              let startRage = s.range(of: "『"),
+              let endRange  = s.range(of: "』", range: startRage.upperBound..<s.endIndex) else {
+            return JpfString(name: label, value: s)  // 文字列
+        }
+        let start = s.index(after: startRage.lowerBound)
+        let end   = endRange.lowerBound
+        let name  = String(s[start..<end])
+        guard let outer = e.outer, let object = outer[name] else {
+            return "外部『\(name)』" + identifierNotFound
+        }
+        return object                               // 外部オブジェクト
+    }
+    /// 識別子が『外部「<識別子>」』かチェックし、外部またはローカルの値を取得する。
+    /// - Parameters:
+    ///   - e: ローカル環境
+    ///   - name: 識別子
+    /// - Returns: 識別子の値、またはエラー
+    private func getValue(from e: Environment, with name: String) -> JpfObject {
+        guard name.hasPrefix(Environment.OUTER),                // 外部「<識別子>」のチェック
+              let startRage = name.range(of: "「"),
+              let endRange  = name.range(of: "」", range: startRage.upperBound..<name.endIndex) else {
+            return e[name] ?? "『\(name)』" + identifierNotFound  // ローカルオブジェクト
+        }
+        let start = name.index(after: startRage.lowerBound)
+        let end   = endRange.lowerBound
+        let name  = String(name[start..<end])
+        guard let outer = e.outer, let value = outer[name] else {
+            return "外部『\(name)』" + identifierNotFound
+        }
+        return value                                              // 外部オブジェクト
     }
 }
 extension ArrayLiteral : Evaluatable {
@@ -715,7 +763,7 @@ extension GenitiveExpression : Evaluatable {
             let element = getElement(from: phrase.left, with: environment)
             let result = object.assign(value, to: element)              // 値を要素に代入
             guard !result.isError else {return result}
-            return assign(result, to: environment, with: object.name)   // 結果を辞書に登録
+            return environment.assign(result, with: object.name)        // 結果を辞書に登録
         }
         return evaluated(object, self.right, with: environment)
     }
@@ -753,25 +801,6 @@ extension GenitiveExpression : Evaluatable {
             accessor = right.evaluated(with: environment)
         }
         return object.accessed(by: accessor!, with: environment)
-    }
-    /// オブジェクトを辞書に登録する。(ローカルに識別子がない場合は、上書き)
-    /// - Parameters:
-    ///   - object: 登録するオブジェクト
-    ///   - environment: 辞書を含む環境
-    ///   - name: 識別子名
-    /// - Returns: nil: 格納、object: 格納できない、エラー: 識別子が辞書に無い
-    private func assign(_ object: JpfObject, to environment: Environment, with name: String) -> JpfObject? {
-        guard !name.isEmpty else {return object}
-        if environment.contains(name) {     // ローカルにある
-            environment[name] = object      // 代入
-        } else
-        if let outer = environment.outer,
-           outer.contains(name) {           // 外部にある
-            outer[name] = object            // 上書き
-        } else {
-            return JpfError("『\(name)』(識別子)が定義されていない。")
-        }
-        return nil
     }
     /// オブジェクトの要素を取り出す。
     /// - Parameters:

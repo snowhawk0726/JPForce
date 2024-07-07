@@ -35,8 +35,7 @@ struct PredicateOperableFactory {
         case .keyword(.DUPLICATE),.keyword(.PULL):
                                     return PullOperator(environment, by: token)
         case .keyword(.PUSH):       return PushOperator(environment, by: token)
-        case .keyword(.ASSIGN),.keyword(.OVERWRITE):
-                                    return AssignOperator(environment, by: token)
+        case .keyword(.ASSIGN):     return AssignOperator(environment)
         case .keyword(.SWAP):       return SwapOperator(environment, by: token)
         case .keyword(.IDENTIFIERS):
                                     return IdentifiersOperator(environment, by: token)
@@ -261,10 +260,8 @@ extension PredicateOperable {
     var reverseUsage: JpfError          {JpfError("仕様：<配列、文字列>を逆順にする。")}
     var pullDupUsage: JpfError          {JpfError("仕様：(識別子「<識別子>」と…)(識別子「<識別子>」に）(「数値」または「値」を)(<数値>個)")}
     var assignUsage: JpfError           {JpfError("仕様：〜(を)「<識別子>」に代入する。または、「<識別子>」に〜を代入する。")}
-    var overwriteUsage: JpfError        {JpfError("仕様：〜(を)「<識別子>」に上書きする。または、「<識別子>」に〜を上書きする。")}
     var compoundAssignUsage: JpfError   {JpfError("仕様：<識別子>(を)<計算し>て代入する。")}
-    var compoundOverwriteUsage: JpfError{JpfError("仕様：<識別子>(を)<計算し>て上書きする。")}
-    var assignArrayUsage: JpfError      {JpfError("仕様：〜(を)<配列>の位置<数値>に代入(または上書き)する。または、<配列>の位置<数値>に〜を代入(または上書き)する。")}
+    var assignArrayUsage: JpfError      {JpfError("仕様：〜(を)<配列>の位置<数値>に代入する。または、<配列>の位置<数値>に〜を代入する。")}
     var swapUsage: JpfError             {JpfError("仕様：<識別子１>と<識別子２>を入れ替える。または、<識別子１>を<識別子２>と入れ替える。")}
     var createUsage: JpfError           {JpfError("仕様：(「<識別子>」を)(<引数>で)<型>から生成する。または、<型>から(<引数>で)「<識別子>」を生成する。")}
     var createEnumeratorUsage: JpfError {JpfError("仕様：(「<識別子>」を)<値>で<列挙型>から生成する。または、<列挙型>から<値>で「<識別子>」を生成する。")}
@@ -727,7 +724,7 @@ struct AvailableOperator : PredicateOperable {
 }
 // MARK: - 要素アクセス
 
-/// 代入(assign)/上書き(overwrite)
+/// 代入(assign)
 /// 1. 配列、辞書に代入(引数３)
 /// <配列>の位置<数値>に<値>を代入する (<値>を<配列>の位置<数値>に代入する)
 /// <配列>の位置『<識別子>』に<値>を代入する (<値>を<配列>の位置『<識別子>』に代入する)
@@ -740,8 +737,8 @@ struct AvailableOperator : PredicateOperable {
 /// 4.識別子に計算して代入(引数１)
 /// <識別子>(に)<計算し>て代入
 struct AssignOperator : PredicateOperable {
-    init(_ environment: Environment, by op: Token) {self.environment = environment; self.op = op}
-    let environment: Environment, op: Token
+    init(_ environment: Environment) {self.environment = environment}
+    let environment: Environment
     func operated() -> JpfObject? {
         if var params = environment.peek(3) {       // 配列または辞書に値を代入
             switch (params[0].particle, params[1].particle, params[2].particle) {
@@ -757,56 +754,41 @@ struct AssignOperator : PredicateOperable {
                 environment.drop(3)
                 guard let name = params[1].value?.name,     // 代入対象の識別子を得る。
                       !name.isEmpty else {return result}    // 代入した結果を返す。
-                return assign(result, to: environment,
-                              by: name, with: op)           // 結果をさらに識別子に代入する。
+                return environment.assign(result, with: name)// 結果をさらに識別子に代入する。
             default:
                 break
             }
         }
-        if var params = environment.peek(2) {       // 列挙子に代入
+        if var params = environment.peek(2) {
             switch (params[0].particle, params[1].particle) {
             case (Token(.NI),Token(.WO)):
                 params.swapAt(0, 1)
                 fallthrough
             case (Token(.WO),Token(.NI)), (nil,Token(.NI)):
                 guard let value = params[0].value else {break}
-                if let enumerator = params[1].value as? JpfEnumerator {
+                if let enumerator = params[1].value as? JpfEnumerator { // 列挙子に代入
                     environment.drop(2)
                     return JpfEnumerator(type: enumerator.type, name: enumerator.name, identifier: enumerator.identifier, rawValue: value)  // 列挙子に値を代入し返す。
                 }
                 let name = environment.getName(from: params[1])
                 guard !name.isEmpty else {break}
                 environment.drop(2)
-                return assign(value, to: environment, by: name, with: op)  // 識別子に値を代入
+                return environment.assign(value, with: params[1].value) // 識別子に値を代入
             default:
                 break
             }
         }
         if let param = environment.peek {           // 計算して代入
-            guard param.value?.name != "" else {return JpfError("代入先の識別子が空(「」)。") + usage2}
+            guard param.value?.name != "" else {return JpfError("代入先の識別子が空(「」)。") + compoundAssignUsage}
             if let value = param.value,
                param.particle?.unwrappedLiteral == Token(.TA).literal {     // 助詞「て」
                 environment.drop()
-                return assign(value, to: environment, by: value.name, with: op)    // 識別子に計算した値を代入
+                return environment.assign(value, with: value.name)  // 識別子に計算した値を代入
             } else {
-                return usage2
+                return compoundAssignUsage
             }
         }
-        return usage
-    }
-    private var usage: JpfError {op.isKeyword(.ASSIGN) ? assignUsage : overwriteUsage}
-    private var usage2: JpfError {op.isKeyword(.ASSIGN) ? compoundAssignUsage : compoundOverwriteUsage}
-    private func assign(_ value: JpfObject, to environment: Environment, by name: String, with op: Token) -> JpfError? {
-        if op.isKeyword(.ASSIGN) {
-            environment[name] = value
-        } else {
-            if let outer = environment.outer, outer.contains(name) {
-                outer[name] = value
-            } else {
-                return JpfError("『\(name)』(識別子)が定義されていない。")
-            }
-        }
-        return nil
+        return assignUsage
     }
 }
 /// オブジェクトの要素に値を設定する。

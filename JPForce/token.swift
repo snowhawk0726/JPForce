@@ -128,7 +128,7 @@ enum Token : Equatable {
         case TYPE       = "型"
         case CREATE     = "生成"
         case AVAILABLE  = "利用可能"
-        case OVERWRITE  = "上書き"
+        case OUTER      = "外部"
         case POSITION   = "位置"
         case KEY        = "キー"
         case MEMBER     = "要素"

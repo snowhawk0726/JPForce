@@ -643,7 +643,7 @@ struct PrefixExpressionParserFactory {
         case .keyword(.CASE):       return CaseExpressionParser(parser)
         case .keyword(.LOOP):       return LoopExpressionParser(parser)
         case .keyword(.CONDITIONAL):return ConditionalOperationParser(parser)
-        case .keyword(.IDENTIFIER),.keyword(.FILE),.keyword(.POSITION),.keyword(.KEY),.keyword(.MEMBER):
+        case .keyword(.IDENTIFIER),.keyword(.FILE),.keyword(.POSITION),.keyword(.KEY),.keyword(.MEMBER),.keyword(.OUTER):
                                     return LabelExpressionParser(parser)
         case .keyword(_):           return PredicateExpressionParser(parser)
         case .illegal:              break
@@ -688,13 +688,17 @@ struct BooleanParser : ExpressionParsable {
     func parse() -> Expression? {Boolean(from: currentToken.isTrue)}
 }
 /// ラベル(キーワード)と、後続の値(または識別子)を記憶する。
-/// ※：例：ファイル「text.txt」、識別子『割った余り』
+/// ※：例：ファイル「text.txt」、識別子『割った余り』、外部「甲」
 /// ※：キーワードに識別子を続けると、合成された識別子となるので、『』で明示的に表記する必要がある。
 struct LabelExpressionParser : ExpressionParsable {
     init(_ parser: Parser) {self.parser = parser}
     let parser: Parser
     func parse() -> Expression? {
         let token = currentToken                // ラベル
+        if token.isKeyword(.OUTER) {            // 外部(outer)識別子
+            getNext()
+            return Label(token: token, value: .IDENT(currentToken.literal))
+        }
         switch nextToken.type {
         case .string,.ident,.int,.keyword(.TRUE),.keyword(.FALSE):
             break
@@ -1221,7 +1225,7 @@ struct PhraseExpressionParser : ExpressionParsable {
     let left: Expression?
     func parse() -> Expression? {
         let token = currentToken
-        if token == .particle(.KO) && nextToken.isParticle {getNext()}
+        if token.isParticle(.KO) && nextToken.isParticle {getNext()}
         guard let left = left else {
             error(message: "「\(token.literal)」格の左辺(式)の解析に失敗した。")
             return nil
