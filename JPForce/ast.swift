@@ -159,7 +159,7 @@ struct PredicateExpression : Expression {
     var tokenLiteral: String {token.literal}
     var string: String {token.coloredLiteral}
 }
-struct InfixExpression : Expression {
+struct OrExpression : Expression {
     var token: Token
     var left: Expression
     var right: Expression

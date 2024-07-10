@@ -222,14 +222,14 @@ extension Identifier : Evaluatable {
     /// - 返すオブジェクトが算出で実行可であれば、取得を呼び出す。
     func evaluated(with environment: Environment) -> JpfObject? {
         var object: JpfObject? = nil
-        if let o = getObject(from: environment, with: value) {  // ローカル辞書から取得
-            object = o
-        } else
         if let target = environment.unwrappedPeek,              // スタックから対象を取得
            let o = target[value, environment.peek?.particle] {  // 対象をsubscriptでアクセス
             environment.drop()
             object = o
-        } else {
+        } else
+        if let o = getObject(from: environment, with: value) {  // ローカル辞書から取得
+            object = o
+       } else {
             return "『\(value)』" + identifierNotFound
         }
         if let computation = object as? JpfComputation, environment.isExecutable {
@@ -273,20 +273,32 @@ extension PhraseExpression : Evaluatable {
         return JpfPhrase(value: object, particle: token)
     }
 }
-extension InfixExpression : Evaluatable {
+extension OrExpression : Evaluatable {
+    /// 選択肢(leftまたはright)を配列(JpfArray)に変換する。
+    /// <値１>または<値２>…<格> → 配列【<値１>、<値２>…】<格>
+    /// - Parameter environment: 環境
+    /// - Returns: 配列、または配列を含む句、エラー
     func evaluated(with environment: Environment) -> JpfObject? {
-        guard token == .keyword(.OR) else {return "「\(tokenLiteral)」" + keywordNotSupportedInInfixExpression}
-        // <値１>または<値２>…<格> → 配列【<値１>、<値２>…】<格>
-        var array: [JpfObject] = []
+        guard token.isKeyword(.OR) else {
+            return "「\(tokenLiteral)」" + keywordNotSupportedInInfixExpression
+        }
         guard let value = left.evaluated(with: environment) else {return nil}
         guard !value.isError else {return value}
-        guard let a = toArray(from: value) else {return keywordNotSupportedInInfixExpression}
-        array += a
+        guard let la = toArray(from: value) else {
+            return "「\(value.string)」" + keywordNotSupportedInInfixExpression
+        }
+        //
         guard let value = right.evaluated(with: environment) else {return nil}
         guard !value.isError else {return value}
-        guard let v = value.value, let a = toArray(from: v) else {return keywordNotSupportedInInfixExpression}
-        array += a
-        return JpfPhrase(value: JpfArray(elements: array), particle: value.particle)
+        guard let ra = toArray(from: value) else {
+            return "「\(value.string)」" + keywordNotSupportedInInfixExpression
+        }
+        //
+        let array = JpfArray(elements: la + ra)
+        if let particle = value.particle {
+            return JpfPhrase(value: array, particle: particle)
+        }
+        return array
     }
     private func toArray(from value: JpfObject) -> [JpfObject]? {
         switch value {

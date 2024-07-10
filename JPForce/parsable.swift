@@ -586,7 +586,7 @@ struct BlockStatementParser : StatementParsable {
 // MARK: - expression parser
 /// 中間置演算子の優先順位(未使用)
 enum Precedence : Int {
-    case lowest = 1, or, and, block, genitive
+    case lowest = 1, block, genitive, or, and
     static func < (lhs: Self, rhs: Self) -> Bool {lhs.rawValue < rhs.rawValue}
     static let precedences: [Token.TokenType: Self] = [
         .keyword(.OR):          .or,
@@ -1151,7 +1151,7 @@ struct InfixExpressionParser : ExpressionParsable {
             error(message: "中間置式(\(op)で、右辺の解析に失敗した。")
             return nil
         }
-        return InfixExpression(token: token, left: left, right: right)
+        return OrExpression(token: token, left: left, right: right)
     }
 }
 struct CallExpressionParser : ExpressionParsable {
