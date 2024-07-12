@@ -41,8 +41,8 @@ struct DefineStatement : Statement {
     var isExtended: Bool = false    // 拡張(多重)識別
     //
     var tokenLiteral: String {token.literal}
-    var string: String {name.string + tokenLiteral + "、" +
-        value.expressions.reduce("") {$0 + $1.string} + (token == .particle(.WA) ? "。" : "のこと。")}
+    var string: String {name.string + tokenLiteral + "、" + (isExtended ? (Self.further + "、") : "") +
+        value.expressions.reduce("") {$0 + $1.string} + (token.isParticle(.TOWA) ? "のこと。" : "。")}
     static let wa = "は"
     static let towa = "とは"
     static let further = "さらに"

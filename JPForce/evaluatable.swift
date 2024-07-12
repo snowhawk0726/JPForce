@@ -229,7 +229,10 @@ extension Identifier : Evaluatable {
         } else
         if let o = getObject(from: environment, with: value) {  // ローカル辞書から取得
             object = o
-       } else {
+        } else
+        if let o = getMethod(of: value, from: environment) {    // スタックのオブジェクトからメソッドを取得
+            object = o
+        } else {
             return "『\(value)』" + identifierNotFound
         }
         if let computation = object as? JpfComputation, environment.isExecutable {
@@ -245,6 +248,27 @@ extension Identifier : Evaluatable {
     /// - Returns: 対応するオブジェクト
     private func getObject(from environment: Environment, with name: String) -> JpfObject? {
         environment[name] ?? ContinuativeForm(name).plainForm.flatMap {environment[$0]}
+    }
+    /// スタック内のメソッド名(name)を持つオブジェクトを探し、メソッドを返す
+    /// - Parameters:
+    ///   - name: メソッドの名称
+    ///   - env: スタックの環境
+    /// - Returns: メソッド
+    private func getMethod(of name: String, from env: Environment) -> JpfObject? {
+        if let target = env.pull(where: {
+            switch $0.value {                       // スタック上のオブジェクト
+            case let o as JpfInstance:
+                return o.available.contains(name)   // インスタンスの利用可能メンバ
+            case let o as JpfType:
+                return o.environment.contains(name) // 型の要素
+            default:
+                return false
+            }
+        }) as? JpfPhrase,
+            let obj = target.value?[name, target.particle] {    // 対象オブジェクトの要素
+                return obj
+        }
+        return nil
     }
 }
 extension PredicateExpression : Evaluatable {

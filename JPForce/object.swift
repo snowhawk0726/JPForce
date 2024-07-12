@@ -247,14 +247,14 @@ struct JpfType : JpfObject {
     var protocols: [String]         // 準拠する規約
     var body: BlockStatement?
     var string: String {
-        var s = type.color(.magenta) + "であって、【" +
+        var s1 = type.color(.magenta) + "であって、【" +
         (protocols.isEmpty ? "" : "準拠する規約は、\(protocols.map {$0}.joined(separator: "と、"))。") +
         (environment.enumerated.isEmpty ? "" : "型の要素が、\(environment.enumerated.map {$0.key}.joined(separator: "と、"))。") +
-        (initializers.array.reduce("") {$0 + "初期化は、さらに、【\($1.string)】。"}) +
-        (body.map {"本体が、\($0.string)"} ?? "") +
+        (initializers.array.reduce("") {$0 + "初期化は、さらに、【\($1.string)】。"}) 
+        let s2 = (body.map {"本体が、\($0.string)"} ?? "") +
         "】"
-        s.range(of: "さらに、").map {s.replaceSubrange($0, with: "")}   // 初出の「さらに、」を取り除く
-        return s.replacingOccurrences(of: "。】", with: "】")
+        s1.range(of: "さらに、").map {s1.replaceSubrange($0, with: "")} // 初出の「さらに、」を取り除く
+        return (s1 + s2).replacingOccurrences(of: "。】", with: "】")
     }
 }
 struct JpfInstance : JpfObject {

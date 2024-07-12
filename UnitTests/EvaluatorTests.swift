@@ -1418,6 +1418,72 @@ final class EvaluatorTests: XCTestCase {
         }
         print("テスト終了")
     }
+    func testInstanceMethods() throws {
+        let input = """
+            計数は、型であって、【
+                カウント値は０。
+                値は、算出【カウント値を返す】。
+                増やすは、算出【カウント値に１を足して、代入】。
+                増やすは、さらに、算出【入力が増分「数値」。カウント値に増分を足して、代入】。
+                リセットは、算出【カウント値に０を代入】。
+                「値」と「増やす」と「リセット」は利用可能。
+            】
+            カウンターは、計数から生成。
+        """
+        let testPatterns: [(input: String, expected: Any)] = [
+            ("カウンターを増やす。カウンターの値。", 1),
+            ("カウンターを5個増やす。カウンターの値。", 6),
+            ("カウンターをリセット。カウンターの値。", 0),
+        ]
+        print("テストパターン: \(input)")
+        let environment = Environment()
+        let parser = Parser(Lexer(input))
+        let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+        let result = eval.object ?? environment.pull()
+        XCTAssertFalse(result?.isError ?? false, result?.error?.message ?? "")
+        for test in testPatterns {
+            print("テストパターン: \(test.input)")
+            let parser = Parser(Lexer(test.input))
+            let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+            let expected = try XCTUnwrap(eval.object ?? environment.pull())
+            try testObject(expected, with: test.expected)
+            print("テスト(\(expected))終了")
+        }
+        print("テスト終了")
+    }
+    func testTypeMethods() throws {
+        let input = """
+            甲は、型であって、【
+                型の要素は、【
+                    Aは、１。
+                    Bは、関数【入力が数。Aに数を足して代入】。
+                】
+                aは、２。
+                bは、関数【入力が数。aに数を足して、代入】。
+                「a」と「b」は利用可能。
+            】
+            乙は、甲から生成。
+        """
+        let testPatterns: [(input: String, expected: Any)] = [
+            ("甲に３でBを実行。甲のA。", 4),
+            ("乙に１でbを実行。乙のa。", 3),
+        ]
+        print("テストパターン: \(input)")
+        let environment = Environment()
+        let parser = Parser(Lexer(input))
+        let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+        let result = eval.object ?? environment.pull()
+        XCTAssertFalse(result?.isError ?? false, result?.error?.message ?? "")
+        for test in testPatterns {
+            print("テストパターン: \(test.input)")
+            let parser = Parser(Lexer(test.input))
+            let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+            let expected = try XCTUnwrap(eval.object ?? environment.pull())
+            try testObject(expected, with: test.expected)
+            print("テスト(\(expected))終了")
+        }
+        print("テスト終了")
+    }
     func testComputationOverloads() throws {
         let input = """
             甲は、型であって、【

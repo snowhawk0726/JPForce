@@ -611,10 +611,9 @@ extension JpfInstance {
         let canditate = environment[name] != nil ? name : ContinuativeForm(name).plainForm ?? ""
         if environment.contains(canditate), let member = environment[canditate] {   // outer除く
             guard available.contains(canditate) else {return JpfError("『\(name)』" + identifierNotAvailable)}
-            if member is JpfFunction {                          // メンバー関数の入力処理
-                environment.outer?.drop()                       // 自身(インスタンス)の句を捨てる
-                if let inputs = environment.outer?.pullAll() {  // 引数をインスタンスに移動
-                    environment.push(inputs)
+            if member is JpfFunction {
+                if let inputs = environment.outer?.pullAll() {  // 引数をインスタンスに移動(自身を除く)
+                    pushParameters(inputs)
                 }
             }
             return member                                       // メンバーを返す
@@ -624,6 +623,13 @@ extension JpfInstance {
     }
     func assign(_ value: JpfObject, to target: JpfObject?) -> JpfObject {
         return assign(value, to: target, with: environment)
+    }
+    private func pushParameters(_ objects: [JpfObject]) {
+        environment.push(objects)
+        _ = environment.pull {  // 自身を取り除く
+            guard let i = $0.value as? JpfInstance else {return false}
+            return i.name == self.name
+        }
     }
 }
 extension JpfEnum {
