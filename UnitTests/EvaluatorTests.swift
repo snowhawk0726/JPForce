@@ -484,6 +484,50 @@ final class EvaluatorTests: XCTestCase {
         XCTAssertEqual(array.elements[5].string, "あい")
         print("テスト(\(array.string))終了")
     }
+    func testOverloadedPredicates() throws {
+        let input = """
+            座標は、型であって、【
+                初期化は、【入力がxとy】。
+                『足す』は、算出【入力がp「座標に」で、
+                    xに、pのxを予約語「足す」て、代入。
+                    yに、pのyを予約語「足す」て、代入。
+                    自身を返す。
+                】。
+                「x」と「y」と「足す」は利用可能。
+            】
+            Aは、座標【xは-1。yは5】。
+            Bは、座標【xは2。yは3】。
+            『引く』は、さらに、算出であって、【入力が、a「座標から」とb「座標を」で、
+                xは0。yは0。
+                aのxから、bのxを予約語「引く」、xに代入。
+                aのyから、bのyを予約語「引く」、yに代入。
+                xとyで座標を生成し、返す。
+            】。
+        """
+        let testPatterns: [(input: String, expected: Any)] = [
+            ("Aから、Bを引き、「結果」に代入。配列【結果のx、結果のy】", [-3,2]),
+            ("１を、２から引く。", 1),
+            ("１を、２から引く【】。", 1),
+            ("Aに、Bを足し、「結果」に代入。配列【結果のx、結果のy】", [1,8]),
+            ("１を、２に足す。", 3),
+            ("「い」を、「ろ」と足す。", "いろ"),
+        ]
+        print("テストパターン: \(input)")
+        let environment = Environment()
+        let parser = Parser(Lexer(input))
+        let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+        let result = eval.object ?? environment.pull()
+        XCTAssertFalse(result?.isError ?? false, result?.error?.message ?? "")
+        for test in testPatterns {
+            print("テストパターン: \(test.input)")
+            let parser = Parser(Lexer(test.input))
+            let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+            let actual = try XCTUnwrap(eval.object ?? environment.pull())
+            try testObject(actual, with: test.expected)
+            print("テスト(\(actual))終了")
+        }
+        print("テスト終了")
+    }
     func testTypeObject() throws {
         let input = """
             型であって、【

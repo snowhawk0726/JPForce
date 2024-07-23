@@ -89,9 +89,14 @@ extension DefineStatement : Evaluatable {
     func evaluated(with environment: Environment) -> JpfObject? {
         if let result = value.evaluated(with: environment), result.isError {return result}
         guard var definition = environment.pull() else {return nil}
-        if isExtended && environment.contains(name.value) {
-            definition = extend(environment, by: name.value, with: definition)
-            if definition.isError {return definition}
+        if isExtended {
+            if environment.contains(name.value) {
+                definition = extend(environment, by: name.value, with: definition)
+                if definition.isError {return definition}
+            } else
+            if let keyword = Token.Keyword(rawValue: name.value), Token.redefinables.contains(keyword) {
+                definition = extend(definition, with: keyword)
+            }
         }
         environment[name.value] = definition
         return nil
@@ -167,6 +172,30 @@ extension DefineStatement : Evaluatable {
         }
         return extended
     }
+    /// 予約語を、関数オブジェクトで拡張(多重定義)する。
+    /// - Parameters:
+    ///   - original: 関数もしくは算出
+    ///   - keyword: 拡張する予約語
+    /// - Returns: 拡張した関数もしくは算出
+    private func extend(_ original: JpfObject, with keyword: Token.Keyword) -> JpfObject {
+        switch original {
+        case let f as JpfFunction:
+            return JpfFunction(
+                name: f.name,
+                functions: f.functions.overloaded(by: keyword),
+                environment: f.environment
+            )
+        case let c as JpfComputation:
+            return JpfComputation(
+                name: c.name,
+                setters: c.setters.overloaded(by: keyword),
+                getters: c.getters.overloaded(by: keyword),
+                environment: c.environment
+            )
+        default:
+            return Token(keyword: keyword).literal + "は、" + cannotExtend
+        }
+    }
     private func overload(_ original: FunctionBlocks, with definition: FunctionBlocks) -> FunctionBlocks {
         var overloaded = original
         return overloaded.append(definition)
@@ -227,11 +256,16 @@ extension Identifier : Evaluatable {
             environment.drop()
             object = o
         } else
-        if let o = getObject(from: environment, with: value) {  // ローカル辞書から取得
-            object = o
-        } else
         if let o = getMethod(of: value, from: environment) {    // スタックのオブジェクトからメソッドを取得
             object = o
+        } else
+        if let o = getObject(of: value, from: environment) {    // ローカル辞書から取得
+            object = o
+        } else
+        if let keyword = Token.Keyword(rawValue: token.unwrappedLiteral),
+           Token.redefinables.contains(keyword) {               // 再定義可能な予約語
+            guard let predicate = PredicateOperableFactory.create(from: Token(keyword: keyword), with: environment) else {return predicateNotSupported}
+            return predicate.operated()
         } else {
             return "『\(value)』" + identifierNotFound
         }
@@ -243,11 +277,11 @@ extension Identifier : Evaluatable {
     ///　前句のオブジェクトにnameで問い合わせ、結果のオブジェクトを得る。
     ///　または、識別名でオブジェクトを取得（できなければ識別名の終止形のでオブジェクトを取得）
     /// - Parameters:
-    ///   - environment: 識別子の辞書、およびスタック
+    ///   - env: 識別子の辞書、およびスタック
     ///   - name: キーとなる識別名
     /// - Returns: 対応するオブジェクト
-    private func getObject(from environment: Environment, with name: String) -> JpfObject? {
-        environment[name] ?? ContinuativeForm(name).plainForm.flatMap {environment[$0]}
+    private func getObject(of name: String, from env: Environment) -> JpfObject? {
+        env[name] ?? ContinuativeForm(name).plainForm.flatMap {env[$0]}
     }
     /// スタック内のメソッド名(name)を持つオブジェクトを探し、メソッドを返す
     /// - Parameters:
@@ -275,6 +309,10 @@ extension PredicateExpression : Evaluatable {
     /// 述語を実行する。(結果があれば返す。= スタックに積まれる。)
     /// self.tokenは述語(Token.Keywordもしくは Token.IDENT(_))
     func evaluated(with environment: Environment) -> JpfObject? {
+        if Token.redefinables.contains(where: {token.isKeyword($0)}) {  // 再定義可？
+            let ident = Identifier(from: token)
+            return ident.evaluated(with: environment)
+        }
         guard let predicate = PredicateOperableFactory.create(from: token, with: environment) else {return predicateNotSupported}
         return predicate.operated()
     }
@@ -541,6 +579,10 @@ extension Label : Evaluatable {
                 environment.append(object, to: tokenLiteral)
             }
         case .keyword(let k):
+            if token.isKeyword(.RESERVEDWORD) {
+                guard let predicate = PredicateOperableFactory.create(from: value, with: environment) else {return predicateNotSupported}
+                return predicate.operated()
+            }
             guard k == .TRUE || k == .FALSE else {return "『\(value.literal)』" + cannotUseAsKeyword}
             object = JpfBoolean(name: tokenLiteral, value: k == .TRUE)
         case .ident:

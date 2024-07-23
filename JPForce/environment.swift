@@ -186,6 +186,10 @@ class Environment {
                 }
             }
         }
+        if let keyword = functions.keyword {        // 予約語再定義の既定動作
+            let predicate = PredicateOperableFactory.create(from: Token(keyword: keyword), with: self)!
+            return predicate.operated()
+        }
         if functions.array.count == 1 {             // 単体の定義の場合、エラーメッセージを作成する
             return errorMessage(to: functions.array.last!)
         }
@@ -202,6 +206,10 @@ class Environment {
                 return error
             }
             return execute(function, with: local)
+        }
+        if let keyword = functions.keyword {        // 予約語再定義の既定動作
+            let predicate = PredicateOperableFactory.create(from: Token(keyword: keyword), with: self)!
+            return predicate.operated()
         }
         if functions.array.count == 1 {             // 単体の定義の場合、エラーメッセージを作成する
             let f = functions.array.last!           // 最新定義
@@ -280,7 +288,7 @@ class Environment {
         }
         for i in 0..<function.parameters.count {    // 入力の位置
             let argument = a < arguments.count ?
-                            arguments[a] : nil      // 引数(無しはnil)
+                           arguments[a] : nil       // 引数(無しはnil)
             let idetifier = function.parameters[i]  // 入力の識別子
             let format = designated.formats[i]      // 指定形式
             var value: JpfObject                    // 割り当てる値
@@ -437,36 +445,6 @@ class Environment {
         if !isSameParticle(of: parameter, as: format.particle) {return InputFormatError.particle(parameter.particle?.literal ?? "無").message}
         return nil
     }
-    // エラー
-    enum InputFormatError : Error {
-        case numberOfParameters(Int)
-        case type(String)
-        case particle(String)
-        case particleFormat(String)
-        case variable(String)
-        case notFoundFirstFormat
-        case noMatchingSignature
-        case noParameterValue
-        case failedToEvaluate
-        case typeOfDefaultValue
-        case cannotGetDefault
-        /// エラーメッセージ
-        var message: JpfError {
-            switch self {
-            case .numberOfParameters(let number):   return JpfError("入力の数が足りていない。必要数：\(number)")
-            case .type(let type):                   return JpfError("入力の型が異なる。入力の型：\(type)")
-            case .particle(let particle):           return JpfError("入力の格が異なる。入力の格：\(particle)")
-            case .particleFormat(let s):            return JpfError("格の形式が誤っている。指定：\(s)")
-            case .variable(let type):               return JpfError("可変長識別子の値が配列ではない。型：\(type)")
-            case .notFoundFirstFormat:              return JpfError("可変長識別子に既定値が設定されている。")
-            case .noMatchingSignature:              return JpfError("入力形式が一致する関数が見つからなかった。")
-            case .noParameterValue:                 return JpfError("固定長パラメータの値が取得できなかった。")
-            case .failedToEvaluate:                 return JpfError("既定値の評価に失敗した。")
-            case .typeOfDefaultValue:               return JpfError("既定値の型が指定形式と一致しない。")
-            case .cannotGetDefault:                 return JpfError("既定値が設定されていなかった。")
-            }
-        }
-    }
     /// 規約(protocols)に違反していたら、エラーを返す。
     func conform(to protocols: [JpfProtocol], isTypeMember: Bool = false) -> JpfError? {
         for p in protocols {
@@ -504,7 +482,7 @@ class Environment {
                    computation.getters.hasParamaeter(to: params1) &&
                    computation.setters.hasParamaeter(to: params2) {
                     return nil                                                  // 設定と取得、両方の引数が準拠
-                }                             
+                }
                 if let params = clause.getterParams,
                    computation.getters.hasParamaeter(to: params) {return nil}   // 取得の引数が準拠
                 if let params = clause.setterParams,
@@ -550,26 +528,56 @@ class Environment {
         }
         return ConformityViolation.degignatedError.error
     }
-    /// 準拠違反
-    enum ConformityViolation : Error {
-        case identifier(String)
-        case type(String)
-        case numberOfParams(Int)
-        case nameOfParams(String)
-        case formatOfParams(String)
-        case targetNotFound             // 準拠対象
-        case degignatedError            // 指定形式のエラー
-        /// エラーメッセージ
-        var error: JpfError {
-            switch self {
-            case .identifier(let s):        return JpfError("指定した識別子が見つからない。識別子名:" + s)
-            case .type(let s):              return JpfError("指定した型が規約に準拠していない。型名：" + s)
-            case .numberOfParams(let n):    return JpfError("引数の数が規約に準拠していない。指定数：" + String(n))
-            case .nameOfParams(let s):      return JpfError("引数の名前が規約に準拠していない。指定値：" + s)
-            case .formatOfParams(let s):    return JpfError("引数の形式が規約に準拠していない。指定形式：" + s)
-            case .targetNotFound:           return JpfError("対象となる定義がみつからない。")
-            case .degignatedError:          return JpfError("規約の指定が間違っている。")
-            }
+}
+// エラー
+enum InputFormatError : Error {
+    case numberOfParameters(Int)
+    case type(String)
+    case particle(String)
+    case particleFormat(String)
+    case variable(String)
+    case notFoundFirstFormat
+    case noMatchingSignature
+    case noParameterValue
+    case failedToEvaluate
+    case typeOfDefaultValue
+    case cannotGetDefault
+    /// エラーメッセージ
+    var message: JpfError {
+        switch self {
+        case .numberOfParameters(let number):   return JpfError("入力の数が足りていない。必要数：\(number)")
+        case .type(let type):                   return JpfError("入力の型が異なる。入力の型：\(type)")
+        case .particle(let particle):           return JpfError("入力の格が異なる。入力の格：\(particle)")
+        case .particleFormat(let s):            return JpfError("格の形式が誤っている。指定：\(s)")
+        case .variable(let type):               return JpfError("可変長識別子の値が配列ではない。型：\(type)")
+        case .notFoundFirstFormat:              return JpfError("可変長識別子に既定値が設定されている。")
+        case .noMatchingSignature:              return JpfError("入力形式が一致する関数が見つからなかった。")
+        case .noParameterValue:                 return JpfError("固定長パラメータの値が取得できなかった。")
+        case .failedToEvaluate:                 return JpfError("既定値の評価に失敗した。")
+        case .typeOfDefaultValue:               return JpfError("既定値の型が指定形式と一致しない。")
+        case .cannotGetDefault:                 return JpfError("既定値が設定されていなかった。")
+        }
+    }
+}
+/// 準拠違反
+enum ConformityViolation : Error {
+    case identifier(String)
+    case type(String)
+    case numberOfParams(Int)
+    case nameOfParams(String)
+    case formatOfParams(String)
+    case targetNotFound             // 準拠対象
+    case degignatedError            // 指定形式のエラー
+    /// エラーメッセージ
+    var error: JpfError {
+        switch self {
+        case .identifier(let s):        return JpfError("指定した識別子が見つからない。識別子名:" + s)
+        case .type(let s):              return JpfError("指定した型が規約に準拠していない。型名：" + s)
+        case .numberOfParams(let n):    return JpfError("引数の数が規約に準拠していない。指定数：" + String(n))
+        case .nameOfParams(let s):      return JpfError("引数の名前が規約に準拠していない。指定値：" + s)
+        case .formatOfParams(let s):    return JpfError("引数の形式が規約に準拠していない。指定形式：" + s)
+        case .targetNotFound:           return JpfError("対象となる定義がみつからない。")
+        case .degignatedError:          return JpfError("規約の指定が間違っている。")
         }
     }
 }

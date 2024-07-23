@@ -400,10 +400,12 @@ struct FunctionBlock {
 }
 /// 必要入力数ごとの関数ブロック配列(多重定義)
 struct FunctionBlocks : Collection {
-    var dictionary: [Int : [FunctionBlock]] = [:]
-    var array: [FunctionBlock] = []
+    var dictionary: [Int : [FunctionBlock]] = [:]   // 引数数毎の関数ブロック
+    var array: [FunctionBlock] = []                 // 関数ブロック定義順
+    var keyword: Token.Keyword? = nil               // 予約語多重定義
     //
     init() {}
+    init(by keyword: Token.Keyword) {self.keyword = keyword}
     /// 関数定義で初期化
     init(_ functionBlock: FunctionBlock) {_ = self.append(functionBlock)}
     // Collection protocolに準拠
@@ -450,6 +452,12 @@ struct FunctionBlocks : Collection {
     var overloaded: Self {
         var functionBlocks = FunctionBlocks()
         self.array.forEach {_ = functionBlocks.append($0.overloaded)}
+        return functionBlocks
+    }
+    func overloaded(by k: Token.Keyword) -> Self {
+        var functionBlocks = FunctionBlocks(by: k)
+        functionBlocks.array = array
+        functionBlocks.dictionary = dictionary
         return functionBlocks
     }
     /// 再定義している(多重定義でない関数ブロックが含まれる)

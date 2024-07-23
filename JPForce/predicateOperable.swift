@@ -36,6 +36,7 @@ struct PredicateOperableFactory {
                                     return PullOperator(environment, by: token)
         case .keyword(.PUSH):       return PushOperator(environment, by: token)
         case .keyword(.ASSIGN):     return AssignOperator(environment)
+        case .keyword(.SET):        return SetOperator(environment, by: token)
         case .keyword(.SWAP):       return SwapOperator(environment, by: token)
         case .keyword(.IDENTIFIERS):
                                     return IdentifiersOperator(environment, by: token)
@@ -54,7 +55,6 @@ struct PredicateOperableFactory {
         case .keyword(.REDUCE):     return ReduceOperator(environment, by: token)
         case .keyword(.SORT):       return SortOperator(environment, by: token)
         case .keyword(.REVERSE):    return ReverseOperator(environment, by: token)
-        case .keyword(.SET):        return SetOperator(environment, by: token)
         case .keyword(.PRINT),.keyword(.ASK):
                                     return PrintOperator(environment, by: token)
         case .keyword(.NEWLINE):    return NewlineOperator(environment)

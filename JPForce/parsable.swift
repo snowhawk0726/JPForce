@@ -643,7 +643,7 @@ struct PrefixExpressionParserFactory {
         case .keyword(.CASE):       return CaseExpressionParser(parser)
         case .keyword(.LOOP):       return LoopExpressionParser(parser)
         case .keyword(.CONDITIONAL):return ConditionalOperationParser(parser)
-        case .keyword(.IDENTIFIER),.keyword(.FILE),.keyword(.POSITION),.keyword(.KEY),.keyword(.MEMBER),.keyword(.OUTER):
+        case .keyword(.IDENTIFIER),.keyword(.FILE),.keyword(.POSITION),.keyword(.KEY),.keyword(.MEMBER),.keyword(.OUTER),.keyword(.RESERVEDWORD):
                                     return LabelExpressionParser(parser)
         case .keyword(_):           return PredicateExpressionParser(parser)
         case .illegal:              break
@@ -697,7 +697,16 @@ struct LabelExpressionParser : ExpressionParsable {
         let token = currentToken                // ラベル
         if token.isKeyword(.OUTER) {            // 外部(outer)識別子
             getNext()
-            return Label(token: token, value: .IDENT(currentToken.literal))
+            return Label(token: token, value: Token(ident: currentToken.literal))
+        } else
+        if token.isKeyword(.RESERVEDWORD) {     // 予約語
+            getNext()
+            guard let keyword = Token.Keyword(rawValue: currentToken.literal), 
+                    Token.redefinables.contains(keyword) else {
+                error(message: "「\(currentToken.literal)」は、再定義可能な述語ではない。")
+                return nil
+            }
+            return Label(token: token, value: Token(keyword: keyword))
         }
         switch nextToken.type {
         case .string,.ident,.int,.keyword(.TRUE),.keyword(.FALSE):

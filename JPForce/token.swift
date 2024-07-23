@@ -135,6 +135,7 @@ enum Token : Equatable {
         case SET        = "設定"
         case COMPUTATION = "算出"
         case INITIALIZATION = "初期化"
+        case RESERVEDWORD = "予約語"
     }
     /// 文字列の連想値について識別しないための分類(.IDENT("文字列") → .ident)
     enum TokenType: Hashable {
@@ -254,6 +255,18 @@ enum Token : Equatable {
     func isKeyword(_ k: Token.Keyword) -> Bool {self.type == .keyword(k)}
     func isParticle(_ p: Token.Particle) -> Bool {self.type == .particle(p)}
     //
+    // MARK: - 再定義可能な予約語(述語)(redefinable predicate keywords)
+    static var redefinables: [Token.Keyword] = [    //
+        .ADD, .MULTIPLY, .SUBSTRACT, .DIVIDE, .NEGATE, .POSITIVE, .NEGATIVE, .NULL,
+        .EQUAL, .BE, .NOT, .LT, .GT,
+        .RETURN, .GOBACK, .BREAK, .CONTINUE,
+        .MONO, .INPUT, .KOTO,
+        .DROP, /*.EMPTY,*/ .DUPLICATE, .PULL, .PUSH,
+        .APPEND, .REMOVE, .CONTAINS, .FOREACH, .MAP, .FILTER, .REDUCE, .SORT, .REVERSE,
+        .PRINT, .ASK, .NEWLINE, .READ, .FILES, .IDENTIFIERS,
+        .ASSIGN, .SET, .SWAP,
+        .EXECUTE, .SURU, .CREATE, .INITIALIZATION, .AVAILABLE,
+    ]
     // MARK: - 全角半角対応の記号辞書(symbol dictionary for half/fullwidth)
     static var symbols = {
         var d: [String: Symbol] = [:]
