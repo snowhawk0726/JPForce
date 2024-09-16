@@ -48,6 +48,8 @@ protocol JpfObject : Accessible {
     func assign(_ value: JpfObject, to target: JpfObject?) -> JpfObject
     var count: JpfObject {get}
     var isEmpty: JpfObject {get}
+    // その他
+    func emit(with c: Compiler)
 }
 protocol JpfHashable {
     var hashKey: JpfHashKey {get}
@@ -72,6 +74,7 @@ extension JpfObject {
     func isEqual(to object: JpfObject) -> Bool {isTrue == object.isTrue}
     func contains(type: String) -> Bool {type == self.type}
     var hasValue: Bool {value != nil}
+    func emit(with c: Compiler) {assertionFailure("翻訳出力方法：未実装")}
 }
 struct JpfInteger : JpfObject, JpfHashable, Comparable {
     static let type = "数値"
@@ -88,6 +91,10 @@ struct JpfInteger : JpfObject, JpfHashable, Comparable {
     //
     var hashKey: JpfHashKey {JpfHashKey(type: type, value: value.hashValue)}
     static func < (lhs: Self, rhs: Self) -> Bool {lhs.value < rhs.value}
+    //
+    func emit(with c: Compiler) {
+        _ = c.emit(op: .opConstant, operand: c.addConstant(self))
+    }
 }
 struct JpfBoolean : JpfObject, JpfHashable {
     static let type = "真偽値"
@@ -103,6 +110,10 @@ struct JpfBoolean : JpfObject, JpfHashable {
     func isEqual(to object: JpfObject) -> Bool {value == object.isTrue}
     //
     var hashKey: JpfHashKey {JpfHashKey(type: type, value: value.hashValue)}
+    //
+    func emit(with c: Compiler) {
+        _ = c.emit(op: isTrue ? .opTrue : .opFalse)
+    }
 }
 struct JpfString : JpfObject, JpfHashable, Comparable {
     static let type = "文字列"

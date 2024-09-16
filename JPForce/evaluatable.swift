@@ -22,7 +22,7 @@ extension Node {
     // 評価エラー
     var notImplementedError: JpfError       {JpfError("の評価を未実装")}
     var phaseValueNotFound: JpfError        {JpfError("句の値が無かった。(例：関数の返り値が無い。)")}
-    var predicateNotSupported: JpfError     {JpfError("「述語」に対応する定義が見つからなかった。")}
+    var predicateNotSupported: JpfError     {JpfError("述語に対応する定義が見つからなかった。")}
     var identifierNotFound: JpfError        {JpfError("(識別子)が定義されていない。")}
     var caseConditionError: JpfError        {JpfError("「場合」の条件(真偽値)が見つからなかった。")}
     var conditionalOperationError: JpfError {JpfError("「によって」の条件(真偽値)が見つからなかった。")}

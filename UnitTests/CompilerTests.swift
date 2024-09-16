@@ -19,13 +19,118 @@ final class CompilerTests: XCTestCase {
     }
     func testIntegerArithmetic() throws {
         let testPatterns: [CompilerTestCase] = [
-            (input: "１と2を足す",
-             expectedConstants: [1, 2],
+            (input: "１と２を足す",
+             expectedConstants: [3],
              expectedInstructions: [
                 make(op: .opConstant, operand: 0),
-                make(op: .opConstant, operand: 1),
-                make(op: .opAdd),
-             ]
+                make(op: .opPop),  ]
+            ),
+            (input: "１から２を引く",
+             expectedConstants: [-1],
+             expectedInstructions: [
+                make(op: .opConstant, operand: 0),
+                make(op: .opPop),  ]
+            ),
+            (input: "１と２を掛ける",
+             expectedConstants: [2],
+             expectedInstructions: [
+                make(op: .opConstant, operand: 0),
+                make(op: .opPop),  ]
+            ),
+            (input: "２を１で割る",
+             expectedConstants: [2],
+             expectedInstructions: [
+                make(op: .opConstant, operand: 0),
+                make(op: .opPop),  ]
+            ),
+            (input: "１の負数",
+             expectedConstants: [-1],
+             expectedInstructions: [
+                make(op: .opConstant, operand: 0),
+                make(op: .opPop),  ]
+            ),
+            (input: "-１を負数にする",
+             expectedConstants: [1],
+             expectedInstructions: [
+                make(op: .opConstant, operand: 0),
+                make(op: .opPop),  ]
+            ),
+        ]
+        try runCompilerTests(testPatterns)
+    }
+    func testBooleanExpressions() throws {
+        let testPatterns: [CompilerTestCase] = [
+            (input: "真",
+             expectedConstants: [],
+             expectedInstructions: [
+                make(op: .opTrue),
+                make(op: .opPop),  ]
+            ),
+            (input: "偽",
+             expectedConstants: [],
+             expectedInstructions: [
+                make(op: .opFalse),
+                make(op: .opPop),  ]
+            ),
+            (input: "1が2より大きい",
+             expectedConstants: [],
+             expectedInstructions: [
+                make(op: .opFalse),
+                make(op: .opPop),  ]
+            ),
+            (input: "1が2より小さい",
+             expectedConstants: [],
+             expectedInstructions: [
+                make(op: .opTrue),
+                make(op: .opPop),  ]
+            ),
+            (input: "1が2に等しい",
+             expectedConstants: [],
+             expectedInstructions: [
+                make(op: .opFalse),
+                make(op: .opPop),  ]
+            ),
+            (input: "1が2に等しくない",
+             expectedConstants: [],
+             expectedInstructions: [
+                make(op: .opTrue),
+                make(op: .opPop),  ]
+            ),
+            (input: "真が偽に等しい",
+             expectedConstants: [],
+             expectedInstructions: [
+                make(op: .opFalse),
+                make(op: .opPop),  ]
+            ),
+            (input: "真が偽に等しくない",
+             expectedConstants: [],
+             expectedInstructions: [
+                make(op: .opTrue),
+                make(op: .opPop),  ]
+            ),
+            (input: "真でない",
+             expectedConstants: [],
+             expectedInstructions: [
+                make(op: .opFalse),
+                make(op: .opPop),  ]
+            ),
+            (input: "1が正",
+             expectedConstants: [],
+             expectedInstructions: [
+                make(op: .opTrue),
+                make(op: .opPop),  ]
+            ),
+            (input: "-1が負",
+             expectedConstants: [],
+             expectedInstructions: [
+                make(op: .opTrue),
+                make(op: .opPop),  ]
+            ),
+            (input: "0が正",
+             expectedConstants: [],
+             expectedInstructions: [
+                make(op: .opFalse),
+                make(op: .opPop),  ]
             ),
         ]
         try runCompilerTests(testPatterns)

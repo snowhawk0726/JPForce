@@ -7,11 +7,18 @@
 
 import Foundation
 
+struct Bytecode {
+    init(_ instructions: Instructions, _ constants: [JpfObject]) {self.instructions = instructions; self.constants = constants}
+    let instructions: Instructions
+    let constants: [JpfObject]
+}
+//
 class Compiler {
-    let node: Node
     init(from node: Node) {self.node = node}
-    var instructions: Instructions = []
-    var constants: [JpfObject] = []
+    private let node: Node
+    private var instructions: Instructions = []
+    private var constants: [JpfObject] = []
+    private var stack: [JpfObject] = []
     var bytecode: Bytecode {
         Bytecode(instructions, constants)
     }
@@ -19,7 +26,8 @@ class Compiler {
     /// 指定されたASTノードをコンパイルする。
     /// - Returns: エラー(無しは、nil)
     func compile() -> JpfError? {
-        node.compiled(with: self)
+        if let error = node.compiled(with: self) as? JpfError {return error}
+        return nil
     }
     /// インストラクションを出力し、新たなインストラクション位置を返す。
     /// - Parameters:
@@ -36,7 +44,7 @@ class Compiler {
     /// インストラクションを記録(追加)し、新たなインストラクション位置を返す。
     /// - Parameter ins: 追加するバイト列
     /// - Returns: 新たなip(インストラクション・ポイント)
-    func addInstruction(_ ins: [Byte]) -> Int {
+    private func addInstruction(_ ins: [Byte]) -> Int {
         let postionOfNewInstruction = instructions.count
         instructions += ins
         return postionOfNewInstruction
@@ -48,9 +56,22 @@ class Compiler {
         constants.append(obj)
         return constants.count - 1
     }
-}
-struct Bytecode {
-    let instructions: Instructions
-    let constants: [JpfObject]
-    init(_ instructions: Instructions, _ constants: [JpfObject]) {self.instructions = instructions; self.constants = constants}
+    // 定数の演算を行うための補助(ヘルパー)
+    func push(_ object: JpfObject)  {stack.append(object)}
+    func pull() -> JpfObject?       {stack.popLast()}
+    var peek: JpfObject?            {stack.last}
+    func drop()                     {_ = pull()}
+    func drop(_ n: Int)             {stack.removeLast(n <= count ? n : count)}
+    var count: Int                  {stack.count}
+    var isEmpty: Bool               {stack.isEmpty}
+    func unwrappedObject() -> JpfObject? {
+        return (pull() as? JpfPhrase)?.value
+    }
+    var unwrappedPeek: JpfObject? {
+        return (peek as? JpfPhrase)?.value ?? peek
+    }
+    func peek(_ n: Int) -> [JpfObject]? {
+        guard n <= count else {return nil}
+        return Array(stack[(count - n)..<count])
+    }
 }

@@ -14,6 +14,7 @@
 		501240E42C2587B800CC2F7C /* VMTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 501240E32C2587B800CC2F7C /* VMTests.swift */; };
 		501240E62C2590C300CC2F7C /* vm.swift in Sources */ = {isa = PBXBuildFile; fileRef = 501240E52C2590C300CC2F7C /* vm.swift */; };
 		501240E72C2590C300CC2F7C /* vm.swift in Sources */ = {isa = PBXBuildFile; fileRef = 501240E52C2590C300CC2F7C /* vm.swift */; };
+		50175F9B2C8C426200DD0F4A /* predicateCompilable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50175F9A2C8C426200DD0F4A /* predicateCompilable.swift */; };
 		5042122729B58DAD00D2EA98 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5042122129B58DAD00D2EA98 /* main.swift */; };
 		5042122829B58DAD00D2EA98 /* lexer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5042121F29B58DAD00D2EA98 /* lexer.swift */; };
 		5042122929B58DAD00D2EA98 /* repl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5042122429B58DAD00D2EA98 /* repl.swift */; };
@@ -52,8 +53,11 @@
 		50A6829E2C2199CC00754E45 /* code.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50A6829C2C2199CC00754E45 /* code.swift */; };
 		50C3CD962C22CBEB006F9957 /* compiler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50C3CD952C22CBEB006F9957 /* compiler.swift */; };
 		50C3CD972C22CBEB006F9957 /* compiler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50C3CD952C22CBEB006F9957 /* compiler.swift */; };
+		50C454DD2C8C89460078C98D /* predicateCompilable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50175F9A2C8C426200DD0F4A /* predicateCompilable.swift */; };
 		50C9C1D629F3A46A0046C735 /* color.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50C9C1D529F3A46A0046C735 /* color.swift */; };
 		50C9C1D729F3A46A0046C735 /* color.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50C9C1D529F3A46A0046C735 /* color.swift */; };
+		50D72B522C8D6ECD00A3841C /* codeExecutable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50D72B512C8D6ECD00A3841C /* codeExecutable.swift */; };
+		50D72B532C8D6ECD00A3841C /* codeExecutable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50D72B512C8D6ECD00A3841C /* codeExecutable.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -74,6 +78,7 @@
 		501240E02C23FCBC00CC2F7C /* compilable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = compilable.swift; sourceTree = "<group>"; };
 		501240E32C2587B800CC2F7C /* VMTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VMTests.swift; sourceTree = "<group>"; };
 		501240E52C2590C300CC2F7C /* vm.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = vm.swift; sourceTree = "<group>"; };
+		50175F9A2C8C426200DD0F4A /* predicateCompilable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = predicateCompilable.swift; sourceTree = "<group>"; };
 		5042121329B58CA700D2EA98 /* JPForce */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = JPForce; sourceTree = BUILT_PRODUCTS_DIR; };
 		5042121E29B58DAD00D2EA98 /* token.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = token.swift; sourceTree = "<group>"; };
 		5042121F29B58DAD00D2EA98 /* lexer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = lexer.swift; sourceTree = "<group>"; };
@@ -100,6 +105,7 @@
 		50A6829C2C2199CC00754E45 /* code.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = code.swift; sourceTree = "<group>"; };
 		50C3CD952C22CBEB006F9957 /* compiler.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = compiler.swift; sourceTree = "<group>"; };
 		50C9C1D529F3A46A0046C735 /* color.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = color.swift; sourceTree = "<group>"; };
+		50D72B512C8D6ECD00A3841C /* codeExecutable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = codeExecutable.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -148,6 +154,7 @@
 				5042124E29B5903F00D2EA98 /* evaluatable.swift */,
 				5006B6EA2C2957E700D34FDD /* accessible.swift */,
 				5070B1A729B61DDA00808FDE /* predicateOperable.swift */,
+				50175F9A2C8C426200DD0F4A /* predicateCompilable.swift */,
 				50552F3C29B5B87D0061CDBE /* environment.swift */,
 				5042121F29B58DAD00D2EA98 /* lexer.swift */,
 				5042122129B58DAD00D2EA98 /* main.swift */,
@@ -161,6 +168,7 @@
 				5042122229B58DAD00D2EA98 /* parser.swift */,
 				5042122429B58DAD00D2EA98 /* repl.swift */,
 				5042121E29B58DAD00D2EA98 /* token.swift */,
+				50D72B512C8D6ECD00A3841C /* codeExecutable.swift */,
 			);
 			path = JPForce;
 			sourceTree = "<group>";
@@ -275,7 +283,9 @@
 				50A6829D2C2199CC00754E45 /* code.swift in Sources */,
 				5042122F29B58DAD00D2EA98 /* ast.swift in Sources */,
 				5070B1A829B61DDA00808FDE /* predicateOperable.swift in Sources */,
+				50D72B522C8D6ECD00A3841C /* codeExecutable.swift in Sources */,
 				5042122929B58DAD00D2EA98 /* repl.swift in Sources */,
+				50175F9B2C8C426200DD0F4A /* predicateCompilable.swift in Sources */,
 				50C9C1D629F3A46A0046C735 /* color.swift in Sources */,
 				5042122729B58DAD00D2EA98 /* main.swift in Sources */,
 				5042122E29B58DAD00D2EA98 /* evaluator.swift in Sources */,
@@ -312,12 +322,14 @@
 				5042123C29B58E5900D2EA98 /* AstTests.swift in Sources */,
 				5006B6EC2C2957E700D34FDD /* accessible.swift in Sources */,
 				5042124529B58EC000D2EA98 /* token.swift in Sources */,
+				50C454DD2C8C89460078C98D /* predicateCompilable.swift in Sources */,
 				50A6829E2C2199CC00754E45 /* code.swift in Sources */,
 				5042124329B58EB600D2EA98 /* parser.swift in Sources */,
 				5042123F29B58EA800D2EA98 /* lexer.swift in Sources */,
 				506561E929D937380016923D /* ObjectTests.swift in Sources */,
 				50C3CD972C22CBEB006F9957 /* compiler.swift in Sources */,
 				5042124229B58EB200D2EA98 /* parsable.swift in Sources */,
+				50D72B532C8D6ECD00A3841C /* codeExecutable.swift in Sources */,
 				5070B1A929B61DDA00808FDE /* predicateOperable.swift in Sources */,
 				5042124929B58EF400D2EA98 /* LexerTests.swift in Sources */,
 				5042123E29B58EA400D2EA98 /* evaluator.swift in Sources */,

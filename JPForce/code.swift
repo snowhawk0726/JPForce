@@ -14,7 +14,16 @@ typealias Instructions = [Byte]
 /// 命令語
 enum Opcode : Byte {
     case opConstant = 0
+    case opPop
+    case opTrue
+    case opFalse
+    case opNot
+    case opEqual
+    case opGreaterThan
     case opAdd
+    case opSub
+    case opMul
+    case opDiv
 }
 /// 命令定義
 struct Definition {
@@ -22,8 +31,17 @@ struct Definition {
     var operandWidths: [Int]
 }
 var definitions: [Opcode: Definition] = [
-    .opConstant: Definition(name: "OpConstant", operandWidths: [2]),
-    .opAdd:      Definition(name: "OpAdd", operandWidths: [])
+    .opConstant:    Definition(name: "OpConstant", operandWidths: [2]),
+    .opPop:         Definition(name: "OpPop", operandWidths: []),
+    .opTrue:        Definition(name: "OpTrue", operandWidths: []),
+    .opFalse:       Definition(name: "OpFalse", operandWidths: []),
+    .opNot:         Definition(name: "OpNot", operandWidths: []),
+    .opEqual:       Definition(name: "OpEqual", operandWidths: []),
+    .opGreaterThan: Definition(name: "OpGreaterThan", operandWidths: []),
+    .opAdd:         Definition(name: "OpAdd", operandWidths: []),
+    .opSub:         Definition(name: "OpSub", operandWidths: []),
+    .opMul:         Definition(name: "OpMul", operandWidths: []),
+    .opDiv:         Definition(name: "OpDiv", operandWidths: []),
 ]
 // MARK: - implements for instruction
 func lookUp(_ op: Byte) -> Definition? {

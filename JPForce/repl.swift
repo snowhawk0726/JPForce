@@ -54,20 +54,27 @@ struct Repl {
         print("入力: (\(environment.string))")
     }
     private func runVirtualMachine(of program: Program) {
+        // 翻訳部
         let compiler = Compiler(from: program)
         if let error = compiler.compile() {
             print("翻訳器が、エラーを検出した。")
             print("Error: \(error.message)")
             return
         }
-        var machine = VM(with: compiler.bytecode)
+        print("翻訳結果：")
+        print(compiler.bytecode.instructions.string)
+        // 実行部
+        let machine = VM(with: compiler.bytecode)
         if let error = machine.run() {
             print("バイトコード実行時にエラーを検出した。")
             print(error.message)
             return
         }
+        // 結果表示
         if let stackTop = machine.stackTop {
             print("実行結果(スタック): \(stackTop.string)")
         }
+        let lastPopped = machine.lastPoppedStackElem
+        print("実行結果: \(lastPopped.string)")
     }
 }

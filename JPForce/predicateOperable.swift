@@ -10,6 +10,8 @@ import AVFAudio
 // MARK: - intefaces for operation
 protocol PredicateOperable {
     var environment: Environment {get}
+    /// 述語を評価する。
+    /// - Returns: 評価結果(JpfObjectもしくはnil)
     func operated() -> JpfObject?
 }
 // MARK: - predicate operable instance factory
