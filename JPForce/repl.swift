@@ -71,10 +71,11 @@ struct Repl {
             return
         }
         // 結果表示
-        if let stackTop = machine.stackTop {
-            print("実行結果(スタック): \(stackTop.string)")
-        }
         let lastPopped = machine.lastPoppedStackElem
         print("実行結果: \(lastPopped.string)")
+        while let stackTop = machine.stackTop {
+            print("スタック: \(stackTop.string)")
+            _ = machine.pull()
+        }
     }
 }

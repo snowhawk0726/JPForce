@@ -17,13 +17,19 @@ enum Opcode : Byte {
     case opPop
     case opTrue
     case opFalse
+    case opNull
+    case opBe
     case opNot
     case opEqual
     case opGreaterThan
+    case opLessThan
+    case opJump
+    case opJumpNotTruthy
     case opAdd
     case opSub
     case opMul
     case opDiv
+    case opNeg
 }
 /// 命令定義
 struct Definition {
@@ -35,13 +41,20 @@ var definitions: [Opcode: Definition] = [
     .opPop:         Definition(name: "OpPop", operandWidths: []),
     .opTrue:        Definition(name: "OpTrue", operandWidths: []),
     .opFalse:       Definition(name: "OpFalse", operandWidths: []),
+    .opNull:        Definition(name: "OpNull", operandWidths: []),
+    .opBe:          Definition(name: "OpBe", operandWidths: []),
     .opNot:         Definition(name: "OpNot", operandWidths: []),
     .opEqual:       Definition(name: "OpEqual", operandWidths: []),
     .opGreaterThan: Definition(name: "OpGreaterThan", operandWidths: []),
+    .opLessThan:    Definition(name: "OpLessThan", operandWidths: []),
+    .opJump:        Definition(name: "OpJump", operandWidths: [2]),
+    .opJumpNotTruthy:
+                    Definition(name: "OpJumpNotTruthy", operandWidths: [2]),
     .opAdd:         Definition(name: "OpAdd", operandWidths: []),
     .opSub:         Definition(name: "OpSub", operandWidths: []),
     .opMul:         Definition(name: "OpMul", operandWidths: []),
     .opDiv:         Definition(name: "OpDiv", operandWidths: []),
+    .opNeg:         Definition(name: "OpNeg", operandWidths: []),
 ]
 // MARK: - implements for instruction
 func lookUp(_ op: Byte) -> Definition? {

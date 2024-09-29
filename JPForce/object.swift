@@ -181,6 +181,9 @@ struct JpfPhrase : JpfObject {
     var error: JpfError? {value?.error}
     var isError: Bool {value?.isError ?? false}
     func isParticle(_ p: Token.Particle) -> Bool {self.particle?.isParticle(p) ?? false}
+    func emit(with c: Compiler) {
+        _ = c.emit(op: .opConstant, operand: c.addConstant(self))
+    }
 }
 struct JpfReturnValue : JpfObject {
     static let type = "返り値"

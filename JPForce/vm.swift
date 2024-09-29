@@ -38,10 +38,16 @@ class VM {
                 if let error = push(constants[constIndex]) {return error}
             case .opPop:
                 _ = pull()
-            case .opTrue:
-                if let error = push(JpfBoolean.TRUE) {return error}
-            case .opFalse:
-                if let error = push(JpfBoolean.FALSE) {return error}
+            case .opJump:
+                let position = Int(readUInt16(from: Array(instructions[(ip+1)...])))
+                ip = position - 1           // 飛び先
+            case .opJumpNotTruthy:
+                let position = Int(readUInt16(from: Array(instructions[(ip+1)...])))
+                ip += 2
+                let condition = pull()
+                if !condition.isTrue {      // Not Truthy
+                    ip = position - 1       // 飛び先
+                }
             default:
                 guard let executer = CodeExecutableFactory.create(from: opcode, with: self) else {return codeNotSupported + "(命令語：\(definitions[opcode]!.name))"}
                 if let error = executer.execute() {return error}
@@ -51,7 +57,7 @@ class VM {
         return nil
     }
     func push(_ object: JpfObject) -> JpfError? {
-        if sp >= stackSize {
+        guard sp < stackSize else {
             return JpfError("stack overflow")
         }
         stack[sp] = object
@@ -59,9 +65,28 @@ class VM {
         return nil
     }
     func pull() -> JpfObject {
+        guard sp > 0 else {
+            return JpfError("stack underflow")
+        }
         let object = stack[sp - 1]
         sp -= 1
         return object
+    }
+    func peek() -> JpfObject? {
+        guard sp > 0 else {return nil}
+        return stack[sp - 1]
+    }
+    func peek(_ n: Int) -> [JpfObject]? {
+        guard n > 0 && n < (sp + 1) else {return nil}
+        return Array(stack[0..<n])
+    }
+    func drop() {
+        guard sp > 0 else {return}
+        sp -= 1
+    }
+    func drop(_ n: Int) {
+        guard sp >= n else {return}
+        sp -= n
     }
     // エラー
     let codeNotSupported = JpfError("該当する命令語は、未実装。")

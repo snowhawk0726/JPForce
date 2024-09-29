@@ -16,9 +16,10 @@ struct Bytecode {
 class Compiler {
     init(from node: Node) {self.node = node}
     private let node: Node
-    private var instructions: Instructions = []
+    var instructions: Instructions = []
     private var constants: [JpfObject] = []
-    private var stack: [JpfObject] = []
+    let environment = Environment() // 定数計算を行うstackを提供する。
+    //
     var bytecode: Bytecode {
         Bytecode(instructions, constants)
     }
@@ -36,7 +37,8 @@ class Compiler {
     /// - Returns: 新たなip(インストラクション・ポイント)
     func emit(op: Opcode, operands: [Int] = []) -> Int {
         let instruction = make(op: op, operands: operands)
-        return addInstruction(instruction)
+        let position = addInstruction(instruction)
+        return position
     }
     func emit(op: Opcode, operand: Int) -> Int {
         return emit(op: op, operands: [operand])
@@ -56,22 +58,30 @@ class Compiler {
         constants.append(obj)
         return constants.count - 1
     }
+    private func replaceInstruction(at pos: Int, newInstructions: Instructions) {
+        for i in 0..<newInstructions.count {
+            instructions[pos + i] = newInstructions[i]
+        }
+    }
+    func changeOperand(at opPosition: Int, operand: Int) {
+        let op = Opcode(rawValue: instructions[opPosition])!
+        let instruction = make(op: op, operand: operand)
+        replaceInstruction(at: opPosition, newInstructions: instruction)
+    }
     // 定数の演算を行うための補助(ヘルパー)
-    func push(_ object: JpfObject)  {stack.append(object)}
-    func pull() -> JpfObject?       {stack.popLast()}
-    var peek: JpfObject?            {stack.last}
-    func drop()                     {_ = pull()}
-    func drop(_ n: Int)             {stack.removeLast(n <= count ? n : count)}
-    var count: Int                  {stack.count}
-    var isEmpty: Bool               {stack.isEmpty}
+    func push(_ object: JpfObject)  {environment.push(object)}
+    func pull() -> JpfObject?       {environment.pull()}
+    func pullAll() -> [JpfObject]   {environment.pullAll()}
+    var peek: JpfObject?            {environment.peek}
+    func peek(_ n: Int) -> [JpfObject]? {environment.peek(n)}
+    func drop()                     {environment.drop()}
+    func drop(_ n: Int)             {environment.drop(n)}
+    var count: Int                  {environment.count}
+    var isEmpty: Bool               {environment.isEmpty}
     func unwrappedObject() -> JpfObject? {
-        return (pull() as? JpfPhrase)?.value
+        (pull() as? JpfPhrase)?.value
     }
     var unwrappedPeek: JpfObject? {
-        return (peek as? JpfPhrase)?.value ?? peek
-    }
-    func peek(_ n: Int) -> [JpfObject]? {
-        guard n <= count else {return nil}
-        return Array(stack[(count - n)..<count])
+        (peek as? JpfPhrase)?.value ?? peek
     }
 }

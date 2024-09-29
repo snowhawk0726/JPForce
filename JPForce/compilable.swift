@@ -28,7 +28,18 @@ extension Program : Compilable {
         for statement in statements {
             if let object = statement.compiled(with: c), object.isError {return object}
         }
+        _ = c.emit(op: .opPop)  // TODO: 必要？
         return nil
+    }
+}
+extension BlockStatement : Compilable {
+    func compiled(with c: Compiler) -> JpfObject? {
+        var result: JpfObject?
+        for statement in statements {
+            result = statement.compiled(with: c)
+            if let object = result, object.isBreakFactor {break}
+        }
+        return result
     }
 }
 extension ExpressionStatement : Compilable {
@@ -38,10 +49,7 @@ extension ExpressionStatement : Compilable {
             if object.isError {return object}
             c.push(object)                      // キャッシュで計算を継続
         }
-        if let object = c.pull() {
-            object.emit(with: c)
-        }
-        _ = c.emit(op: .opPop)
+        c.pullAll().forEach {$0.emit(with: c)}  // キャッシュをバイトコードに出力
         return nil
     }
 }
@@ -58,65 +66,38 @@ extension PhraseExpression : Compilable {
         return JpfPhrase(value: object, particle: token)
     }
 }
-extension GenitiveExpression : Compilable {
+extension CaseExpression : Compilable {
+    /// 条件処理(場合分け)。
+    /// 形式１：　(条件)場合、【処理】(、それ以外は、【処理】)
+    /// 形式２：   (〜が、〜の)場合、【処理】(、(〜の)場合、【処理】...)(、それ以外は、【処理】)
+    /// - Returns: ReturnValueまたはnil、エラー
     func compiled(with c: Compiler) -> JpfObject? {
-        guard let object = left.compiled(with: c) else {return nil}
-        guard !object.isError else {return object}
-        if let phrase = right as? PhraseExpression, phrase.token.isParticle(.WA),
-           let value = value?.compiled(with: c) {
-            let element = getElement(from: phrase.left, with: c)
-            let result = object.assign(value, to: element)              // 値を要素に代入
-            guard !result.isError else {return result}
-            return nil    // c.assign(result, with: object.name)        // 結果を辞書に登録
-        }
-        return compiled(object, self.right, with: c)
-    }
-    /// 属格の右を確認し、<object>の<right>を処理する。
-    /// - Parameters:
-    ///   - object: 左側のオブジェクト
-    ///   - right:  右側の式(ASTノード)
-    /// - Parameter compiler: 入力の環境
-    /// - Returns: 評価結果
-    private func compiled(_ object: JpfObject, _ right: Expression, with compiler: Compiler) -> JpfObject? {
-        var accessor: JpfObject? = nil
-        let phrase = JpfPhrase(name: object.name, value: object, particle: token)
-        switch right {
-        case let ident as Identifier:
-            compiler.push(phrase)
-            accessor = ident.compiled(with: compiler)
-            if compiler.peek?.name == object.name && compiler.peek?.particle == Token(.NO) {
-                compiler.drop()
-            } else {                // objectをsubsciptでアクセス済み
-                return accessor
+        if c.isEmpty {
+            let opJumpNotTruthyPosition = c.emit(op: .opJumpNotTruthy, operand: 9999)
+            if let err = consequence.compiled(with: c) {return err}
+            let opJumpPosition = c.emit(op: .opJump, operand: 9999)
+            let afterConsequencePositon = c.instructions.count
+            c.changeOperand(at: opJumpNotTruthyPosition, operand: afterConsequencePositon)
+            if alternative == nil {
+                _ = c.emit(op: .opNull)
+            } else {
+                if let err = alternative!.compiled(with: c) {return err}
             }
-//        case is ComputationLiteral:
-//            compiler.push(phrase)
-//            if let c = right.compiled(with: compiler) as? JpfComputation {
-//                return compiler.isExecutable ? c.getter(with: compiler) : c
-//            }
-//            return nil
-        case let expression as PhraseExpression:
-            let object = compiled(object, expression.left, with: compiler)
-            return JpfPhrase(name: "", value: object, particle: expression.token)
-        case is PredicateExpression, is CaseExpression, is Label:
-            compiler.push(phrase)
-            return right.compiled(with: compiler)
-        default:
-            accessor = right.compiled(with: compiler)
+            let afterAlternativePosition = c.instructions.count
+            c.changeOperand(at: opJumpPosition, operand: afterAlternativePosition)
+            return nil
         }
-        return object   // .accessed(by: accessor!, with: environment)
+        if let result = evaluated(with: c.environment) {return result}
+        _ = c.emit(op: .opNull)
+        return nil
     }
-    /// オブジェクトの要素を取り出す。
-    /// - Parameters:
-    ///   - expression: 要素を表す式
-    ///   - compiler: 要素を含む環境
-    /// - Returns: 要素オブジェクト、または識別子名のオブジェクト
-    private func getElement(from expression: Expression, with compiler: Compiler) -> JpfObject? {
-//        if let ident = expression as? Identifier {
-//            if let object = compiler[ident.value] {return object}
-//            return JpfString(value: ident.value)
-//        }
-        return expression.compiled(with: compiler)
+}
+extension GenitiveExpression : Compilable {
+    /// 属格：<オブジェクト>の<オブジェクト>(は、<値>。)を評価する。
+    /// - Parameter environment: 入力の環境
+    /// - Returns: 評価結果
+    func compiled(with c: Compiler) -> JpfObject? {
+        return evaluated(with: c.environment)
     }
 }
 extension IntegerLiteral : Compilable {

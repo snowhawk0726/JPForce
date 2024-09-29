@@ -18,7 +18,7 @@ protocol PredicateOperable {
 struct PredicateOperableFactory {
     static func create(from token: Token, with environment: Environment) -> PredicateOperable? {
         switch token.type {
-        case .keyword(.ADD):        return AddOperator(environment, by: token)
+        case .keyword(.ADD):        return AddOperator(environment)
         case .keyword(.MULTIPLY):   return MultiplyOperator(environment, by: token)
         case .keyword(.SUBSTRACT):  return SubstractOperator(environment, by: token)
         case .keyword(.DIVIDE):     return DivideOperator(environment, by: token)
@@ -219,7 +219,7 @@ extension PredicateOperable {
     var atLeastOneParamError: JpfError  {JpfError("には１つ以上の入力が必要。")}
     var oneParamNeeded: JpfError        {JpfError("には１つの入力が必要。")}
     var twoParamsNeeded: JpfError       {JpfError("には２つの入力が必要。")}
-    var additionParamError: JpfError    {JpfError("には、２つ以上の数値、文字列、配列の入力が必要。")}
+    var additionParamError: JpfError    {JpfError("「足す」には、２つ以上の数値、文字列、配列の入力が必要。")}
     var particleError: JpfError         {JpfError("助詞が間違っている。")}
     var valueNotFound: JpfError         {JpfError("で判定すべき値が無かった。")}
     var determineError: JpfError        {JpfError("判定の述語が間違っている。述語：「ある」「ない」「等しい」")}
@@ -351,10 +351,10 @@ struct IdentifiersOperator : PredicateOperable {
 }
 // MARK: - 算術演算
 struct AddOperator : PredicateOperable {
-    init(_ environment: Environment, by token: Token) {self.environment = environment; self.op = token}
-    let environment: Environment, op: Token
+    init(_ environment: Environment) {self.environment = environment}
+    let environment: Environment
     func operated() -> JpfObject? {
-        guard let params = environment.peek(2)  else {return "「\(op.literal)」" + additionParamError + additionUsage}
+        guard let params = environment.peek(2)  else {return additionParamError + additionUsage}
         var added = params[0].add(params[1])
         if !added.isError {environment.drop(2)}
         while isPeekParticle(.TO) && !added.isError {   // スタックにト格があれば、中身を足す
