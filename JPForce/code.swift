@@ -14,6 +14,8 @@ typealias Instructions = [Byte]
 /// 命令語
 enum Opcode : Byte {
     case opConstant = 0
+    case opSetGlobal
+    case opGetGlobal
     case opPop
     case opTrue
     case opFalse
@@ -38,6 +40,8 @@ struct Definition {
 }
 var definitions: [Opcode: Definition] = [
     .opConstant:    Definition(name: "OpConstant", operandWidths: [2]),
+    .opSetGlobal:   Definition(name: "OpSetGlobal", operandWidths: [2]),
+    .opGetGlobal:   Definition(name: "OpGetGlobal", operandWidths: [2]),
     .opPop:         Definition(name: "OpPop", operandWidths: []),
     .opTrue:        Definition(name: "OpTrue", operandWidths: []),
     .opFalse:       Definition(name: "OpFalse", operandWidths: []),

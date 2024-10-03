@@ -28,7 +28,17 @@ extension Program : Compilable {
         for statement in statements {
             if let object = statement.compiled(with: c), object.isError {return object}
         }
-        _ = c.emit(op: .opPop)  // TODO: 必要？
+        return nil
+    }
+}
+extension ExpressionStatement : Compilable {
+    func compiled(with c: Compiler) -> JpfObject? {
+        for expression in expressions {
+            guard let object = expression.compiled(with: c) else {continue}
+            if object.isError {return object}
+            c.push(object)                      // キャッシュで計算を継続
+        }
+        c.pullAll().forEach {$0.emit(with: c)}  // キャッシュをバイトコードに出力
         return nil
     }
 }
@@ -42,14 +52,20 @@ extension BlockStatement : Compilable {
         return result
     }
 }
-extension ExpressionStatement : Compilable {
+extension DefineStatement : Compilable {
     func compiled(with c: Compiler) -> JpfObject? {
-        for expression in expressions {
-            guard let object = expression.compiled(with: c) else {continue}
-            if object.isError {return object}
-            c.push(object)                      // キャッシュで計算を継続
+        if let object = value.compiled(with: c), object.isError {return object}
+        let symbol = c.symbolTable.define(name.value)
+        _ = c.emit(op: .opSetGlobal, operand: symbol.index)
+        return nil
+    }
+}
+extension Identifier : Compilable {
+    func compiled(with c: Compiler) -> JpfObject? {
+        guard let symbol = c.symbolTable.resolve(value) else {
+            return JpfError("『\(value)』") + identifierNotFound
         }
-        c.pullAll().forEach {$0.emit(with: c)}  // キャッシュをバイトコードに出力
+        _ = c.emit(op: .opGetGlobal, operand: symbol.index)
         return nil
     }
 }
@@ -75,21 +91,15 @@ extension CaseExpression : Compilable {
         if c.isEmpty {
             let opJumpNotTruthyPosition = c.emit(op: .opJumpNotTruthy, operand: 9999)
             if let err = consequence.compiled(with: c) {return err}
-            let opJumpPosition = c.emit(op: .opJump, operand: 9999)
-            let afterConsequencePositon = c.instructions.count
-            c.changeOperand(at: opJumpNotTruthyPosition, operand: afterConsequencePositon)
-            if alternative == nil {
-                _ = c.emit(op: .opNull)
-            } else {
-                if let err = alternative!.compiled(with: c) {return err}
+            let opJumpPosition = (alternative != nil) ? c.emit(op: .opJump, operand: 9999) : -1
+            c.changeOperand(at: opJumpNotTruthyPosition, operand: c.lastPosition)   // Jump先書換え
+            if let alternative = alternative {
+                if let err = alternative.compiled(with: c) {return err}
+                c.changeOperand(at: opJumpPosition, operand: c.lastPosition)        // Jump先書換え
             }
-            let afterAlternativePosition = c.instructions.count
-            c.changeOperand(at: opJumpPosition, operand: afterAlternativePosition)
             return nil
         }
-        if let result = evaluated(with: c.environment) {return result}
-        _ = c.emit(op: .opNull)
-        return nil
+        return evaluated(with: c.environment)
     }
 }
 extension GenitiveExpression : Compilable {

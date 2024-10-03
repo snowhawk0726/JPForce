@@ -45,6 +45,9 @@
 		5070B1A829B61DDA00808FDE /* predicateOperable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5070B1A729B61DDA00808FDE /* predicateOperable.swift */; };
 		5070B1A929B61DDA00808FDE /* predicateOperable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5070B1A729B61DDA00808FDE /* predicateOperable.swift */; };
 		5070B1AA29BC977500808FDE /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5042122129B58DAD00D2EA98 /* main.swift */; };
+		508909CD2CAA752B00032B0A /* symbolTable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 508909CC2CAA752B00032B0A /* symbolTable.swift */; };
+		508909CE2CAA752B00032B0A /* symbolTable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 508909CC2CAA752B00032B0A /* symbolTable.swift */; };
+		508909D32CAA793000032B0A /* SymbolTableTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 508909D22CAA793000032B0A /* SymbolTableTests.swift */; };
 		509D11FA2C21A34B00FC0C89 /* CodeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 509D11F82C21A34B00FC0C89 /* CodeTests.swift */; };
 		509D11FF2C228AFF00FC0C89 /* CompilerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 509D11FD2C228AFF00FC0C89 /* CompilerTests.swift */; };
 		509D910329CD85C200C22283 /* builtin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 509D910229CD85C200C22283 /* builtin.swift */; };
@@ -99,6 +102,8 @@
 		50552F3C29B5B87D0061CDBE /* environment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = environment.swift; sourceTree = "<group>"; };
 		506561E829D937380016923D /* ObjectTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ObjectTests.swift; sourceTree = "<group>"; };
 		5070B1A729B61DDA00808FDE /* predicateOperable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = predicateOperable.swift; sourceTree = "<group>"; };
+		508909CC2CAA752B00032B0A /* symbolTable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = symbolTable.swift; sourceTree = "<group>"; };
+		508909D22CAA793000032B0A /* SymbolTableTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SymbolTableTests.swift; sourceTree = "<group>"; };
 		509D11F82C21A34B00FC0C89 /* CodeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodeTests.swift; sourceTree = "<group>"; };
 		509D11FD2C228AFF00FC0C89 /* CompilerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompilerTests.swift; sourceTree = "<group>"; };
 		509D910229CD85C200C22283 /* builtin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = builtin.swift; sourceTree = "<group>"; };
@@ -169,6 +174,7 @@
 				5042122429B58DAD00D2EA98 /* repl.swift */,
 				5042121E29B58DAD00D2EA98 /* token.swift */,
 				50D72B512C8D6ECD00A3841C /* codeExecutable.swift */,
+				508909CC2CAA752B00032B0A /* symbolTable.swift */,
 			);
 			path = JPForce;
 			sourceTree = "<group>";
@@ -185,6 +191,7 @@
 				5042124629B58EE100D2EA98 /* EvaluatorTests.swift */,
 				509D11F82C21A34B00FC0C89 /* CodeTests.swift */,
 				509D11FD2C228AFF00FC0C89 /* CompilerTests.swift */,
+				508909D22CAA793000032B0A /* SymbolTableTests.swift */,
 			);
 			path = UnitTests;
 			sourceTree = "<group>";
@@ -287,6 +294,7 @@
 				5042122929B58DAD00D2EA98 /* repl.swift in Sources */,
 				50175F9B2C8C426200DD0F4A /* predicateCompilable.swift in Sources */,
 				50C9C1D629F3A46A0046C735 /* color.swift in Sources */,
+				508909CD2CAA752B00032B0A /* symbolTable.swift in Sources */,
 				5042122729B58DAD00D2EA98 /* main.swift in Sources */,
 				5042122E29B58DAD00D2EA98 /* evaluator.swift in Sources */,
 				5042122B29B58DAD00D2EA98 /* object.swift in Sources */,
@@ -309,6 +317,7 @@
 			files = (
 				50C9C1D729F3A46A0046C735 /* color.swift in Sources */,
 				5042123D29B58E9F00D2EA98 /* ast.swift in Sources */,
+				508909D32CAA793000032B0A /* SymbolTableTests.swift in Sources */,
 				501240E72C2590C300CC2F7C /* vm.swift in Sources */,
 				50552F3E29B5B87D0061CDBE /* environment.swift in Sources */,
 				5070B1AA29BC977500808FDE /* main.swift in Sources */,
@@ -335,6 +344,7 @@
 				5042123E29B58EA400D2EA98 /* evaluator.swift in Sources */,
 				509D11FA2C21A34B00FC0C89 /* CodeTests.swift in Sources */,
 				501240E22C23FCBC00CC2F7C /* compilable.swift in Sources */,
+				508909CE2CAA752B00032B0A /* symbolTable.swift in Sources */,
 				5042124B29B58F0000D2EA98 /* ParserTests.swift in Sources */,
 				5042124D29B58F0D00D2EA98 /* TokenTests.swift in Sources */,
 			);

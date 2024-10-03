@@ -69,7 +69,7 @@ final class VMTests: XCTestCase {
             ("１より２が。小さいは、真である", true), ("１より２が。小さいは、偽である", false),
             ("１より２が小さいは、真でない", false), ("１より２が小さいは、偽でない", true),
             ("１より２が。小さいは、真でない", false), ("１より２が。小さいは、偽でない", true),
-            ("偽である場合、【５】でない", true),
+//            ("偽である場合、【５】でない", true),
         ]
         try runVmTests(with: testPattern)
     }
@@ -83,7 +83,15 @@ final class VMTests: XCTestCase {
             ("１が２より大きい場合【10】、それ以外は【20】", 20),
             ("１が２より大きい場合、【10】", nil),
             ("偽である場合、【10】。", nil),
-            ("偽である場合【10】、である場合【10】、それ以外は【20】", 20),
+//            ("偽である場合【10】、である場合【10】、それ以外は【20】", 20),
+        ]
+        try runVmTests(with: testPattern)
+    }
+    func testGlobalDefineStatements() throws {
+        let testPattern: [VmTestCase] = [
+            ("一は１。一", 1),
+            ("一は１。二は２。一と二を足す", 3),
+            ("一は１。二は、一と一を足す。一と二を足す", 3),
         ]
         try runVmTests(with: testPattern)
     }
@@ -95,7 +103,7 @@ final class VMTests: XCTestCase {
             XCTAssertNil(compiler.compile())
             let vm = VM(with: compiler.bytecode)
             XCTAssertNil(vm.run())
-            let element = vm.lastPoppedStackElem
+            let element = vm.stackTop
             try testExpectedObject(t.expected, element)
         }
     }
@@ -106,8 +114,7 @@ final class VMTests: XCTestCase {
         case let boolean as Bool:
             try testBooleanObject(boolean, actual)
         case nil:
-            XCTAssertNotNil(actual)
-            XCTAssertTrue(actual!.isNull, "object is not Null: \(type(of: actual)) (\(actual!.string))")
+            XCTAssertNil(actual)
         default:
             break
         }

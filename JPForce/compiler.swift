@@ -15,14 +15,21 @@ struct Bytecode {
 //
 class Compiler {
     init(from node: Node) {self.node = node}
+    convenience init(from node: Node, _ symbolTable: SymbolTable, _ constants: [JpfObject]) {
+        self.init(from: node)
+        self.symbolTable = symbolTable
+        self.constants = constants
+    }
     private let node: Node
-    var instructions: Instructions = []
     private var constants: [JpfObject] = []
+    var symbolTable = SymbolTable() // シンボルテーブル
     let environment = Environment() // 定数計算を行うstackを提供する。
+    var instructions: Instructions = []
     //
     var bytecode: Bytecode {
         Bytecode(instructions, constants)
     }
+    var lastPosition: Int {instructions.count}  // 最新インストラクション・ポイント
     //
     /// 指定されたASTノードをコンパイルする。
     /// - Returns: エラー(無しは、nil)

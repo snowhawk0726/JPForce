@@ -23,7 +23,7 @@ final class CompilerTests: XCTestCase {
              expectedConstants: [3],
              expectedInstructions: [
                 make(op: .opConstant, operand: 0),
-                make(op: .opPop),  ]
+             ]
             ),
             (input: "１と２を。足す",
              expectedConstants: [1, 2],
@@ -31,13 +31,13 @@ final class CompilerTests: XCTestCase {
                 make(op: .opConstant, operand: 0),
                 make(op: .opConstant, operand: 1),
                 make(op: .opAdd),
-                make(op: .opPop),  ]
+             ]
             ),
             (input: "１から２を引く",
              expectedConstants: [-1],
              expectedInstructions: [
                 make(op: .opConstant, operand: 0),
-                make(op: .opPop),  ]
+             ]
             ),
             (input: "１から２を。引く",
              expectedConstants: [1, 2],
@@ -45,13 +45,13 @@ final class CompilerTests: XCTestCase {
                 make(op: .opConstant, operand: 0),
                 make(op: .opConstant, operand: 1),
                 make(op: .opSub),
-                make(op: .opPop),  ]
+             ]
             ),
             (input: "１と２を掛ける",
              expectedConstants: [2],
              expectedInstructions: [
                 make(op: .opConstant, operand: 0),
-                make(op: .opPop),  ]
+             ]
             ),
             (input: "１と２を。掛ける",
              expectedConstants: [1, 2],
@@ -59,13 +59,13 @@ final class CompilerTests: XCTestCase {
                 make(op: .opConstant, operand: 0),
                 make(op: .opConstant, operand: 1),
                 make(op: .opMul),
-                make(op: .opPop),  ]
+             ]
             ),
             (input: "２を１で割る",
              expectedConstants: [2],
              expectedInstructions: [
                 make(op: .opConstant, operand: 0),
-                make(op: .opPop),  ]
+             ]
             ),
             (input: "２を１で。割る",
              expectedConstants: [2, 1],
@@ -73,26 +73,26 @@ final class CompilerTests: XCTestCase {
                 make(op: .opConstant, operand: 0),
                 make(op: .opConstant, operand: 1),
                 make(op: .opDiv),
-                make(op: .opPop),  ]
+             ]
             ),
             (input: "１の負数",
              expectedConstants: [-1],
              expectedInstructions: [
                 make(op: .opConstant, operand: 0),
-                make(op: .opPop),  ]
+             ]
             ),
             (input: "-１を負数にする",
              expectedConstants: [1],
              expectedInstructions: [
                 make(op: .opConstant, operand: 0),
-                make(op: .opPop),  ]
+             ]
             ),
             (input: "１。負数",
              expectedConstants: [1],
              expectedInstructions: [
                 make(op: .opConstant, operand: 0),
                 make(op: .opNeg),
-                make(op: .opPop),  ]
+             ]
             ),
         ]
         try runCompilerTests(testPatterns)
@@ -103,19 +103,19 @@ final class CompilerTests: XCTestCase {
              expectedConstants: [],
              expectedInstructions: [
                 make(op: .opTrue),
-                make(op: .opPop),  ]
+             ]
             ),
             (input: "偽",
              expectedConstants: [],
              expectedInstructions: [
                 make(op: .opFalse),
-                make(op: .opPop),  ]
+             ]
             ),
             (input: "1が2より大きい",
              expectedConstants: [],
              expectedInstructions: [
                 make(op: .opFalse),
-                make(op: .opPop),  ]
+             ]
             ),
             (input: "1が2より。大きい",
              expectedConstants: [1, 2],
@@ -123,13 +123,13 @@ final class CompilerTests: XCTestCase {
                 make(op: .opConstant, operand: 0),
                 make(op: .opConstant, operand: 1),
                 make(op: .opGreaterThan),
-                make(op: .opPop),  ]
+             ]
             ),
             (input: "1が2より小さい",
              expectedConstants: [],
              expectedInstructions: [
                 make(op: .opTrue),
-                make(op: .opPop),  ]
+             ]
             ),
             (input: "1が2より。小さい",
              expectedConstants: [1, 2],
@@ -137,13 +137,13 @@ final class CompilerTests: XCTestCase {
                 make(op: .opConstant, operand: 0),
                 make(op: .opConstant, operand: 1),
                 make(op: .opLessThan),
-                make(op: .opPop),  ]
+             ]
             ),
             (input: "1が2に等しい",
              expectedConstants: [],
              expectedInstructions: [
                 make(op: .opFalse),
-                make(op: .opPop),  ]
+             ]
             ),
             (input: "1が2に。等しい",
              expectedConstants: [1, 2],
@@ -151,14 +151,14 @@ final class CompilerTests: XCTestCase {
                 make(op: .opConstant, operand: 0),
                 make(op: .opConstant, operand: 1),
                 make(op: .opEqual),
-                make(op: .opPop),  ]
+             ]
             ),
             (input: "1が2に等しくない",
              expectedConstants: [],
              expectedInstructions: [
                 make(op: .opFalse),
                 make(op: .opNot),
-                make(op: .opPop),  ]
+             ]
             ),
             (input: "1が2に。等しくない",
              expectedConstants: [1, 2],
@@ -167,13 +167,13 @@ final class CompilerTests: XCTestCase {
                 make(op: .opConstant, operand: 1),
                 make(op: .opEqual),
                 make(op: .opNot),
-                make(op: .opPop),  ]
+             ]
             ),
             (input: "真が偽に等しい",
              expectedConstants: [],
              expectedInstructions: [
                 make(op: .opFalse),
-                make(op: .opPop),  ]
+             ]
             ),
             (input: "真が偽に。等しい",
              expectedConstants: [true, false],
@@ -181,14 +181,14 @@ final class CompilerTests: XCTestCase {
                 make(op: .opConstant, operand: 0),
                 make(op: .opConstant, operand: 1),
                 make(op: .opEqual),
-                make(op: .opPop),  ]
+             ]
             ),
             (input: "真が偽に等しくない",
              expectedConstants: [],
              expectedInstructions: [
                 make(op: .opFalse),
                 make(op: .opNot),
-                make(op: .opPop),  ]
+             ]
             ),
             (input: "真が偽に。等しくない",
              expectedConstants: [true, false],
@@ -197,27 +197,27 @@ final class CompilerTests: XCTestCase {
                 make(op: .opConstant, operand: 1),
                 make(op: .opEqual),
                 make(op: .opNot),
-                make(op: .opPop),  ]
+             ]
             ),
             (input: "真でない",
              expectedConstants: [true],
              expectedInstructions: [
                 make(op: .opConstant, operand: 0),
                 make(op: .opNot),
-                make(op: .opPop),  ]
+             ]
             ),
             (input: "真で。ない",
              expectedConstants: [true],
              expectedInstructions: [
                 make(op: .opConstant, operand: 0),
                 make(op: .opNot),
-                make(op: .opPop),  ]
+             ]
             ),
             (input: "1が正",
              expectedConstants: [],
              expectedInstructions: [
                 make(op: .opTrue),
-                make(op: .opPop),  ]
+             ]
             ),
             (input: "1。正",
              expectedConstants: [1, 0],
@@ -225,13 +225,13 @@ final class CompilerTests: XCTestCase {
                 make(op: .opConstant, operand: 0),
                 make(op: .opConstant, operand: 1),
                 make(op: .opGreaterThan),
-                make(op: .opPop),  ]
+             ]
             ),
             (input: "-1が負",
              expectedConstants: [],
              expectedInstructions: [
                 make(op: .opTrue),
-                make(op: .opPop),  ]
+             ]
             ),
             (input: "-1。負",
              expectedConstants: [-1, 0],
@@ -239,13 +239,13 @@ final class CompilerTests: XCTestCase {
                 make(op: .opConstant, operand: 0),
                 make(op: .opConstant, operand: 1),
                 make(op: .opLessThan),
-                make(op: .opPop),  ]
+             ]
             ),
             (input: "0が正",
              expectedConstants: [],
              expectedInstructions: [
                 make(op: .opFalse),
-                make(op: .opPop),  ]
+             ]
             ),
             (input: "0。正",
              expectedConstants: [0, 0],
@@ -253,7 +253,7 @@ final class CompilerTests: XCTestCase {
                 make(op: .opConstant, operand: 0),
                 make(op: .opConstant, operand: 1),
                 make(op: .opGreaterThan),
-                make(op: .opPop),  ]
+             ]
             ),
         ]
         try runCompilerTests(testPatterns)
@@ -265,12 +265,10 @@ final class CompilerTests: XCTestCase {
              expectedInstructions: [
                 make(op: .opConstant, operand: 0),          // 0000 真
                 make(op: .opBe),                            // 0003
-                make(op: .opJumpNotTruthy, operand: 13),    // 0004
+                make(op: .opJumpNotTruthy, operand: 10),    // 0004
                 make(op: .opConstant, operand: 1),          // 0007 10
-                make(op: .opJump, operand: 14),             // 0010
-                make(op: .opNull),                          // 0013
-                make(op: .opConstant, operand: 2),          // 0014 3333
-                make(op: .opPop),  ]                        // 0017
+                make(op: .opConstant, operand: 2),          // 0010 3333
+             ]
             ),
             (input: "１が１に。等しい場合、【１０】。３３３３。",
              expectedConstants: [1, 1, 10, 3333],
@@ -278,12 +276,10 @@ final class CompilerTests: XCTestCase {
                 make(op: .opConstant, operand: 0),          // 0000 1
                 make(op: .opConstant, operand: 1),          // 0003 1
                 make(op: .opEqual),                         // 0006
-                make(op: .opJumpNotTruthy, operand: 16),    // 0007
+                make(op: .opJumpNotTruthy, operand: 13),    // 0007
                 make(op: .opConstant, operand: 2),          // 0010 10
-                make(op: .opJump, operand: 17),             // 0013
-                make(op: .opNull),                          // 0016
-                make(op: .opConstant, operand: 3),          // 0017 3333
-                make(op: .opPop),  ]                        // 0020
+                make(op: .opConstant, operand: 3),          // 0013 3333
+             ]
             ),
             (input: "真である場合、【１０】、それ以外は、【２０】。３３３３。",
              expectedConstants: [true, 10, 20, 3333],
@@ -295,7 +291,7 @@ final class CompilerTests: XCTestCase {
                 make(op: .opJump, operand: 16),             // 0010
                 make(op: .opConstant, operand: 2),          // 0013 20
                 make(op: .opConstant, operand: 3),          // 0016 3333
-                make(op: .opPop),  ]                        // 0019
+             ]
             ),
             (input: "１が１に。等しい場合、【１０】、それ以外は、【２０】。３３３３。",
              expectedConstants: [1, 1, 10, 20, 3333],
@@ -308,7 +304,39 @@ final class CompilerTests: XCTestCase {
                 make(op: .opJump, operand: 19),             // 0013
                 make(op: .opConstant, operand: 3),          // 0016 20
                 make(op: .opConstant, operand: 4),          // 0019 3333
-                make(op: .opPop),  ]                        // 0021
+             ]
+            ),
+        ]
+        try runCompilerTests(testPatterns)
+    }
+    func testGlobalDefStatements() throws {
+        let testPatterns: [CompilerTestCase] = [
+            (input: "一は１。二は2。",
+             expectedConstants: [1, 2],
+             expectedInstructions: [
+                make(op: .opConstant, operand: 0),
+                make(op: .opSetGlobal, operand: 0),
+                make(op: .opConstant, operand: 1),
+                make(op: .opSetGlobal, operand: 1),
+             ]
+            ),
+            (input: "一は１。一。",
+             expectedConstants: [1],
+             expectedInstructions: [
+                make(op: .opConstant, operand: 0),
+                make(op: .opSetGlobal, operand: 0),
+                make(op: .opGetGlobal, operand: 0),
+             ]
+            ),
+            (input: "一は１。二は一。二。",
+             expectedConstants: [1],
+             expectedInstructions: [
+                make(op: .opConstant, operand: 0),
+                make(op: .opSetGlobal, operand: 0),
+                make(op: .opGetGlobal, operand: 0),
+                make(op: .opSetGlobal, operand: 1),
+                make(op: .opGetGlobal, operand: 1),
+             ]
             ),
         ]
         try runCompilerTests(testPatterns)

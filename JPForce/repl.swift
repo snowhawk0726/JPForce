@@ -11,7 +11,12 @@ struct Repl {
     func start() {
         enum Mode {case interpriter, vm}
         var mode: Mode = .interpriter
-        let environment = Environment()
+        //
+        let environment = Environment()     // for Intepriter
+        var constants: [JpfObject] = []     // for Compiler & VM
+        let globals = GlobalStore()         // for Compiler & VM
+        let symbolTable = SymbolTable()     // for Compiler
+        let stack = Stack()                 // for VM
         print("日本語ふぉーす(JPForce)のREPLです。")
         while true {
             printPrompt()
@@ -35,7 +40,7 @@ struct Repl {
                 continue
             }
             if mode == .vm {
-                runVirtualMachine(of: program)
+                runVirtualMachine(of: program, &constants, symbolTable, globals, stack)
             } else {
                 runEvaluator(of: program, with: environment)
             }
@@ -53,29 +58,28 @@ struct Repl {
         evaluated.map {print("評価結果: \($0.string)")}
         print("入力: (\(environment.string))")
     }
-    private func runVirtualMachine(of program: Program) {
+    private func runVirtualMachine(of program: Program, _ constants: inout [JpfObject], _ symbolTable: SymbolTable, _ globals: GlobalStore, _ stack: Stack) {
         // 翻訳部
-        let compiler = Compiler(from: program)
+        let compiler = Compiler(from: program, symbolTable, constants)
         if let error = compiler.compile() {
             print("翻訳器が、エラーを検出した。")
-            print("Error: \(error.message)")
+            print("\tエラー: \(error.message)")
             return
         }
+        constants = compiler.bytecode.constants
         print("翻訳結果：")
         print(compiler.bytecode.instructions.string)
         // 実行部
-        let machine = VM(with: compiler.bytecode)
+        let machine = VM(with: compiler.bytecode, globals, stack)
         if let error = machine.run() {
             print("バイトコード実行時にエラーを検出した。")
             print(error.message)
             return
         }
         // 結果表示
-        let lastPopped = machine.lastPoppedStackElem
-        print("実行結果: \(lastPopped.string)")
-        while let stackTop = machine.stackTop {
-            print("スタック: \(stackTop.string)")
-            _ = machine.pull()
+        if let result = machine.stackTop {
+            print("実行結果: \(result.string)")
         }
+        print("入力: (\(machine.string))")
     }
 }
