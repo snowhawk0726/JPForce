@@ -18,8 +18,8 @@ protocol CodeExecutable {
 extension CodeExecutable {
     func binaryIntegerOperation(with vm: VM, operation: (Int, Int) -> Int) -> JpfError? {
         let right = vm.pull(), left = vm.pull()
-        guard let leftValue = left.number, let rightValue = right.number else {
-            return JpfError("二項数値演算の項が、数値でない。")
+        guard let leftValue = left?.number, let rightValue = right?.number else {
+            return binaryIntegerError
         }
         let value = operation(leftValue, rightValue)
         if let error = vm.push(JpfInteger(value: value)) {return error}
@@ -27,15 +27,15 @@ extension CodeExecutable {
     }
     func binaryIntegerComparison(with vm: VM, operation: (Int, Int) -> Bool) -> JpfError? {
         let right = vm.pull(), left = vm.pull()
-        guard let leftValue = left.number, let rightValue = right.number else {
-            return JpfError("二項数値演算の項が、数値でない。")
+        guard let leftValue = left?.number, let rightValue = right?.number else {
+            return binaryIntegerError
         }
         let value = operation(leftValue, rightValue)
         if let error = vm.push(JpfBoolean.object(of: value)) {return error}
         return nil
     }
     func binaryObjectComparison(with vm: VM, operation: (JpfObject, JpfObject) -> Bool) -> JpfError? {
-        let right = vm.pull(), left = vm.pull()
+        guard let right = vm.pull(), let left = vm.pull() else {return comparisionObjectMissig}
         let value = operation(left, right)
         if let error = vm.push(JpfBoolean.object(of: value)) {return error}
         return nil
@@ -62,8 +62,13 @@ extension CodeExecutable {
                 return nil
             }
         }
-        return JpfError("対象となる句(オブジェクト)が無い。")
+        return targetPhraseNotFound
     }
+    var comparisionObjectMissig: JpfError {JpfError("比較するオブジェクトが足りない。")}
+    var binaryIntegerError: JpfError    {JpfError("二項数値演算の項が、数値でない。")}
+    var targetPhraseNotFound: JpfError  {JpfError("対象となる句(オブジェクト)が無い。")}
+    var operandIsNotInteger: JpfError   {JpfError("演算の項が、数値でない。")}
+    var genitiveParamError: JpfError    {JpfError("属格の左右オブジェクトが足りない。")}
 }
 // MARK: - instance factory
 struct CodeExecutableFactory {
@@ -84,6 +89,7 @@ struct CodeExecutableFactory {
                         return GreaterThanExecuter(vm)
         case .opLessThan:
                         return LessThanExecuter(vm)
+        case .opIndex:  return GenitiveExecuter(vm)
         default:        return nil
         }
     }
@@ -93,7 +99,11 @@ struct AddExecuter : CodeExecutable {
     init(_ vm: VM) {self.vm = vm}
     let vm: VM
     func execute() -> JpfError? {
-        return binaryIntegerOperation(with: vm) {$0 + $1}
+        let environment = Environment(with: vm.stack)
+        let result = AddOperator(environment).operated()!
+        if result.isError {return result.error}
+        if let err = vm.push(result) {return err}
+        return nil
     }
 }
 struct SubExecuter : CodeExecutable {
@@ -122,8 +132,9 @@ struct NegExecuter : CodeExecutable {
     let vm: VM
     func execute() -> JpfError? {
         let value = vm.pull()
-        guard let number = value.number else {return JpfError("対象が、数値でない。")}
-        if let err = vm.push(JpfInteger(name: value.name, value: -number)) {return err}
+        guard let number = value?.number else {return operandIsNotInteger}
+        let name = value?.name ?? ""
+        if let err = vm.push(JpfInteger(name: name, value: -number)) {return err}
         return nil
     }
 }
@@ -175,6 +186,18 @@ struct NullExecuter : CodeExecutable {
     let vm: VM
     func execute() -> JpfError? {
         if let error = vm.push(JpfNull.object) {return error}
+        return nil
+    }
+}
+struct GenitiveExecuter : CodeExecutable {
+    init(_ vm: VM) {self.vm = vm}
+    let vm: VM
+    func execute() -> JpfError? {
+        guard let index = vm.pull(), let left = vm.pull() else {return genitiveParamError}
+        let environment = Environment(with: vm.stack)
+        guard let result = left.accessed(by: index, with: environment) else {return nil}
+        if result.isError {return result.error}
+        if let error = vm.push(result) {return error}
         return nil
     }
 }

@@ -76,7 +76,8 @@ class Compiler {
         replaceInstruction(at: opPosition, newInstructions: instruction)
     }
     // 定数の演算を行うための補助(ヘルパー)
-    func push(_ object: JpfObject)  {environment.push(object)}
+    func push(_ o: JpfObject) -> JpfError?
+                                    {environment.push(o)}
     func pull() -> JpfObject?       {environment.pull()}
     func pullAll() -> [JpfObject]   {environment.pullAll()}
     var peek: JpfObject?            {environment.peek}
@@ -85,10 +86,7 @@ class Compiler {
     func drop(_ n: Int)             {environment.drop(n)}
     var count: Int                  {environment.count}
     var isEmpty: Bool               {environment.isEmpty}
-    func unwrappedObject() -> JpfObject? {
-        (pull() as? JpfPhrase)?.value
-    }
-    var unwrappedPeek: JpfObject? {
-        (peek as? JpfPhrase)?.value ?? peek
-    }
+    func unwrappedObject() -> JpfObject?
+                                    {(pull() as? JpfPhrase)?.value}
+    var unwrappedPeek: JpfObject?   {(peek as? JpfPhrase)?.value ?? peek}
 }

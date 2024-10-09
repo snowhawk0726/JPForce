@@ -69,7 +69,17 @@ final class VMTests: XCTestCase {
             ("１より２が。小さいは、真である", true), ("１より２が。小さいは、偽である", false),
             ("１より２が小さいは、真でない", false), ("１より２が小さいは、偽でない", true),
             ("１より２が。小さいは、真でない", false), ("１より２が。小さいは、偽でない", true),
-//            ("偽である場合、【５】でない", true),
+            //            ("偽である場合、【５】でない", true),
+        ]
+        try runVmTests(with: testPattern)
+    }
+    func testStringExpressions() throws {
+        let testPattern: [VmTestCase] = [
+            ("「モンキー」", "モンキー"),
+            ("「モン」と「キー」を足す", "モンキー"),
+            ("「モン」と「キー」を。足す", "モンキー"),
+            ("「モン」と「キー」と「バナナ」を足す", "モンキーバナナ"),
+            ("「モン」と「キー」と「バナナ」を。足す", "モンキーバナナ"),
         ]
         try runVmTests(with: testPattern)
     }
@@ -83,7 +93,45 @@ final class VMTests: XCTestCase {
             ("１が２より大きい場合【10】、それ以外は【20】", 20),
             ("１が２より大きい場合、【10】", nil),
             ("偽である場合、【10】。", nil),
-//            ("偽である場合【10】、である場合【10】、それ以外は【20】", 20),
+            //            ("偽である場合【10】、である場合【10】、それ以外は【20】", 20),
+        ]
+        try runVmTests(with: testPattern)
+    }
+    func testArrayLiterals() throws {
+        let testPattern: [VmTestCase] = [
+            ("配列【】", []),
+            ("配列【１、２、３】", [1, 2, 3]),
+            ("配列【1と2を足す、3と4を掛ける、5と6を足す】", [3, 12, 11]),
+        ]
+        try runVmTests(with: testPattern)
+    }
+    func testDictionaryLiterals() throws {
+        let testPattern: [VmTestCase] = [
+            ("辞書【１が２、２が３】",
+             [JpfInteger(value: 1).hashKey: 2,
+              JpfInteger(value: 2).hashKey: 3,
+             ]
+            ),
+            ("辞書【１と１を足すが２と２を掛ける、３と３を足すが４と４を掛ける】",
+             [JpfInteger(value: 2).hashKey: 4,
+              JpfInteger(value: 6).hashKey: 16,
+             ]
+            ),
+        ]
+        try runVmTests(with: testPattern)
+    }
+    func testIndexExpressions() throws {
+        let testPattern: [VmTestCase] = [
+            ("iは1。配列【１、２、３】のi", 2),
+            ("iは、０と2を足す。配列【１、２、３】のi", 3),
+            ("iは０。jは０。配列【配列【１、１、１】】のiのj", 1),
+            ("iは０。配列【】のi", nil),
+            ("iは９９。配列【１、２、３】のi", nil),
+            ("iは−１。配列【１】のi", nil),
+            ("iは１。辞書【１が１、２が２】のi", 1),
+            ("iは２。辞書【１が１、２が２】のi", 2),
+            ("iは０。辞書【１が１】のi", nil),
+            ("iは０。辞書【】のi", nil),
         ]
         try runVmTests(with: testPattern)
     }
@@ -113,8 +161,23 @@ final class VMTests: XCTestCase {
             try testIntegerObject(Int64(integer), actual)
         case let boolean as Bool:
             try testBooleanObject(boolean, actual)
+        case let string as String:
+            try testStringObject(string, actual)
+        case let array as [Any]:
+            guard let actualArray = actual as? JpfArray else {
+                throw XCTSkip("Expected array, but got \(String(describing: actual))")
+            }
+            XCTAssertEqual(array.count, actualArray.count.number, "Array count mismatch")
+            try array.enumerated().forEach { try testExpectedObject($1, actualArray[$0]) }
+        case let expectedDict as [JpfHashKey: Any]:
+            let actualDict = try XCTUnwrap(actual as? JpfDictionary)
+            XCTAssertEqual(expectedDict.count, actualDict.pairs.count)
+            for (expectedKey, expectedValue) in expectedDict {
+                let pair = try XCTUnwrap(actualDict[expectedKey])
+                try testExpectedObject(expectedValue, pair.1)
+            }
         case nil:
-            XCTAssertNil(actual)
+            XCTAssertTrue(actual?.isNull ?? true)
         default:
             break
         }
@@ -126,5 +189,9 @@ final class VMTests: XCTestCase {
     private func testBooleanObject(_ expected: Bool, _ actual: JpfObject?) throws {
         let boolean = try XCTUnwrap(actual as? JpfBoolean)
         XCTAssertEqual(boolean.value, expected)
+    }
+    private func testStringObject(_ expected: String, _ actual: JpfObject?) throws {
+        let string = try XCTUnwrap(actual as? JpfString)
+        XCTAssertEqual(string.value, expected) 
     }
 }

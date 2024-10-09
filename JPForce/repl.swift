@@ -69,6 +69,9 @@ struct Repl {
         constants = compiler.bytecode.constants
         print("翻訳結果：")
         print(compiler.bytecode.instructions.string)
+        print("定数表：")
+        print(constants.string)
+        print()
         // 実行部
         let machine = VM(with: compiler.bytecode, globals, stack)
         if let error = machine.run() {

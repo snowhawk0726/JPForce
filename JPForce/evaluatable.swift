@@ -68,8 +68,10 @@ extension ExpressionStatement : Evaluatable {
         var result: JpfObject?
         for expression in expressions {
             result = expression.evaluated(with: environment)
-            if let object = result, object.isBreakFactor {break}
-            result.map {environment.push($0)}
+            if let object = result {
+                if object.isBreakFactor {break}
+                if let err = environment.push(object) {return err}
+            }
         }
         environment.remove(name: Environment.OUTER)
         return result
@@ -225,7 +227,7 @@ extension Boolean : Evaluatable {
 }
 extension RangeLiteral : Evaluatable {
     func evaluated(with environment: Environment) -> JpfObject? {
-        environment.push(JpfNull.object)    // 範囲の上下限が、配列にアクセスしないための回避策
+        if let err = environment.push(JpfNull.object) {return err}  // 範囲の上下限が、配列にアクセスしないための回避策
         var lowerBound, upperBound: (JpfInteger, Token)?
         if let object = self.lowerBound?.evaluated(with: environment) {
             if object.isError {return object}
@@ -554,8 +556,10 @@ extension LoopExpression : Evaluatable {
         var result: JpfObject?
         for expression in condition {
             result = expression.evaluated(with: environment)
-            if let object = result, object.isBreakFactor {break}
-            result.map {environment.push($0)}
+            if let object = result {
+                if object.isBreakFactor {break}
+                if let err = environment.push(object) {return err}
+            }
         }
         environment.drop()                          // 真偽値を捨てる
         return result
@@ -856,7 +860,7 @@ extension GenitiveExpression : Evaluatable {
         let phrase = JpfPhrase(name: object.name, value: object, particle: token)
         switch right {
         case let ident as Identifier:
-            environment.push(phrase)
+            if let err = environment.push(phrase) {return err}
             accessor = ident.evaluated(with: environment)
             if environment.peek?.name == object.name && environment.isPeekParticle(.NO) {
                 environment.drop()
@@ -864,7 +868,7 @@ extension GenitiveExpression : Evaluatable {
                 return accessor
             }
         case is ComputationLiteral:
-            environment.push(phrase)
+            if let err = environment.push(phrase) {return err}
             if let c = right.evaluated(with: environment) as? JpfComputation {
                 return environment.isExecutable ? c.getter(with: environment) : c
             }
@@ -873,7 +877,7 @@ extension GenitiveExpression : Evaluatable {
             let object = evaluated(object, expression.left, with: environment)
             return JpfPhrase(name: "", value: object, particle: expression.token)
         case is PredicateExpression, is CaseExpression, is Label:
-            environment.push(phrase)
+            if let err = environment.push(phrase) {return err}
             return right.evaluated(with: environment)
         default:
             accessor = right.evaluated(with: environment)

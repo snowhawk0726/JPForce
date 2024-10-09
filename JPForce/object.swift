@@ -128,6 +128,10 @@ struct JpfString : JpfObject, JpfHashable, Comparable {
     //
     var hashKey: JpfHashKey {JpfHashKey(type: type, value: value.hashValue)}
     static func < (lhs: Self, rhs: Self) -> Bool {lhs.value < rhs.value}
+    //
+    func emit(with c: Compiler) {
+        _ = c.emit(op: .opConstant, operand: c.addConstant(self))
+    }
 }
 struct JpfRange : JpfObject {
     static let type = "範囲"
@@ -368,7 +372,7 @@ extension JpfFunction {
     func executed(with environment: Environment) -> JpfObject? {
         let local = Environment(outer: self.environment)    // 関数の環境を拡張
         let stackEnv = environment.isEmpty ? self.environment : environment
-        defer {environment.push(stackEnv.pullAll())}        // スタックを戻す
+        defer {_ = environment.push(stackEnv.pullAll())}    // スタックを戻す
         if let returnValue = stackEnv.execute(functions, with: local) {
             return returnValue
         }
@@ -399,7 +403,7 @@ extension JpfType {
     /// - Returns: インスタンス、もしくはエラー
     func create(with outer: Environment) -> JpfObject {
         let local = Environment(outer: outer)               // 型の環境を拡張
-        defer {outer.push(local.pullAll())}                 // スタックを戻す
+        defer {_ = outer.push(local.pullAll())}             // スタックを戻す
         var protocols: [JpfProtocol] = []                   // 規約(型)登録
         for ident in self.protocols {
             if let rule = outer[ident] as? JpfProtocol {
@@ -444,5 +448,13 @@ extension JpfInstance {
            let result = outer.call(type.initializers, with: environment),
            result.isError {return result.error}
         return nil
+    }
+}
+extension Array<JpfObject> {
+    /// オブジェクト列を表示
+    var string: String {
+        self.enumerated().map { (i, object) in
+            String(format: "%d: %@(%@)", i, object.string, object.type)
+        }.joined(separator: ", ")
     }
 }

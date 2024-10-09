@@ -7,12 +7,13 @@
 import Foundation
 
 class Environment {
-    init(outer: Environment? = nil) {self.outer = outer}
+    init(outer: Environment? = nil) {self.outer = outer; self.stack = Stack()}
+    init(with stack: Stack) {self.outer = nil; self.stack = stack}
     let outer: Environment?     // 拡張環境
     static let OUTER = Token.Keyword.OUTER.rawValue // 外部
     var isExecutable: Bool = true                   // false: 実行抑止
     private var store: [String: JpfObject] = [:]
-    private var stack: [JpfObject] = []
+    private var stack: Stack
     private var arguments: [String: JpfObject] = [:]// 引数
     // MARK: - 辞書操作
     subscript(_ name: String) -> JpfObject? {
@@ -117,38 +118,24 @@ class Environment {
         arguments.map {($0, $1)}
     }
     // MARK: - スタック操作
-    func push(_ object: JpfObject)  {stack.append(object)}
-    func push(_ objects: [JpfObject])   {stack += objects}
-    func pull() -> JpfObject?       {stack.popLast()}
+    func push(_ object: JpfObject) -> JpfError?     {stack.push(object)}
+    func push(_ objects: [JpfObject]) -> JpfError?  {stack.push(objects)}
+    func pull() -> JpfObject?                       {stack.pull()}
     /// スタックに指定のオブジェクトがあったら、それを取り出す。(無ければ nil)
-    func pull(where codition: (JpfObject) -> Bool) -> JpfObject? {
-        guard let p = stack.lastIndex(where: { codition($0) }) else {return nil}
-        return stack.remove(at: p)
-    }
-    func pullAll() -> [JpfObject]   {defer {empty()}; return stack}
-    func getAll() -> [JpfObject]    {return stack}
-    func drop()                     {_ = pull()} // removeLast()を使うと、emptyチェックが必要
-    func drop(_ n: Int)             {stack.removeLast(n <= count ? n : count)}
-    func empty()                    {stack.removeAll()}
-    func swap()                     {if count >= 2 {stack.swapAt(count-2, count-1)}}
+    func pull(where condition: (JpfObject) -> Bool) -> JpfObject? {stack.pull(where: condition)}
+    func pullAll() -> [JpfObject]                   {stack.pullAll()}
+    func getAll() -> [JpfObject]                    {stack.getAll()}
+    func drop()                                     {stack.drop()}
+    func drop(_ n: Int)                             {stack.drop(n)}
+    func empty()                                    {stack.empty()}
+    func swap()                                     {stack.swap()}
     //
-    var isEmpty: Bool               {stack.isEmpty}
-    var count: Int                  {stack.count}
-    var peek: JpfObject?            {stack.last}
-    /// 指定個数のオブジェクトをスタックからコピー
-    /// - Parameter numberOf: 指定個数
-    /// - Returns: 指定個数のオブジェクト配列を返す。
-    ///            オブジェクト数(count)が指定個数に満たない場合は、nil。
-    ///            numberOfが、0以下の場合は、[]。
-    func peek(_ numberOf: Int) -> [JpfObject]? {
-        guard numberOf <= count else {return nil}
-        return Array(stack[(count - numberOf)..<count])
-    }
-    subscript(index: Int) -> JpfObject? {
-        guard case 0..<count = index else {return nil}
-        return stack[index]
-    }
-    var string: String              {stack.map {$0.string}.joined(separator: " ")}
+    var isEmpty: Bool                               {stack.isEmpty}
+    var count: Int                                  {stack.count}
+    var peek: JpfObject?                            {stack.peek()}
+    func peek(_ n: Int) -> [JpfObject]?             {stack.peek(n)}
+    subscript(index: Int) -> JpfObject?             {stack[index]}
+    var string: String                              {stack.string}
     // MARK: - 入力操作
     var isPeekParticle: Bool {peek?.particle != nil}
     func isPeekParticle(_ particle: Token.Particle) -> Bool {
@@ -228,7 +215,7 @@ class Environment {
     ///   - local: 関数のローカル環境
     /// - Returns: 返り値(無いときはnil)、またはエラー
     private func execute(_ function: FunctionBlock, with local: Environment) -> JpfObject? {
-        defer {push(local.pullAll())}           // スタックを戻す
+        defer {_ = push(local.pullAll())}   // スタックを戻す
         if let body = function.body, let result = Evaluator(from: body, with: local).object {
             if result.isError {return result}
             if result.isReturnValue {return result.value}
@@ -286,20 +273,21 @@ class Environment {
             }
             a = arguments.firstIndex {isSameFormat(of: $0, as: format)} ?? 0
         }
-        for i in 0..<function.parameters.count {    // 入力の位置
-            let argument = a < arguments.count ?
-                           arguments[a] : nil       // 引数(無しはnil)
-            let idetifier = function.parameters[i]  // 入力の識別子
+        for (i, idetifier) in function.parameters.enumerated() {    // 入力の位置
             let format = designated.formats[i]      // 指定形式
             var value: JpfObject                    // 割り当てる値
             if !format.hasThreeDots {               // 固定長
-                value = argument?.value ?? getDefaultValue(with: designated, at: i)
-                a += 1
+                if a < arguments.count, let argument = arguments[a].value {
+                    value = argument                // 値を引数から取得
+                    a += 1
+                } else {                            // 値を既定値から取得
+                    value = getDefaultValue(with: designated, at: i)
+                }
             } else {                                // 可変長
-                let length = numberOfElements(in: [JpfObject](arguments[a..<arguments.count]), withConsecutive: format)
-                let elements = [JpfObject](arguments[a..<(a + length)]).map {$0.value ?? JpfNull.object}    // 要素の値を取り出す。
-                // TODO: スタック中の値にnilがあった場合、エラーにすべきか？ → ありえないので、発生したら検討する。
-                value = JpfArray(elements: elements)
+                let remainingArgs = Array(arguments[a..<arguments.count])
+                let length = numberOfElements(in: remainingArgs, withConsecutive: format)
+                let elements = remainingArgs.prefix(length).map {$0.value ?? JpfNull.object}    // 要素の値を取り出す。
+                value = JpfArray(elements: elements)// 値を配列とする
                 a += length
             }
             if value.isError {return value.error}

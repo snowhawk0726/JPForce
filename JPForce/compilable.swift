@@ -36,7 +36,7 @@ extension ExpressionStatement : Compilable {
         for expression in expressions {
             guard let object = expression.compiled(with: c) else {continue}
             if object.isError {return object}
-            c.push(object)                      // キャッシュで計算を継続
+            if let err = c.push(object), err.isError {return err}   // キャッシュで計算を継続
         }
         c.pullAll().forEach {$0.emit(with: c)}  // キャッシュをバイトコードに出力
         return nil
@@ -103,10 +103,30 @@ extension CaseExpression : Compilable {
     }
 }
 extension GenitiveExpression : Compilable {
-    /// 属格：<オブジェクト>の<オブジェクト>(は、<値>。)を評価する。
-    /// - Parameter environment: 入力の環境
+    /// 属格：<オブジェクト>の<オブジェクト>(は、<値>。)を評価/コンパイルする。
+    /// - Parameter c: コンパイラ
     /// - Returns: 評価結果
     func compiled(with c: Compiler) -> JpfObject? {
+        switch right {
+        case is Identifier:
+            if let err = left.compiled(with: c) {return err}
+            if let err = right.compiled(with: c) {return err}
+            switch left {
+            case is ArrayLiteral, is DictionaryLiteral, is GenitiveExpression:
+                _ = c.emit(op: .opIndex)
+                return nil
+            default:
+                break
+            }
+        case is PredicateExpression:
+            if left is Identifier {
+                if let err = left.compiled(with: c) {return err}
+                if let err = right.compiled(with: c) {return err}
+                return nil
+            }
+        default:
+            break
+        }
         return evaluated(with: c.environment)
     }
 }
@@ -118,5 +138,29 @@ extension IntegerLiteral : Compilable {
 extension Boolean : Compilable {
     func compiled(with c: Compiler) -> JpfObject? {
         JpfBoolean(value: value)
+    }
+}
+extension StringLiteral : Compilable {
+    func compiled(with c: Compiler) -> JpfObject? {
+        JpfString(value: value)
+    }
+}
+extension ArrayLiteral : Compilable {
+    func compiled(with c: Compiler) -> JpfObject? {
+        for element in elements {   // 要素を順に出力
+            if let result = element.compiled(with: c), result.isError {return result}
+        }
+        _ = c.emit(op: .opArray, operand: elements.count)
+        return nil
+    }
+}
+extension DictionaryLiteral : Compilable {
+    func compiled(with c: Compiler) -> JpfObject? {
+        for e in pairs {            // キー、値の順にpairを出力
+            if let result = e.pair.key.compiled(with: c), result.isError {return result}
+            if let result = e.pair.value.compiled(with: c), result.isError {return result}
+        }
+        _ = c.emit(op: .opDictionary, operand: pairs.count * 2)
+        return nil
     }
 }

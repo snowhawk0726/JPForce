@@ -258,6 +258,131 @@ final class CompilerTests: XCTestCase {
         ]
         try runCompilerTests(testPatterns)
     }
+    func testStringExpressions() throws {
+        let testPatterns: [CompilerTestCase] = [
+            (input: "「monkey」",
+             expectedConstants: ["monkey"],
+             expectedInstructions: [
+                make(op: .opConstant, operand: 0),
+             ]
+            ),
+            (input: "「mon」と「key」を足す",
+             expectedConstants: ["monkey"],
+             expectedInstructions: [
+                make(op: .opConstant, operand: 0),
+             ]
+            ),
+            (input: "「mon」と「key」を。足す",
+             expectedConstants: ["mon", "key"],
+             expectedInstructions: [
+                make(op: .opConstant, operand: 0),
+                make(op: .opConstant, operand: 1),
+                make(op: .opAdd),
+             ]
+            ),
+        ]
+        try runCompilerTests(testPatterns)
+    }
+    func testArrayLiterals() throws {
+        let testPatterns: [CompilerTestCase] = [
+            (input: "配列【】",
+             expectedConstants: [],
+             expectedInstructions: [
+                make(op: .opArray, operand: 0),
+             ]
+            ),
+            (input: "配列【1、2、3】",
+             expectedConstants: [1, 2, 3],
+             expectedInstructions: [
+                make(op: .opConstant, operand: 0),
+                make(op: .opConstant, operand: 1),
+                make(op: .opConstant, operand: 2),
+                make(op: .opArray, operand: 3),
+             ]
+            ),
+            (input: "配列【１と２を足す、３から４を引く、５と６を掛ける】",
+             expectedConstants: [3, -1, 30],
+             expectedInstructions: [
+                make(op: .opConstant, operand: 0),
+                make(op: .opConstant, operand: 1),
+                make(op: .opConstant, operand: 2),
+                make(op: .opArray, operand: 3),
+             ]
+            ),
+        ]
+        try runCompilerTests(testPatterns)
+    }
+    func testDictionaryLiterals() throws {
+        let testPatterns: [CompilerTestCase] = [
+            (input: "辞書【】",
+             expectedConstants: [],
+             expectedInstructions: [
+                make(op: .opDictionary, operand: 0),
+             ]
+            ),
+            (input: "辞書【１が２、３が４、５が６】",
+             expectedConstants: [1,2,3,4,5,6],
+             expectedInstructions: [
+                make(op: .opConstant, operand: 0),
+                make(op: .opConstant, operand: 1),
+                make(op: .opConstant, operand: 2),
+                make(op: .opConstant, operand: 3),
+                make(op: .opConstant, operand: 4),
+                make(op: .opConstant, operand: 5),
+                make(op: .opDictionary, operand: 6),
+             ]
+            ),
+            (input: "辞書【１が２と３を足す、４が５と６を掛ける】",
+             expectedConstants: [1, 5, 4, 30],
+             expectedInstructions: [
+                make(op: .opConstant, operand: 0),
+                make(op: .opConstant, operand: 1),
+                make(op: .opConstant, operand: 2),
+                make(op: .opConstant, operand: 3),
+                make(op: .opDictionary, operand: 4),
+             ]
+            ),
+        ]
+        try runCompilerTests(testPatterns)
+    }
+    func testIndexExpressions() throws {
+        let testPatterns: [CompilerTestCase] = [
+            (input: "iは、1と1を足す。配列【１、２、３】のi",
+             expectedConstants: [2, 1, 2, 3],
+             expectedInstructions: [
+                make(op: .opConstant, operand: 0),
+                make(op: .opSetGlobal, operand: 0),
+                make(op: .opConstant, operand: 1),
+                make(op: .opConstant, operand: 2),
+                make(op: .opConstant, operand: 3),
+                make(op: .opArray, operand: 3),
+                make(op: .opGetGlobal, operand: 0),
+                make(op: .opIndex),
+             ]),
+            (input: "配列【１、２、３】の２番目",
+             expectedConstants: [3],
+             expectedInstructions: [
+                make(op: .opConstant, operand: 0),
+             ]),
+            (input: "iは、2から1を引く。辞書【１が２】のi",
+             expectedConstants: [1, 1, 2],
+             expectedInstructions: [
+                make(op: .opConstant, operand: 0),
+                make(op: .opSetGlobal, operand: 0),
+                make(op: .opConstant, operand: 1),
+                make(op: .opConstant, operand: 2),
+                make(op: .opDictionary, operand: 2),
+                make(op: .opGetGlobal, operand: 0),
+                make(op: .opIndex),
+             ]),
+            (input: "辞書【１が２】の１",
+             expectedConstants: [2],
+             expectedInstructions: [
+                make(op: .opConstant, operand: 0),
+             ]),
+        ]
+        try runCompilerTests(testPatterns)
+    }
     func testConditionals() throws {
         let testPatterns: [CompilerTestCase] = [
             (input: "真である場合、【１０】。３３３３。",
@@ -373,6 +498,8 @@ final class CompilerTests: XCTestCase {
                 try testIntegerObject(Int64(constant), object)
             case let constant as Bool:
                 try testBooleanObject(constant, object)
+            case let string as String:
+                try testStringObject(string, object)
             default:
                 break
             }
@@ -385,6 +512,10 @@ final class CompilerTests: XCTestCase {
     private func testBooleanObject(_ expected: Bool, _ actual: JpfObject) throws {
         let integer = try XCTUnwrap(actual.value as? JpfBoolean)
         XCTAssertEqual(integer.value, expected)
+    }
+    private func testStringObject(_ expected: String, _ actual: JpfObject) throws {
+        let string = try XCTUnwrap(actual.value as? JpfString)
+        XCTAssertEqual(string.value, expected)  
     }
 }
 extension String {

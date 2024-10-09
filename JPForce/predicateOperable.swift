@@ -287,7 +287,7 @@ struct PrintOperator : PredicateOperable {
             if result?.isError ?? false {return result}
         }
         if op.isKeyword(.ASK), let input = readLine() {
-                environment.push(JpfString(value: input))
+            if let err = environment.push(JpfString(value: input)) {return err}
         }
         return nil
     }
@@ -451,7 +451,7 @@ struct BooleanOperator : PredicateOperable {
                 return determineUsage + "\(op.literal)。"
             }
             environment.drop(2)
-            environment.push(range)
+            if let err = environment.push(range) {return err}
         }
         if let params = environment.peek(2) {                   // 入力が２つ
             switch (params[0].particle, params[1].particle, op.type) {
@@ -639,7 +639,7 @@ struct CreateOperator : PredicateOperable {
     func operated() -> JpfObject? {
         if environment.isPeekParticle(.DE) {// <型>から<引数>で → <引数>で<型>から
             guard let phrase = environment.pull(where: {$0.isParticle(.KARA)}) else {return createUsage}
-            environment.push(phrase)
+            if let err = environment.push(phrase) {return err}
         }
         guard environment.isPeekParticle(.KARA) || environment.isPeekParticle(.WO) else {return createUsage}
         switch environment.unwrappedPeek {
@@ -1056,11 +1056,9 @@ struct PushOperator : PredicateOperable {
     init(_ environment: Environment, by op: Token) {self.environment = environment; self.op = op}
     let environment: Environment, op: Token
     func operated() -> JpfObject? {
-        if isPeekParticle(.WO) {
-            if let value = environment.unwrappedPeek {
-                environment.drop()
-                environment.push(value)
-            }
+        if isPeekParticle(.WO), let value = environment.unwrappedPeek {
+            environment.drop()
+            if let err = environment.push(value) {return err}
         }
         return nil
     }

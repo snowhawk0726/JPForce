@@ -20,6 +20,9 @@ enum Opcode : Byte {
     case opTrue
     case opFalse
     case opNull
+    case opArray
+    case opDictionary
+    case opIndex
     case opBe
     case opNot
     case opEqual
@@ -46,6 +49,9 @@ var definitions: [Opcode: Definition] = [
     .opTrue:        Definition(name: "OpTrue", operandWidths: []),
     .opFalse:       Definition(name: "OpFalse", operandWidths: []),
     .opNull:        Definition(name: "OpNull", operandWidths: []),
+    .opArray:       Definition(name: "OpArray", operandWidths: [2]),
+    .opDictionary:  Definition(name: "OpDictionary", operandWidths: [2]),
+    .opIndex:       Definition(name: "OpIndex", operandWidths: []),
     .opBe:          Definition(name: "OpBe", operandWidths: []),
     .opNot:         Definition(name: "OpNot", operandWidths: []),
     .opEqual:       Definition(name: "OpEqual", operandWidths: []),
