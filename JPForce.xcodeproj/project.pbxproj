@@ -42,6 +42,8 @@
 		50552F3D29B5B87D0061CDBE /* environment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50552F3C29B5B87D0061CDBE /* environment.swift */; };
 		50552F3E29B5B87D0061CDBE /* environment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50552F3C29B5B87D0061CDBE /* environment.swift */; };
 		506561E929D937380016923D /* ObjectTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 506561E829D937380016923D /* ObjectTests.swift */; };
+		506B442B2CBA11D900C9F929 /* frame.swift in Sources */ = {isa = PBXBuildFile; fileRef = 506B442A2CBA11D900C9F929 /* frame.swift */; };
+		506B442C2CBA11D900C9F929 /* frame.swift in Sources */ = {isa = PBXBuildFile; fileRef = 506B442A2CBA11D900C9F929 /* frame.swift */; };
 		5070B1A829B61DDA00808FDE /* predicateOperable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5070B1A729B61DDA00808FDE /* predicateOperable.swift */; };
 		5070B1A929B61DDA00808FDE /* predicateOperable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5070B1A729B61DDA00808FDE /* predicateOperable.swift */; };
 		5070B1AA29BC977500808FDE /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5042122129B58DAD00D2EA98 /* main.swift */; };
@@ -101,6 +103,7 @@
 		5042124E29B5903F00D2EA98 /* evaluatable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = evaluatable.swift; sourceTree = "<group>"; };
 		50552F3C29B5B87D0061CDBE /* environment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = environment.swift; sourceTree = "<group>"; };
 		506561E829D937380016923D /* ObjectTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ObjectTests.swift; sourceTree = "<group>"; };
+		506B442A2CBA11D900C9F929 /* frame.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = frame.swift; sourceTree = "<group>"; };
 		5070B1A729B61DDA00808FDE /* predicateOperable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = predicateOperable.swift; sourceTree = "<group>"; };
 		508909CC2CAA752B00032B0A /* symbolTable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = symbolTable.swift; sourceTree = "<group>"; };
 		508909D22CAA793000032B0A /* SymbolTableTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SymbolTableTests.swift; sourceTree = "<group>"; };
@@ -175,6 +178,7 @@
 				5042121E29B58DAD00D2EA98 /* token.swift */,
 				50D72B512C8D6ECD00A3841C /* codeExecutable.swift */,
 				508909CC2CAA752B00032B0A /* symbolTable.swift */,
+				506B442A2CBA11D900C9F929 /* frame.swift */,
 			);
 			path = JPForce;
 			sourceTree = "<group>";
@@ -295,6 +299,7 @@
 				50175F9B2C8C426200DD0F4A /* predicateCompilable.swift in Sources */,
 				50C9C1D629F3A46A0046C735 /* color.swift in Sources */,
 				508909CD2CAA752B00032B0A /* symbolTable.swift in Sources */,
+				506B442B2CBA11D900C9F929 /* frame.swift in Sources */,
 				5042122729B58DAD00D2EA98 /* main.swift in Sources */,
 				5042122E29B58DAD00D2EA98 /* evaluator.swift in Sources */,
 				5042122B29B58DAD00D2EA98 /* object.swift in Sources */,
@@ -319,6 +324,7 @@
 				5042123D29B58E9F00D2EA98 /* ast.swift in Sources */,
 				508909D32CAA793000032B0A /* SymbolTableTests.swift in Sources */,
 				501240E72C2590C300CC2F7C /* vm.swift in Sources */,
+				506B442C2CBA11D900C9F929 /* frame.swift in Sources */,
 				50552F3E29B5B87D0061CDBE /* environment.swift in Sources */,
 				5070B1AA29BC977500808FDE /* main.swift in Sources */,
 				509D11FF2C228AFF00FC0C89 /* CompilerTests.swift in Sources */,

@@ -1075,7 +1075,7 @@ final class EvaluatorTests: XCTestCase {
         }
         print("テスト(\(evaluated))終了")
     }
-    func testAsWellAsPredicate() throws {
+    func testAsWellAsPredicate() throws {   // 「および」のテスト
         let input = "１を2から引いたもの、および3と4と５を足したもので、関数【入力がaとb。bからaを引く】を実行。"
         print("テストパターン: \(input)")
         let evaluated = try XCTUnwrap(testEvaluator(input))

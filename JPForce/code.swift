@@ -16,7 +16,10 @@ enum Opcode : Byte {
     case opConstant = 0
     case opSetGlobal
     case opGetGlobal
+    case opGetLocal
+    case opSetLocal
     case opPop
+    case opPhrase           // 句を形成する
     case opTrue
     case opFalse
     case opNull
@@ -35,6 +38,9 @@ enum Opcode : Byte {
     case opMul
     case opDiv
     case opNeg
+    case opCall
+    case opReturnValue
+    case opReturn
 }
 /// 命令定義
 struct Definition {
@@ -42,30 +48,40 @@ struct Definition {
     var operandWidths: [Int]
 }
 var definitions: [Opcode: Definition] = [
-    .opConstant:    Definition(name: "OpConstant", operandWidths: [2]),
+    .opConstant:    Definition(name: "OpConstant", operandWidths: [2]),     // 0
     .opSetGlobal:   Definition(name: "OpSetGlobal", operandWidths: [2]),
     .opGetGlobal:   Definition(name: "OpGetGlobal", operandWidths: [2]),
-    .opPop:         Definition(name: "OpPop", operandWidths: []),
+    .opSetLocal:    Definition(name: "OpSetLocal", operandWidths: [1]),
+    .opGetLocal:    Definition(name: "OpGetLocal", operandWidths: [1]),
+    .opPop:         Definition(name: "OpPop", operandWidths: []),           // 5
+    .opPhrase:      Definition(name: "OpPhrase", operandWidths: [2]),
     .opTrue:        Definition(name: "OpTrue", operandWidths: []),
     .opFalse:       Definition(name: "OpFalse", operandWidths: []),
     .opNull:        Definition(name: "OpNull", operandWidths: []),
-    .opArray:       Definition(name: "OpArray", operandWidths: [2]),
+    .opArray:       Definition(name: "OpArray", operandWidths: [2]),        // 10
     .opDictionary:  Definition(name: "OpDictionary", operandWidths: [2]),
     .opIndex:       Definition(name: "OpIndex", operandWidths: []),
     .opBe:          Definition(name: "OpBe", operandWidths: []),
     .opNot:         Definition(name: "OpNot", operandWidths: []),
-    .opEqual:       Definition(name: "OpEqual", operandWidths: []),
+    .opEqual:       Definition(name: "OpEqual", operandWidths: []),         // 15
     .opGreaterThan: Definition(name: "OpGreaterThan", operandWidths: []),
     .opLessThan:    Definition(name: "OpLessThan", operandWidths: []),
     .opJump:        Definition(name: "OpJump", operandWidths: [2]),
     .opJumpNotTruthy:
                     Definition(name: "OpJumpNotTruthy", operandWidths: [2]),
-    .opAdd:         Definition(name: "OpAdd", operandWidths: []),
+    .opAdd:         Definition(name: "OpAdd", operandWidths: []),           // 20
     .opSub:         Definition(name: "OpSub", operandWidths: []),
     .opMul:         Definition(name: "OpMul", operandWidths: []),
     .opDiv:         Definition(name: "OpDiv", operandWidths: []),
     .opNeg:         Definition(name: "OpNeg", operandWidths: []),
+    .opCall:        Definition(name: "OpCall", operandWidths: []),          // 25
+    .opReturnValue: Definition(name: "OpReturnValue", operandWidths: []),
+    .opReturn:      Definition(name: "OpReturn", operandWidths: []),
 ]
+func operandWidth(of op: Opcode) -> Int? {
+    guard let definitions = definitions[op] else {return nil}
+    return definitions.operandWidths.first ?? 0
+}
 // MARK: - implements for instruction
 func lookUp(_ op: Byte) -> Definition? {
     guard let op = Opcode(rawValue: op) else {return nil}
@@ -87,6 +103,8 @@ func make(op: Opcode, operands: [Int] = []) -> [Byte] {
         case 2:
             let bytes = withUnsafeBytes(of: UInt16(operand).bigEndian) {Array($0)}
             instrunction.replaceSubrange(offset..<offset+2, with: bytes)
+        case 1:
+            instrunction[offset] = Byte(operand)
         default:
             break
         }
@@ -133,6 +151,8 @@ func readOperands(with def: Definition, from ins: Instructions) -> ([Int], Int) 
         switch width {
         case 2:
             operands[i] = Int(readUInt16(from: Array(ins[offset...])))
+        case 1:
+            operands[i] = Int(readUInt8(from: Array(ins[offset...])))
         default:
             break
         }
@@ -143,9 +163,8 @@ func readOperands(with def: Definition, from ins: Instructions) -> ([Int], Int) 
 /// インストラクションから、16ビットをビッグエンディアンで読み込む。
 /// - Parameter ins: インストラクション
 /// - Returns: ビッグエンディアンの16ビットデータ(UInt16)
-func readUInt16(from ins: Instructions) -> UInt16 {
-    Data(ins).withUnsafeBytes {$0.load(as: UInt16.self)}.bigEndian
-}
+func readUInt16(from ins: Instructions) -> UInt16 {Data(ins).withUnsafeBytes {$0.load(as: UInt16.self)}.bigEndian}
+func readUInt8(from ins: Instructions) -> UInt8 {ins[0]}
 /// 命令定義とオペランド列から、文字列形式を作成する。("命令語 オペランド")
 /// - Parameters:
 ///   - def: 命令定義

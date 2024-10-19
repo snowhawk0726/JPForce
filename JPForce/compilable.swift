@@ -55,17 +55,27 @@ extension BlockStatement : Compilable {
 extension DefineStatement : Compilable {
     func compiled(with c: Compiler) -> JpfObject? {
         if let object = value.compiled(with: c), object.isError {return object}
+        if c.lastOpcode == .opConstant {
+            c.setLastConstant(name: name.value)
+        }
         let symbol = c.symbolTable.define(name.value)
-        _ = c.emit(op: .opSetGlobal, operand: symbol.index)
+        _ = c.emit(
+            op: symbol.scope == .GLOBAL ? .opSetGlobal : .opSetLocal,
+            operand: symbol.index
+        )
         return nil
     }
 }
 extension Identifier : Compilable {
     func compiled(with c: Compiler) -> JpfObject? {
+        c.pullAll().forEach {$0.emit(with: c)}  // キャッシュをバイトコードに出力
         guard let symbol = c.symbolTable.resolve(value) else {
             return JpfError("『\(value)』") + identifierNotFound
         }
-        _ = c.emit(op: .opGetGlobal, operand: symbol.index)
+        _ = c.emit(
+            op: symbol.scope == .GLOBAL ? .opGetGlobal : .opGetLocal,
+            operand: symbol.index
+        )
         return nil
     }
 }
@@ -77,7 +87,15 @@ extension PredicateExpression : Compilable {
 }
 extension PhraseExpression : Compilable {
     func compiled(with c: Compiler) -> JpfObject? {
-        guard let object = left.compiled(with: c) else {return nil}
+        guard let object = left.compiled(with: c) else {    // キャッシュ無し = 翻訳済み
+            let phrase = JpfPhrase(value: nil, particle: token)
+            if c.lastOpcode != .opPhrase {
+                _ = c.emit(op: .opPhrase, operand: c.addConstant(phrase))
+            } else {    // 直前が opPhrase であれば、直前は省略
+                c.changeLastConstant(with: phrase)
+            }
+            return nil
+        }
         if object.isError {return object}
         return JpfPhrase(value: object, particle: token)
     }
@@ -161,6 +179,31 @@ extension DictionaryLiteral : Compilable {
             if let result = e.pair.value.compiled(with: c), result.isError {return result}
         }
         _ = c.emit(op: .opDictionary, operand: pairs.count * 2)
+        return nil
+    }
+}
+extension FunctionLiteral : Compilable {
+    func compiled(with c: Compiler) -> JpfObject? {
+        c.pullAll().forEach {$0.emit(with: c)}  // キャッシュをバイトコードに出力
+        // TODO: 関数をキャッシュとして維持できないか？
+        c.enterScope()
+        functions.array[0].parameters.forEach {
+            _ = c.symbolTable.define($0.value)
+        }
+        if let body = functions.array[0].body,
+           let result = body.compiled(with: c) {
+           if result.isError {return result}
+        }
+        if c.lastOpcode != .opReturnValue {
+            _ = c.emit(op: .opReturn)
+        }
+        let numberOfLocals = c.symbolTable.numberOfDefinitions
+        let instructions = c.leaveScope()
+        let compiledFunction = JpfCompiledFunction(
+                                    instructions: instructions,
+                                    numberOfLocals: numberOfLocals,
+                                    numberOfParameters: functions.array[0].parameters.count)
+        _ = c.emit(op: .opConstant, operand: c.addConstant(compiledFunction))
         return nil
     }
 }

@@ -143,6 +143,88 @@ final class VMTests: XCTestCase {
         ]
         try runVmTests(with: testPattern)
     }
+    func testCallingFunctionsWithoutArguments() throws {
+        let testPattern: [VmTestCase] = [
+            ("fivePlusTenは、関数【５と１０を足す】。fivePlusTenを実行する。", 15),
+            ("oneは、関数【１】。twoは、関数【２】。oneを実行し、twoを実行し、足す。", 3),
+            ("aは、関数【１】。bは、関数【aを実行し、1を足す】。cは、関数【bを実行し、1を足す】。cを実行する。", 3),
+        ]
+        try runVmTests(with: testPattern)
+    }
+    func testFunctionsWithRturnStatement() throws {
+        let testPattern: [VmTestCase] = [
+            ("早期脱出は、関数【99を返す。100】。早期脱出を実行する。", 99),
+            ("早期脱出は、関数【99を返す。100を返す】。早期脱出をする。", 99),
+        ]
+        try runVmTests(with: testPattern)
+    }
+    func testFunctionsWithoutReturnValue() throws {
+        let testPattern: [VmTestCase] = [
+            ("返り値無は、関数【】。返り値無２は、関数【返り値無を実行】。返り値無を実行。返り値無２を実行。", nil),
+        ]
+        try runVmTests(with: testPattern)
+    }
+    func testFirstClassFunctions() throws {
+        let testPattern: [VmTestCase] = [
+            ("返り値１は、関数【１】。返り値１返却は、関数【返り値１】。返り値１返却し、実行。", 1),
+        ]
+        try runVmTests(with: testPattern)
+    }
+    func testCallingFuntionsWithBindings() throws {
+        let testPattern: [VmTestCase] = [
+            ("oneは、関数【oneは１。one】。oneを実行する。", 1),
+            ("oneAndTwoは、関数【oneは１。twoは２。oneとtwoを足す】。oneAndTwoを実行。", 3),
+            ("""
+                oneAndTwoは、関数【oneは１。twoは２。oneとtwoを足す】。
+                threeAndFourは、関数【threeは3。fourは4。threeとfourを足す】。
+                oneAndTwoを実行し、threeAndFourを実行し、足す。
+            """, 10),
+            ("""
+                firstFoobarは、関数【foobarは50。foobar】。
+                secondFoobarは、関数【foobarは100。foobar】。
+                firstFoobarを実行し、secondFoobarを実行し、足す。
+            """, 150),
+            ("""
+                globalSeedは50。
+                minusOneは関数【numは1。globalSeedからnumを引く】。
+                minusTwoは関数【numは2。globalSeedからnumを引く】。
+                minusOneを実行し、minusTwoを実行し、足す。
+            """, 97),
+        ]
+        try runVmTests(with: testPattern)
+    }
+    func testCallingFuntionsWithArgumentsAndBindings() throws {
+        let testPattern: [VmTestCase] = [
+            ("判別は、関数【入力がa。a】。4を判別する。", 4),
+            ("合計は、関数【入力がaとb。aとbを足す】。１と２を合計する。", 3),
+            ("合計は、関数【入力がaとb。cは、aとbを足す。c】。１と２を合計する。", 3),
+            ("合計は、関数【入力がaとb。cは、aとbを足す。c】。１と２を合計し、３と４を合計し、足す。", 10),
+            ("合計は、関数【入力がaとb。cは、aとbを足す。c】。外側は、関数【１と２を合計し、３と４を合計し、足す】。外側を実行する。", 10),
+            ("""
+                大域数は、10。合計は、関数【入力がaとb。cは、aとbを足す。cと大域数を足す】。外側は関数【１と２を合計したものと、３と４を合計したものと、大域数を足す】。
+                外側を実行し、大域数を足す。
+            """, 50)
+        ]
+        try runVmTests(with: testPattern)
+    }
+    func testCallingFuntionsWithWrongArguments() throws {
+        let testPattern: [VmTestCase] = [
+            ("１で関数【１】を実行。", 1), // JPFではエラーでは無い
+            ("関数【入力がa。a】を実行。", "入力の数が足りていない。必要数：1"),
+            ("１で関数【入力がaとb。aとbを足す】を実行。", "入力の数が足りていない。必要数：2"),
+        ]
+        for test in testPattern {
+            let program = parseProgram(with: test.input)
+            let compiler = Compiler(from: program)
+            XCTAssertNil(compiler.compile())
+            let vm = VM(with: compiler.bytecode)
+            if let error = vm.run() {
+                XCTAssertEqual(error.message, test.expected as? String)
+            } else {
+                XCTAssertEqual(vm.stackTop?.number, test.expected as? Int)
+            }
+        }
+    }
     // MARK: - Helpers
     private func runVmTests(with tests: [VmTestCase]) throws {
         for t in tests {
@@ -177,21 +259,21 @@ final class VMTests: XCTestCase {
                 try testExpectedObject(expectedValue, pair.1)
             }
         case nil:
-            XCTAssertTrue(actual?.isNull ?? true)
+            XCTAssertTrue(actual?.isNull ?? true, "Expected nil or Null, but got \(String(describing: actual))")
         default:
             break
         }
     }
     private func testIntegerObject(_ expected: Int64, _ actual: JpfObject?) throws {
-        let integer = try XCTUnwrap(actual as? JpfInteger)
+        let integer = try XCTUnwrap(actual as? JpfInteger, "got = \(String(describing: actual))")
         XCTAssertEqual(integer.value, Int(expected))
     }
     private func testBooleanObject(_ expected: Bool, _ actual: JpfObject?) throws {
-        let boolean = try XCTUnwrap(actual as? JpfBoolean)
+        let boolean = try XCTUnwrap(actual as? JpfBoolean, "got = \(String(describing: actual))")
         XCTAssertEqual(boolean.value, expected)
     }
     private func testStringObject(_ expected: String, _ actual: JpfObject?) throws {
-        let string = try XCTUnwrap(actual as? JpfString)
-        XCTAssertEqual(string.value, expected) 
+        let string = try XCTUnwrap(actual as? JpfString, "got = \(String(describing: actual))")
+        XCTAssertEqual(string.value, expected)
     }
 }

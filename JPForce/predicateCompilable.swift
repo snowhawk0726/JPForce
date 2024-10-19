@@ -29,12 +29,14 @@ struct PredicateCompilableFactory {
         case .keyword(.NEGATE):     return NegateCompiler(compiler, by: token)
         case .keyword(.POSITIVE),.keyword(.NEGATIVE):
                                     return SignCompiler(compiler, by: token)
+        case .keyword(.RETURN):     return ReturnCompiler(compiler)
         case .keyword(.MONO):       return UnwrapCompiler(compiler, by: token)
         case .keyword(.BE):         return BeOperationCompiler(compiler)
         case .keyword(.NOT):        return NotOperationCompiler(compiler)
         case .keyword(.EQUAL):      return EqualOperationCompiler(compiler)
         case .keyword(.LT),.keyword(.GT):
                                     return CompareOperationCompiler(compiler, by: token)
+        case .keyword(.EXECUTE):    return ExecuteCompiler(compiler)
         case .keyword(.SURU):       return PerformCompiler(compiler)    // 〜にする、〜をする
         default:                    return nil
         }
@@ -134,6 +136,12 @@ struct UnwrapCompiler : PredicateCompilable {
     init(_ compiler: Compiler, by token: Token) {self.compiler = compiler; self.op = token}
     let compiler: Compiler, op: Token
     func compiled() -> JpfObject? {
+        guard !compiler.isEmpty else {
+            if compiler.lastOpcode == .opPhrase {
+                compiler.removeLastInstruction()
+            }
+            return nil
+        }
         return UnwrapOperator(compiler.environment, by: op).operated()
     }
 }
@@ -196,11 +204,44 @@ struct CompareOperationCompiler : PredicateCompilable {
         return CompareOperator(compiler.environment, by: op).operated()
     }
 }
-// MARK: -
+// MARK: - 関数実行/返す
+struct ExecuteCompiler : PredicateCompilable {
+    init(_ compiler: Compiler) {self.compiler = compiler}
+    let compiler: Compiler
+    func compiled() -> JpfObject? {
+        if compiler.lastOpcode == .opPhrase {
+            compiler.removeLastInstruction()
+        }
+        _ = compiler.emit(op: .opCall)
+        return nil
+    }
+}
 struct PerformCompiler : PredicateCompilable {
     init(_ compiler: Compiler) {self.compiler = compiler}
     let compiler: Compiler
     func compiled() -> JpfObject? {
-        return PerformOperator(compiler.environment).operated()
+        if let unwrapped = compiler.pull()?.value { // キャッシュの値を取り出し、出力
+            unwrapped.emit(with: compiler)
+        } else
+        if compiler.lastOpcode == .opPhrase {       // をする、にする
+            compiler.removeLastInstruction()        // 助詞を除く
+        }
+        if compiler.lastOpcode == .opGetGlobal {    // <動名詞>する = 実行
+            _ = compiler.emit(op: .opCall)
+        }
+        return nil
+    }
+}
+struct ReturnCompiler : PredicateCompilable {
+    init(_ compiler: Compiler) {self.compiler = compiler}
+    let compiler: Compiler
+    func compiled() -> JpfObject? {
+        if !compiler.isEmpty,
+           let result = ReturnOperator(compiler.environment).operated() {
+            if result.isError {return result}
+            result.emit(with: compiler)
+        }
+        _ = compiler.emit(op: .opReturnValue)
+        return nil
     }
 }

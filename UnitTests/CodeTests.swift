@@ -16,6 +16,7 @@ final class CodeTests: XCTestCase {
         let testPatterns: [(op: Opcode, operands: [Int], expected: [Byte]) ] = [
             (.opConstant, [65534], [Opcode.opConstant.rawValue, 255, 254]),
             (.opAdd, [], [Opcode.opAdd.rawValue]),
+            (.opGetLocal, [255], [Opcode.opGetLocal.rawValue, 255]),
         ]
         for test in testPatterns {
             let instruction = make(op: test.op, operands: test.operands)
@@ -30,13 +31,15 @@ final class CodeTests: XCTestCase {
     func testInstructionsString() throws {
         let instructions: [Instructions] = [
             make(op: .opAdd),
+            make(op: .opGetLocal, operand: 1),
             make(op: .opConstant, operand: 2),
             make(op: .opConstant, operand: 65535),
         ]
         let expected = """
         0000 OpAdd
-        0001 OpConstant 2
-        0004 OpConstant 65535
+        0001 OpGetLocal 1
+        0003 OpConstant 2
+        0006 OpConstant 65535
         
         """
         let concatted = instructions.reduce(Instructions()) {$0 + $1}
@@ -45,6 +48,7 @@ final class CodeTests: XCTestCase {
     func testReadOperands() throws {
         let testPattern: [(op: Opcode, operands: [Int], bytesRead: Int)] = [
             (.opConstant, [65535], 2),
+            (.opGetLocal, [255], 1),
         ]
         for test in testPattern {
             let instruction = make(op: test.op, operands: test.operands)

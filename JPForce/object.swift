@@ -196,6 +196,7 @@ struct JpfReturnValue : JpfObject {
     var string: String {Self.type + ": " + (value?.string ?? "無し")}
     //
     var isReturnValue: Bool {true}
+    func emit(with c: Compiler) {value?.emit(with: c)}
 }
 struct JpfLoopControl : JpfObject {
     static let type = "反復制御"
@@ -361,6 +362,14 @@ struct JpfError : JpfObject {
     static func + (lhs: Self, rhs: Self) -> Self {JpfError(lhs.message + rhs.message)}
     static func + (lhs: Self, rhs: String) -> Self {JpfError(lhs.message + rhs)}
     static func + (lhs: String, rhs: Self) -> Self {JpfError(lhs + rhs.message)}
+}
+struct JpfCompiledFunction : JpfObject {
+    static let type = "翻訳済み関数"
+    var name: String = ""
+    var instructions: Instructions
+    var numberOfLocals = 0          // ローカル変数の数
+    var numberOfParameters = 0      // 仮引数の数
+    var string: String {"\(name.isEmpty ? type : name)(入力:\(numberOfParameters)個、本体:\(instructions.count)バイト)"}
 }
 ///  Object Extentions
 extension JpfFunction {
