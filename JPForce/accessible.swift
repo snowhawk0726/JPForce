@@ -21,7 +21,7 @@ extension JpfObject {
         guard let string = accessor as? JpfString else {
             return "\(self.string)を\(accessor.type)" + cannotAccessObjectWith
         }
-        return getObject(from: string.value)
+        return getProperty(by: string.value)
     }
     var unusableAsIndex: JpfError       {JpfError("は、「配列」の要素の索引として使用できない。")}
     var unusableAsHashKey: JpfError     {JpfError("は、「辞書」の要素の索引(ハッシュキー)として使用できない。")}
@@ -63,7 +63,7 @@ extension JpfDictionary : Accessible {
             if let pair = pairs[string.hashKey] {
                 return pair.value
             }
-            return getObject(from: string.value) ?? JpfNull.object
+            return getProperty(by: string.value) ?? JpfNull.object
         case let int as JpfInteger:     // <辞書>の<索引(数値)>
             guard let pair = pairs[int.hashKey] else {break}
             return pair.value

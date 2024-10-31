@@ -111,9 +111,7 @@ struct JpfBoolean : JpfObject, JpfHashable {
     //
     var hashKey: JpfHashKey {JpfHashKey(type: type, value: value.hashValue)}
     //
-    func emit(with c: Compiler) {
-        _ = c.emit(op: isTrue ? .opTrue : .opFalse)
-    }
+    func emit(with c: Compiler) {_ = c.emit(op: isTrue ? .opTrue : .opFalse)}
 }
 struct JpfString : JpfObject, JpfHashable, Comparable {
     static let type = "文字列"
@@ -169,6 +167,7 @@ struct JpfNull : JpfObject {
     var isTrue: Bool {false}
     var isNull: Bool {true}
     func isEqual(to object: JpfObject) -> Bool {object.isNull}
+    func emit(with c: Compiler) {_ = c.emit(op: .opNull)}
 }
 struct JpfPhrase : JpfObject {
     static let type = "句"
@@ -196,7 +195,10 @@ struct JpfReturnValue : JpfObject {
     var string: String {Self.type + ": " + (value?.string ?? "無し")}
     //
     var isReturnValue: Bool {true}
-    func emit(with c: Compiler) {value?.emit(with: c)}
+    func emit(with c: Compiler) {
+        value?.emit(with: c)
+        _ = c.emit(op: value != nil ? .opReturnValue : .opReturn)
+    }
 }
 struct JpfLoopControl : JpfObject {
     static let type = "反復制御"
@@ -309,6 +311,10 @@ struct JpfArray : JpfObject {
         (elements.isEmpty ? "" :
          "要素が、\(elements.map {$0.string}.joined(separator: "と、"))") + "】"
     }
+    func emit(with c: Compiler) {
+        elements.forEach {$0.emit(with: c)}
+        _ = c.emit(op: .opArray, operand: elements.count)
+    }
 }
 struct JpfInput : JpfObject {
     static let type = "入力"
@@ -347,6 +353,21 @@ struct JpfDictionary : JpfObject {
             guard let keyObject = key as? JpfHashable, let value = newValue else {return}
             pairs[keyObject.hashKey] = (key, value)
         }
+    }
+    func emit(with c: Compiler) {
+#if DEBUG   // UnitTestのために、要素の順序正を保つ
+        pairs.values.sorted(by: {$0.key.string < $1.key.string}).forEach {
+            $0.key.emit(with: c)
+            $0.value.emit(with: c)
+        }
+        _ = c.emit(op: .opDictionary, operand: pairs.count * 2)
+#else
+        pairs.values.forEach {
+            $0.key.emit(with: c)
+            $0.value.emit(with: c)
+        }
+        _ = c.emit(op: .opDictionary, operand: pairs.count * 2)
+#endif
     }
 }
 struct JpfError : JpfObject {

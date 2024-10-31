@@ -22,110 +22,17 @@ protocol PredicateCompilable {
 struct PredicateCompilableFactory {
     static func create(from token: Token, with compiler: Compiler) -> PredicateCompilable? {
         switch token.type {
-        case .keyword(.ADD):        return AddCompiler(compiler)
-        case .keyword(.MULTIPLY):   return MultiplyCompiler(compiler, by: token)
-        case .keyword(.SUBSTRACT):  return SubstractCompiler(compiler, by: token)
-        case .keyword(.DIVIDE):     return DivideCompiler(compiler, by: token)
-        case .keyword(.NEGATE):     return NegateCompiler(compiler, by: token)
-        case .keyword(.POSITIVE),.keyword(.NEGATIVE):
-                                    return SignCompiler(compiler, by: token)
-        case .keyword(.RETURN):     return ReturnCompiler(compiler)
         case .keyword(.MONO):       return UnwrapCompiler(compiler, by: token)
-        case .keyword(.BE):         return BeOperationCompiler(compiler)
-        case .keyword(.NOT):        return NotOperationCompiler(compiler)
-        case .keyword(.EQUAL):      return EqualOperationCompiler(compiler)
-        case .keyword(.LT),.keyword(.GT):
-                                    return CompareOperationCompiler(compiler, by: token)
         case .keyword(.EXECUTE):    return ExecuteCompiler(compiler)
         case .keyword(.SURU):       return PerformCompiler(compiler)    // 〜にする、〜をする
+        case .keyword(.RETURN):     return ReturnCompiler(compiler)     // (〜を)返す
+        case .keyword(.NULL):       return NullCompiler(compiler)
         default:                    return nil
         }
     }
 }
 // MARK: - predicate compilable implements
 extension PredicateCompilable {
-}
-// MARK: - 算術演算
-struct AddCompiler : PredicateCompilable {
-    init(_ compiler: Compiler) {self.compiler = compiler}
-    let compiler: Compiler
-    func compiled() -> JpfObject? {
-        if compiler.count < 2 {
-            if let object = compiler.unwrappedObject() {
-                object.emit(with: compiler)
-            }
-            _ = compiler.emit(op: .opAdd)
-            return nil
-        }
-        return AddOperator(compiler.environment).operated()
-    }
-}
-struct MultiplyCompiler : PredicateCompilable {
-    init(_ compiler: Compiler, by token: Token) {self.compiler = compiler; self.op = token}
-    let compiler: Compiler, op: Token
-    func compiled() -> JpfObject? {
-        if compiler.count < 2 {
-            if let object = compiler.unwrappedObject() {
-                object.emit(with: compiler)
-            }
-            _ = compiler.emit(op: .opMul)
-            return nil
-        }
-        return MultiplyOperator(compiler.environment, by: op).operated()
-    }
-}
-struct SubstractCompiler : PredicateCompilable {
-    init(_ compiler: Compiler, by token: Token) {self.compiler = compiler; self.op = token}
-    let compiler: Compiler, op: Token
-    func compiled() -> JpfObject? {
-        if compiler.count < 2 {
-            if let object = compiler.unwrappedObject() {
-                object.emit(with: compiler)
-            }
-            _ = compiler.emit(op: .opSub)
-            return nil
-        }
-        return SubstractOperator(compiler.environment, by: op).operated()
-    }
-}
-struct DivideCompiler : PredicateCompilable {
-    init(_ compiler: Compiler, by token: Token) {self.compiler = compiler; self.op = token}
-    let compiler: Compiler, op: Token
-    func compiled() -> JpfObject? {
-        if compiler.count < 2 {
-            if let object = compiler.unwrappedObject() {
-                object.emit(with: compiler)
-            }
-            _ = compiler.emit(op: .opDiv)
-            return nil
-        }
-        return DivideOperator(compiler.environment, by: op).operated()
-    }
-}
-struct NegateCompiler : PredicateCompilable {
-    init(_ compiler: Compiler, by token: Token) {self.compiler = compiler; self.op = token}
-    let compiler: Compiler, op: Token
-    func compiled() -> JpfObject? {
-        if compiler.isEmpty {
-            _ = compiler.emit(op: .opNeg)
-            return nil
-        }
-        return NegateOperator(compiler.environment, by: op).operated()
-    }
-}
-struct SignCompiler : PredicateCompilable {
-    init(_ compiler: Compiler, by token: Token) {self.compiler = compiler; self.op = token}
-    let compiler: Compiler, op: Token
-    func compiled() -> JpfObject? {
-        if compiler.isEmpty {
-            _ = compiler.emit(op: .opConstant, operand: compiler.addConstant(JpfInteger(value: 0)))
-            _ = op.isKeyword(.POSITIVE) ?
-                compiler.emit(op: .opGreaterThan) :
-                compiler.emit(op: .opLessThan)
-            return nil
-        }
-        return SignOperator(compiler.environment, by: op).operated()
-    }
 }
 // MARK: - 補助演算
 /// <式>たもの → <式>
@@ -136,72 +43,13 @@ struct UnwrapCompiler : PredicateCompilable {
     init(_ compiler: Compiler, by token: Token) {self.compiler = compiler; self.op = token}
     let compiler: Compiler, op: Token
     func compiled() -> JpfObject? {
-        guard !compiler.isEmpty else {
-            if compiler.lastOpcode == .opPhrase {
-                compiler.removeLastInstruction()
-            }
-            return nil
+        guard compiler.isEmpty else {
+            return UnwrapOperator(compiler.environment, by: op).operated()
         }
-        return UnwrapOperator(compiler.environment, by: op).operated()
-    }
-}
-// MARK: - 比較演算
-struct BeOperationCompiler : PredicateCompilable {
-    init(_ compiler: Compiler) {self.compiler = compiler}
-    let compiler: Compiler
-    func compiled() -> JpfObject? {
-        if compiler.count < 2 {
-            if let value = compiler.pull() {
-                value.emit(with: compiler)
-            }
-            _ = compiler.emit(op: .opBe)
-            return nil
+        if compiler.lastOpcode == .opPhrase {
+            compiler.removeLastInstruction()
         }
-        return BooleanOperator(compiler.environment, by: .keyword(.BE)).operated()
-    }
-}
-struct NotOperationCompiler : PredicateCompilable {
-    init(_ compiler: Compiler) {self.compiler = compiler}
-    let compiler: Compiler
-    func compiled() -> JpfObject? {
-        if compiler.count < 2 {
-            if let value = compiler.pull() {
-                value.emit(with: compiler)
-            }
-            _ = compiler.emit(op: .opNot)
-            return nil
-        }
-        return BooleanOperator(compiler.environment, by: .keyword(.NOT)).operated()
-    }
-}
-struct EqualOperationCompiler : PredicateCompilable {
-    init(_ compiler: Compiler) {self.compiler = compiler}
-    let compiler: Compiler
-    func compiled() -> JpfObject? {
-        if compiler.count < 2 {
-            if let value = compiler.pull() {
-                value.emit(with: compiler)
-            }
-            _ = compiler.emit(op: .opEqual)
-            return nil
-        }
-        return BooleanOperator(compiler.environment, by: .keyword(.EQUAL)).operated()
-    }
-}
-struct CompareOperationCompiler : PredicateCompilable {
-    init(_ compiler: Compiler, by token: Token) {self.compiler = compiler; self.op = token}
-    let compiler: Compiler, op: Token
-    func compiled() -> JpfObject? {
-        if compiler.count < 2 {
-            if let value = compiler.pull() {
-                value.emit(with: compiler)
-            }
-            _ = op.isKeyword(.GT) ?
-                compiler.emit(op: .opGreaterThan) :
-                compiler.emit(op: .opLessThan)
-            return nil
-        }
-        return CompareOperator(compiler.environment, by: op).operated()
+        return nil
     }
 }
 // MARK: - 関数実行/返す
@@ -232,16 +80,31 @@ struct PerformCompiler : PredicateCompilable {
         return nil
     }
 }
+/// 「(〜を)返す」を翻訳する。
+/// ・キャッシュがあれば計算(operated())し、opReturnValueを出力する。
+/// ・出力する前に、句をチェックし、
+///  「〜を」または「無し」であれば、出力を行う。(格が違う(「を」でない)場合はusageを返す)
+///   opPhraseが出力されていたら、それを取り除く。
 struct ReturnCompiler : PredicateCompilable {
     init(_ compiler: Compiler) {self.compiler = compiler}
     let compiler: Compiler
     func compiled() -> JpfObject? {
-        if !compiler.isEmpty,
-           let result = ReturnOperator(compiler.environment).operated() {
+        let op = ReturnOperator(compiler.environment)
+        if !compiler.isEmpty, let result = op.operated() {  // キャッシュで計算
             if result.isError {return result}
-            result.emit(with: compiler)
+            result.value?.emit(with: compiler)              // resultはJpfReturnValue
+        } else {                                            // 直前の出力で計算
+            guard compiler.lastOpcode != .opPhrase ||
+                  compiler.removeLastPhrase(particle: .WO) else {
+                return op.returnValueUsage                  // 前句の助詞が間違っている
+            }
         }
         _ = compiler.emit(op: .opReturnValue)
         return nil
     }
+}
+struct NullCompiler : PredicateCompilable {
+    init(_ compiler: Compiler) {self.compiler = compiler}
+    let compiler: Compiler
+    func compiled() -> JpfObject? {JpfNull.object}
 }

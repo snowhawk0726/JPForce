@@ -60,7 +60,7 @@ extension DefineStatement : Compilable {
         }
         let symbol = c.symbolTable.define(name.value)
         _ = c.emit(
-            op: symbol.scope == .GLOBAL ? .opSetGlobal : .opSetLocal,
+            op: symbol.isGlobal ? .opSetGlobal : .opSetLocal,
             operand: symbol.index
         )
         return nil
@@ -68,21 +68,35 @@ extension DefineStatement : Compilable {
 }
 extension Identifier : Compilable {
     func compiled(with c: Compiler) -> JpfObject? {
-        c.pullAll().forEach {$0.emit(with: c)}  // キャッシュをバイトコードに出力
         guard let symbol = c.symbolTable.resolve(value) else {
             return JpfError("『\(value)』") + identifierNotFound
         }
-        _ = c.emit(
-            op: symbol.scope == .GLOBAL ? .opGetGlobal : .opGetLocal,
-            operand: symbol.index
-        )
+        if !c.isEmpty && symbol.isProperty {            // 属性をキャッシュでアクセス
+            return evaluated(with: c.environment)
+        }
+        c.pullAll().forEach {$0.emit(with: c)}          // キャッシュを翻訳
+        _ = c.emit(op: symbol.opCode, operand: symbol.index)
         return nil
     }
 }
 extension PredicateExpression : Compilable {
     func compiled(with c: Compiler) -> JpfObject? {
-        guard let predicate = PredicateCompilableFactory.create(from: token, with: c) else {return predicateNotSupported + "(述語：\(token.literal))"}
-        return predicate.compiled()
+        if let predicate = PredicateCompilableFactory.create(from: token, with: c) {
+            return predicate.compiled()                 // opPredicate以外の翻訳
+        }
+        if !c.isEmpty {
+            guard let result = evaluated(with: c.environment) else {return nil}
+            if !result.isError {
+                return result
+            }   // キャッシュでの計算が失敗した場合は、キャッシュを出力(実行時まで実行を先延ばし)
+        }
+        c.pullAll().forEach {$0.emit(with: c)}
+        if let symbol = c.symbolTable.resolve(token) {
+            _ = c.emit(op: symbol.opCode, operand: symbol.index)
+        } else {
+            fatalError("『\(token.literal)』が未登録。")
+        }
+        return nil
     }
 }
 extension PhraseExpression : Compilable {
@@ -106,18 +120,18 @@ extension CaseExpression : Compilable {
     /// 形式２：   (〜が、〜の)場合、【処理】(、(〜の)場合、【処理】...)(、それ以外は、【処理】)
     /// - Returns: ReturnValueまたはnil、エラー
     func compiled(with c: Compiler) -> JpfObject? {
-        if c.isEmpty {
-            let opJumpNotTruthyPosition = c.emit(op: .opJumpNotTruthy, operand: 9999)
-            if let err = consequence.compiled(with: c) {return err}
-            let opJumpPosition = (alternative != nil) ? c.emit(op: .opJump, operand: 9999) : -1
-            c.changeOperand(at: opJumpNotTruthyPosition, operand: c.lastPosition)   // Jump先書換え
-            if let alternative = alternative {
-                if let err = alternative.compiled(with: c) {return err}
-                c.changeOperand(at: opJumpPosition, operand: c.lastPosition)        // Jump先書換え
-            }
-            return nil
+        guard c.isEmpty else {
+            return evaluated(with: c.environment)
         }
-        return evaluated(with: c.environment)
+        let opJumpNotTruthyPosition = c.emit(op: .opJumpNotTruthy, operand: 9999)
+        if let err = consequence.compiled(with: c) {return err}
+        let opJumpPosition = (alternative != nil) ? c.emit(op: .opJump, operand: 9999) : -1
+        c.changeOperand(at: opJumpNotTruthyPosition, operand: c.lastPosition)   // Jump先書換え
+        if let alternative = alternative {
+            if let err = alternative.compiled(with: c) {return err}
+            c.changeOperand(at: opJumpPosition, operand: c.lastPosition)        // Jump先書換え
+        }
+        return nil
     }
 }
 extension GenitiveExpression : Compilable {
@@ -125,27 +139,27 @@ extension GenitiveExpression : Compilable {
     /// - Parameter c: コンパイラ
     /// - Returns: 評価結果
     func compiled(with c: Compiler) -> JpfObject? {
-        switch right {
-        case is Identifier:
-            if let err = left.compiled(with: c) {return err}
-            if let err = right.compiled(with: c) {return err}
-            switch left {
-            case is ArrayLiteral, is DictionaryLiteral, is GenitiveExpression:
-                _ = c.emit(op: .opIndex)
-                return nil
-            default:
-                break
+        if let cash = left.compiled(with: c) {          // leftが定数
+            if let symbol = c.symbolTable.resolve(right.tokenLiteral),
+               symbol.isVariable {                      // rightが変数
+                cash.emit(with: c)                      // キャッシュを出力
+            } else {
+                return evaluated(with: c.environment)   // キャッシュで評価
             }
-        case is PredicateExpression:
-            if left is Identifier {
-                if let err = left.compiled(with: c) {return err}
-                if let err = right.compiled(with: c) {return err}
-                return nil
-            }
-        default:
-            break
         }
-        return evaluated(with: c.environment)
+        if let cash = right.compiled(with: c) {         // rightが定数
+            if cash.isError {return cash}
+            cash.emit(with: c)                          // キャッシュを出力
+            _ = c.emit(op: .opGenitive)                 // 索引をアクセス
+        } else {
+            guard let symbol = c.symbolTable.resolve(right.tokenLiteral) else {
+                return "『\(right.tokenLiteral)』" + identifierNotFound
+            }   /* 未定義シンボルはコンパイルエラー → 来ない */
+            if symbol.isVariable {                      // rightが変数
+                _ = c.emit(op: .opGenitive)             // 索引をアクセス
+            }
+        }
+        return nil
     }
 }
 extension IntegerLiteral : Compilable {
@@ -165,21 +179,12 @@ extension StringLiteral : Compilable {
 }
 extension ArrayLiteral : Compilable {
     func compiled(with c: Compiler) -> JpfObject? {
-        for element in elements {   // 要素を順に出力
-            if let result = element.compiled(with: c), result.isError {return result}
-        }
-        _ = c.emit(op: .opArray, operand: elements.count)
-        return nil
+        evaluated(with: c.environment)
     }
 }
 extension DictionaryLiteral : Compilable {
     func compiled(with c: Compiler) -> JpfObject? {
-        for e in pairs {            // キー、値の順にpairを出力
-            if let result = e.pair.key.compiled(with: c), result.isError {return result}
-            if let result = e.pair.value.compiled(with: c), result.isError {return result}
-        }
-        _ = c.emit(op: .opDictionary, operand: pairs.count * 2)
-        return nil
+        evaluated(with: c.environment)
     }
 }
 extension FunctionLiteral : Compilable {

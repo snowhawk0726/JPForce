@@ -15,7 +15,7 @@ final class CodeTests: XCTestCase {
     func testMake() throws {
         let testPatterns: [(op: Opcode, operands: [Int], expected: [Byte]) ] = [
             (.opConstant, [65534], [Opcode.opConstant.rawValue, 255, 254]),
-            (.opAdd, [], [Opcode.opAdd.rawValue]),
+            (.opReturn, [], [Opcode.opReturn.rawValue]),
             (.opGetLocal, [255], [Opcode.opGetLocal.rawValue, 255]),
         ]
         for test in testPatterns {
@@ -30,13 +30,13 @@ final class CodeTests: XCTestCase {
     }
     func testInstructionsString() throws {
         let instructions: [Instructions] = [
-            make(op: .opAdd),
+            make(op: .opReturn),
             make(op: .opGetLocal, operand: 1),
             make(op: .opConstant, operand: 2),
             make(op: .opConstant, operand: 65535),
         ]
         let expected = """
-        0000 OpAdd
+        0000 OpReturn
         0001 OpGetLocal 1
         0003 OpConstant 2
         0006 OpConstant 65535

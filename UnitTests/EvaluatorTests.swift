@@ -596,7 +596,7 @@ final class EvaluatorTests: XCTestCase {
             print("テストパターン: \(test.input)")
             let parser = Parser(Lexer(test.input))
             let eval = Evaluator(from: parser.parseProgram()!, with: environment)
-            let expected = eval.object ?? environment.pull()!
+            let expected = try XCTUnwrap(eval.object ?? environment.pull())
             try testObject(expected, with: test.expected)
             print("テスト(\(expected))終了")
         }

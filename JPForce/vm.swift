@@ -147,6 +147,8 @@ class VM {
     private let failedToSetGlobal =         JpfError("大域変数の定義に失敗した。")
     private let failedToBuildArray =        JpfError("配列の定義に失敗した。")
     private let failedToBuildDictionary =   JpfError("辞書の定義に失敗した。")
+    private let failedToGetProperty =       JpfError("属性の取得に失敗した。")
+    private let cannotFoundPredicate =      JpfError("述語が定義されていない。")
     // Fetch instructions
     func run() -> JpfError? {
         while currentFrame.isIpInRange {
@@ -175,6 +177,22 @@ class VM {
                 let localIndex = Int(readUInt8(from: Array(instructions[(ip+1)...])))
                 currentFrame.advanceIp(by: 1)
                 if let error = push(stack[currentFrame.basePointer + localIndex]!) {return error}
+            case .opGetProperty:
+                let index = Int(readUInt8(from: Array(instructions[(ip+1)...])))
+                currentFrame.advanceIp(by: 1)
+                guard let getPropertyOf = ObjectProperties()[index]?.accessor,
+                      let object = pull(),
+                      let result = getPropertyOf(object) else {
+                    return failedToGetProperty
+                }
+                if let error = push(result) {return error}
+            case .opPredicate:
+                let index = Int(readUInt8(from: Array(instructions[(ip+1)...])))
+                currentFrame.advanceIp(by: 1)
+                guard let predicate = PredicateOperableFactory()[index] else {return cannotFoundPredicate}
+                let environment = Environment(with: stack)
+                guard let result = predicate(environment).operated() else {return nil}
+                if let error = push(result) {return error}
             case .opArray:
                 let numberOfElements = Int(readUInt16(from: Array(instructions[(ip+1)...])))
                 currentFrame.advanceIp(by: 2)
@@ -203,7 +221,7 @@ class VM {
                     currentFrame.setIp(to: position - 1)    // 飛び先
                 }
             default:
-                guard let executer = CodeExecutableFactory.create(from: opcode, with: self) else {return "命令語(\(definitions[opcode]!.name))" + codeNotSupported}
+                guard let executer = CodeExecutableFactory.create(from: opcode, with: self) else {return "命令語(\(opcode.definition.name))" + codeNotSupported}
                 if let error = executer.execute() {return error}
             }
         }
@@ -231,7 +249,8 @@ class VM {
         frames[framesIndex] = frame
         framesIndex += 1
     }
-    func popFrame() -> Frame {
+    func popFrame() -> Frame? {
+        guard framesIndex > 1 else {return nil}
         framesIndex -= 1
         return frames[framesIndex]
     }

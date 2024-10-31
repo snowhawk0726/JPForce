@@ -93,8 +93,6 @@ enum Token : Equatable {
         case TRUE       = "真"
         case FALSE      = "偽"
         case NULL       = "無"   // object is nil
-        case POSITIVE   = "正"
-        case NEGATIVE   = "負"
         case ARRAY      = "配列"
         case DICTIONARY = "辞書"
         case ENUM       = "列挙"
@@ -257,7 +255,7 @@ enum Token : Equatable {
     //
     // MARK: - 再定義可能な予約語(述語)(redefinable predicate keywords)
     static var redefinables: [Token.Keyword] = [    //
-        .ADD, .MULTIPLY, .SUBSTRACT, .DIVIDE, .NEGATE, .POSITIVE, .NEGATIVE, .NULL,
+        .ADD, .MULTIPLY, .SUBSTRACT, .DIVIDE, .NEGATE, .NULL,
         .EQUAL, .BE, .NOT, .LT, .GT,
         .RETURN, .GOBACK, .BREAK, .CONTINUE,
         .MONO, .INPUT, .KOTO,

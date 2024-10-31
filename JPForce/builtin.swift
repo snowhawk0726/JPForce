@@ -1,5 +1,5 @@
 //
-//  builtin.swift
+//  builtin.swift   (拡張オブジェクト)
 //  JPForce
 //
 //  Created by 佐藤貴之 on 2023/03/24.
@@ -7,32 +7,65 @@
 
 import Foundation
 
+/// オブジェクトの属性(属性名(name)とアクセス方法(acessor))
+struct ObjectProperties {
+    init() {
+        self.allProperties = commonProperties + specificProperties
+    }
+    typealias NamedAccessor = (name: String, accessor: (JpfObject) -> JpfObject?)
+    let allProperties: [NamedAccessor]
+    let commonProperties: [NamedAccessor] = [       // オブジェクト共通属性
+        ("型", {JpfString(value: $0.type)}),                         // 0
+        ("格", {$0.particle.map {JpfString(value: $0.literal)} ?? JpfNull.object}),
+        ("値", {$0.value ?? JpfNull.object}),
+        ("数値", {$0.number.map {JpfInteger(value: $0)} ?? JpfNull.object}),
+        ("文字列", {JpfString(value: $0.string)}),
+        ("識別子名", {   /* 三項演算子だと型推論がうまくいかなかった */       // 5
+            guard !$0.name.isEmpty else {return JpfNull.object}
+            return JpfString(value: $0.name)
+        }),
+        ("数", {$0.count}),
+        ("空", {$0.isEmpty}),
+    ]
+    let specificProperties: [NamedAccessor] = [     // オブジェクト固有属性
+        ("正", {($0.value!)["正", $0.particle]}),                     // 8 (JpfInteger)
+        ("負", {($0.value!)["負", $0.particle]}),
+        ("最初", {($0.value!)["最初", $0.particle]}),                 // 10 (JpfString, JpfArray, ...)
+        ("先頭", {($0.value!)["先頭", $0.particle]}),
+        ("最後", {($0.value!)["最後", $0.particle]}),
+        ("後尾", {($0.value!)["後尾", $0.particle]}),
+        ("残り", {($0.value!)["残り", $0.particle]}),
+        ("列挙子", {($0.value!)["列挙子", $0.particle]}),              // 15 (JpfEnum, JpfEnumerator)
+        ("値", {($0.value!)["値", $0.particle]}),
+    ]
+    // アクセサ
+    subscript(index: Int) -> NamedAccessor? {
+        (0..<allProperties.count).contains(index) ? allProperties[index] : nil
+    }
+    subscript(name: String) -> NamedAccessor? {allProperties.first {$0.name == name}}
+    var names: [String] {allProperties.map(\.name)}
+    var common: [String] {commonProperties.map(\.name)}
+    var specific: [String] {specificProperties.map(\.name)}
+}
+
 extension JpfObject {
     /// オブジェクトへのアクセス
     subscript(name: String, particle: Token?) -> JpfObject? {
-        get {getObject(from: name, with: particle)}
+        get {getProperty(by: name, with: particle)}
     }
-    func getObject(from name: String, with particle: Token? = nil) -> JpfObject? {
-        switch (particle, name) {
-        case (Token(.NO),"型"),(nil,"型"):
-            return JpfString(value: self.type)
-        case (Token(.NO),"格"),(nil,"格"):
-            return self.particle.map {JpfString(value: $0.literal)} ?? JpfNull.object
-        case (Token(.NO),"値"),(nil,"値"):
-            return self.value ?? JpfNull.object
-        case (Token(.NO),"数値"),(nil,"数値"):
-            return self.number.map {JpfInteger(value: $0)} ?? JpfNull.object
-        case (Token(.NO),"文字列"),(nil,"文字列"):
-            return JpfString(value: self.string)
-        case (Token(.NO),"識別子名"),(nil,"識別子名"):
-            return !self.name.isEmpty ? JpfString(value: self.name) : JpfNull.object
-        case (Token(.NO),"数"),(nil,"数"):
-            return count        // オブジェクトの要素数
-        case (Token(.GA),"空"),(nil,"空"):
-            return isEmpty      // オブジェクトの要素が空？
+    func getProperty(by name: String, with particle: Token? = nil) -> JpfObject? {
+        let properties = ObjectProperties()
+        switch particle {
+        case Token(.NO) where properties.common.contains(name) && name != "空",
+             Token(.GA) where name == "空",
+             nil        where properties.common.contains(name):
+            return properties[name]?.accessor(self)
         default:
-            return nil
+            if properties.specific.contains(name) {
+                return "\(self.string)(\(self.type))を「\(name)」" + cannotAccessObjectWith
+            }
         }
+        return nil
     }
     /// オブジェクト自身の対象に、値を設定する。対象が算出である場合は、算出の設定処理を行う。
     /// - Parameters:
@@ -100,7 +133,7 @@ extension JpfInteger {
         switch (particle, name) {
         case (Token(.GA),"正"),(nil,"正"):    return JpfBoolean(value: value > 0)
         case (Token(.GA),"負"),(nil,"負"):    return JpfBoolean(value: value < 0)
-        default:                            return getObject(from: name, with: particle)
+        default:                            return getProperty(by: name, with: particle)
         }
     }
 }
@@ -270,15 +303,17 @@ extension JpfString {
     }
     subscript(name: String, particle: Token?) -> JpfObject? {
         switch (particle, name) {
-        case (Token(.NO),"最初"),(nil,"最初"),(Token(.NO),"先頭"),(nil,"先頭"):
+        case (Token(.NO),"最初"),(Token(.TA),"最初"),(nil,"最初"),
+             (Token(.NO),"先頭"),(Token(.TA),"先頭"),(nil,"先頭"):
             return value.first.map {JpfString(value: String($0))} ?? JpfNull.object
-        case (Token(.NO),"最後"),(nil,"最後"),(Token(.NO),"後尾"),(nil,"後尾"):
+        case (Token(.NO),"最後"),(Token(.TA),"最後"),(nil,"最後"),
+             (Token(.NO),"後尾"),(Token(.TA),"後尾"),(nil,"後尾"):
             return value.last.map {JpfString(value: String($0))} ?? JpfNull.object
-        case (Token(.NO),"残り"),(nil,"残り"):
+        case (Token(.NO),"残り"),(Token(.TA),"残り"),(nil,"残り"):
             guard !value.isEmpty else {return JpfNull.object}
             return JpfString(value: String(value.dropFirst()))
         default:
-            return getObject(from: name, with: particle)
+            return getProperty(by: name, with: particle)
         }
     }
     subscript(range: JpfRange) -> JpfObject? {
@@ -316,12 +351,14 @@ extension JpfInput {
     }
     subscript(name: String, particle: Token?) -> JpfObject? {
         switch (particle, name) {
-        case (Token(.NO),"最初"),(nil,"最初"),(Token(.NO),"先頭"),(nil,"先頭"):
+        case (Token(.NO),"最初"),(Token(.TA),"最初"),(nil,"最初"),
+             (Token(.NO),"先頭"),(Token(.TA),"先頭"),(nil,"先頭"):
             return stack.first ?? JpfNull.object
-        case (Token(.NO),"最後"),(nil,"最後"),(Token(.NO),"後尾"),(nil,"後尾"):
+        case (Token(.NO),"最後"),(Token(.TA),"最後"),(nil,"最後"),
+             (Token(.NO),"後尾"),(Token(.TA),"後尾"),(nil,"後尾"):
             return stack.last ?? JpfNull.object
         default:
-            return getObject(from: name, with: particle)
+            return getProperty(by: name, with: particle)
         }
     }
 }
@@ -344,17 +381,19 @@ extension JpfArray {
     }
     subscript(name: String, particle: Token?) -> JpfObject? {
         switch (particle, name) {
-        case (Token(.NO),"最初"),(nil,"最初"),(Token(.NO),"先頭"),(nil,"先頭"):
+        case (Token(.NO),"最初"),(Token(.TA),"最初"),(nil,"最初"),
+             (Token(.NO),"先頭"),(Token(.TA),"先頭"),(nil,"先頭"):
             return elements.first ?? JpfNull.object
-        case (Token(.NO),"最後"),(nil,"最後"),(Token(.NO),"後尾"),(nil,"後尾"):
+        case (Token(.NO),"最後"),(Token(.TA),"最後"),(nil,"最後"),
+             (Token(.NO),"後尾"),(Token(.TA),"後尾"),(nil,"後尾"):
             return elements.last ?? JpfNull.object
-        case (Token(.NO),"残り"),(nil,"残り"):
+        case (Token(.NO),"残り"),(Token(.TA),"残り"),(nil,"残り"):
             guard !elements.isEmpty else {return JpfNull.object}
             return JpfArray(name: self.name, elements: [JpfObject](elements.dropFirst()))
         default:
             break
         }
-        return getObject(from: name, with: particle)
+        return getProperty(by: name, with: particle)
     }
     subscript(range: JpfRange) -> JpfObject? {
         switch (range.lowerBound?.0.number, range.lowerBound?.1,
@@ -597,7 +636,7 @@ extension JpfType {
         let canditate = environment[name] != nil ? name : ContinuativeForm(name).plainForm ?? ""
         if environment.contains(canditate), let object = environment[canditate] {return object}
         // 名前が辞書に無いなら、デフォルト
-        return getObject(from: name, with: particle)
+        return getProperty(by: name, with: particle)
     }
     func assign(_ value: JpfObject, to target: JpfObject?) -> JpfObject {
         return assign(value, to: target, with: environment)
@@ -619,7 +658,7 @@ extension JpfInstance {
             return member                                       // メンバーを返す
         }
         // 利用可能な名前でないなら、デフォルト
-        return getObject(from: name, with: particle)
+        return getProperty(by: name, with: particle)
     }
     func assign(_ value: JpfObject, to target: JpfObject?) -> JpfObject {
         return assign(value, to: target, with: environment)
@@ -642,7 +681,7 @@ extension JpfEnum {
         if particle == .particle(.NO), name == "列挙子" {
             return JpfArray(name: self.name, elements: elements.map {JpfString(value: $0)})
         }
-        return getObject(from: name, with: particle)
+        return getProperty(by: name, with: particle)
     }
 }
 extension JpfEnumerator {
@@ -655,6 +694,6 @@ extension JpfEnumerator {
                 break
             }
         }
-        return getObject(from: name, with: particle)
+        return getProperty(by: name, with: particle)
     }
 }

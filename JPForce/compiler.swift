@@ -35,14 +35,13 @@ class CompilationScope {
 }
 //
 class Compiler {
-    init(from node: Node) {self.node = node}
+    init(from node: Node) {
+        self.node = node
+    }
     convenience init(from node: Node, _ symbolTable: SymbolTable, _ constants: [JpfObject]) {
         self.init(from: node)
         self.symbolTable = symbolTable
         self.constants = constants
-    }
-    init() {
-        self.node = Program()   // ダミーノード
     }
     private let node: Node      // コンパイルするASTノード
     private var constants: [JpfObject] = []
@@ -97,6 +96,13 @@ class Compiler {
     var lastOpcode: Opcode? {
         return currentScope.lastInstruction?.opcode
     }
+    func isLastPhrase(particle: Token.Particle) -> Bool {
+        if lastOpcode == .opPhrase,
+           let phrase = constants.last as? JpfPhrase {
+            return phrase.isParticle(particle)
+        }
+        return false
+    }
     /// 指定位置のオペランドを書き換える。
     /// - Parameters:
     ///   - opPosition: オペコードの位置
@@ -121,12 +127,20 @@ class Compiler {
         guard let lastEmittied = currentScope.lastInstruction else {return}
         let previousEmitted = currentScope.previousInstruction
         let old = currentInstructions
-        let new = Array(old.dropLast(1 + operandWidth(of: lastEmittied.opcode)!))
+        let new = Array(old.dropLast(1 + lastEmittied.opcode.operandWidth))
         currentInstructions = new
         currentScope.lastInstruction = previousEmitted
         if lastEmittied.opcode == .opConstant || lastEmittied.opcode == .opPhrase {
             constants.removeLast()
         }
+    }
+    /// 句の格が正しければ、その句を出力から取り除く
+    /// - Parameter particle: 格
+    /// - Returns: 格の成否
+    func removeLastPhrase(particle: Token.Particle) -> Bool {
+        guard isLastPhrase(particle: particle) else {return false}
+        removeLastInstruction()
+        return true
     }
     /// 指定位置のインストラクションを置き換える。
     /// - Parameters:

@@ -8,17 +8,40 @@
 import Foundation
 
 enum SymbolScope: String {
-    case GLOBAL
-    case LOCAL
+    case GLOBAL, LOCAL, PREDICATE, PROPETRY
+    //
+    var opCode: Opcode {
+        switch self {
+        case .GLOBAL: return .opGetGlobal       // 大域
+        case .LOCAL: return .opGetLocal         // 局所
+        case .PREDICATE: return .opPredicate    // 述語
+        case .PROPETRY: return .opGetProperty   // 属性
+        }
+    }
 }
 struct Symbol : Equatable {
     let name: String
     let scope: SymbolScope
     let index: Int
+    //
+    var opCode: Opcode {scope.opCode}
+    var isProperty: Bool {scope == .PROPETRY}
+    var isPredicate: Bool {scope == .PREDICATE}
+    var isVariable: Bool {scope == .LOCAL || scope == .GLOBAL}
+    var isGlobal: Bool {scope == .GLOBAL}
+    var isLocal: Bool {scope == .LOCAL}
 }
 class SymbolTable : Equatable {
-    init() {}
-    init(outer: SymbolTable) {
+    init() {
+        ObjectProperties().names.enumerated().forEach {                 // オブジェクトの属性
+            _ = define(name: $1, index: $0, scope: .PROPETRY)
+        }
+        PredicateOperableFactory.predicates.enumerated().forEach {      // 述語オブジェクト
+            _ = define(name: $1.keyword.rawValue, index: $0, scope: .PREDICATE)
+        }
+    }
+    convenience init(outer: SymbolTable) {
+        self.init()
         self.outer = outer
     }
     var outer: SymbolTable?
@@ -29,15 +52,21 @@ class SymbolTable : Equatable {
         lhs.store == rhs.store
         && lhs.numberOfDefinitions == rhs.numberOfDefinitions
     }
+    //
     func define(_ name: String) -> Symbol {
-        let symbol = Symbol(
+        let symbol = define(
             name: name,
-            scope: outer != nil ? .LOCAL : .GLOBAL,
-            index: numberOfDefinitions
+            index: numberOfDefinitions,
+            scope: outer != nil ? .LOCAL : .GLOBAL
         )
-        store[name] = symbol
         numberOfDefinitions += 1
         return symbol
     }
+    func define(name: String, index: Int, scope: SymbolScope) -> Symbol {
+        let symbol = Symbol(name: name, scope: scope, index: index)
+        store[name] = symbol
+        return symbol
+    }
     func resolve(_ name: String) -> Symbol? {store[name] ?? outer?.resolve(name)}
+    func resolve(_ token: Token) -> Symbol? {resolve(token.unwrappedLiteral)}
 }

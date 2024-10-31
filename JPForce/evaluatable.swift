@@ -253,15 +253,15 @@ extension Identifier : Evaluatable {
     /// - 返すオブジェクトが算出で実行可であれば、取得を呼び出す。
     func evaluated(with environment: Environment) -> JpfObject? {
         var object: JpfObject? = nil
-        if let target = environment.unwrappedPeek,              // スタックから対象を取得
-           let o = target[value, environment.peek?.particle] {  // 対象をsubscriptでアクセス
-            environment.drop()
-            object = o
-        } else
         if let o = getMethod(of: value, from: environment) {    // スタックのオブジェクトからメソッドを取得
             object = o
         } else
         if let o = getObject(of: value, from: environment) {    // ローカル辞書から取得
+            object = o
+        } else
+        if let target = environment.unwrappedPeek,              // スタックから対象を取得
+           let o = target[value, environment.peek?.particle] {  // 対象をsubscriptでアクセス
+            environment.drop()
             object = o
         } else
         if let keyword = Token.Keyword(rawValue: token.unwrappedLiteral),

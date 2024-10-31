@@ -16,60 +16,69 @@ protocol PredicateOperable {
 }
 // MARK: - predicate operable instance factory
 struct PredicateOperableFactory {
+    // 予約語とそれを実行するPredicateOperableを返す関数の配列
+    static let predicates: [(keyword: Token.Keyword, operator: (Environment) -> PredicateOperable)] = [
+        (.APPEND,       {AppendOperator($0, by: Token(.APPEND))}),      // 0
+        (.REMOVE,       {RemoveOperator($0, by: Token(.REMOVE))}),
+        (.CONTAINS,     {ContainsOperator($0, by: Token(.CONTAINS))}),
+        (.FOREACH,      {ForeachOperator($0, by: Token(.FOREACH))}),
+        (.MAP,          {MapOperator($0, by: Token(.MAP))}),
+        (.FILTER,       {FilterOperator($0, by: Token(.FILTER))}),      // 5
+        (.REDUCE,       {ReduceOperator($0, by: Token(.REDUCE))}),
+        (.SORT,         {SortOperator($0, by: Token(.SORT))}),
+        (.REVERSE,      {ReverseOperator($0, by: Token(.REVERSE))}),
+        (.PRINT,        {PrintOperator($0, by: Token(.PRINT))}),
+        (.ASK,          {PrintOperator($0, by: Token(.ASK))}),          // 10
+        (.NEWLINE,      {NewlineOperator($0)}),
+        (.READ,         {ReadOperator($0, by: Token(.READ))}),
+        (.FILES,        {FilesOperator($0, by: Token(.FILES))}),
+        (.INPUT,        {StackOperator($0)}),
+        (.DROP,         {DropOperator($0)}),                            // 15
+        (.EMPTY,        {EmptyOperator($0, by: Token(.EMPTY))}),
+        (.DUPLICATE,    {PullOperator($0, by: Token(.DUPLICATE))}),
+        (.PULL,         {PullOperator($0, by: Token(.PULL))}),
+        (.PUSH,         {PushOperator($0, by: Token(.PUSH))}),
+        (.ASSIGN,       {AssignOperator($0)}),                          // 20
+        (.SET,          {SetOperator($0, by: Token(.SET))}),
+        (.SWAP,         {SwapOperator($0, by: Token(.SWAP))}),
+        (.IDENTIFIERS,  {IdentifiersOperator($0, by: Token(.IDENTIFIERS))}),
+        (.ADD,          {AddOperator($0)}),
+        (.MULTIPLY,     {MultiplyOperator($0, by: Token(.MULTIPLY))}),  // 25
+        (.SUBSTRACT,    {SubstractOperator($0, by: Token(.SUBSTRACT))}),
+        (.DIVIDE,       {DivideOperator($0, by: Token(.DIVIDE))}),
+        (.NEGATE,       {NegateOperator($0, by: Token(.NEGATE))}),
+        (.LT,           {CompareOperator($0, by: Token(.LT))}),
+        (.GT,           {CompareOperator($0, by: Token(.GT))}),         // 30
+        (.EQUAL,        {BooleanOperator($0, by: Token(.EQUAL))}),
+        (.BE,           {BooleanOperator($0, by: Token(.BE))}),
+        (.NOT,          {BooleanOperator($0, by: Token(.NOT))}),
+        (.RETURN,       {ReturnOperator($0)}),
+        (.GOBACK,       {GobackOperator($0)}),                          // 35
+        (.BREAK,        {LoopControlOperator($0, by: Token(.BREAK))}),
+        (.CONTINUE,     {LoopControlOperator($0, by: Token(.CONTINUE))}),
+        (.MONO,         {UnwrapOperator($0, by: Token(.MONO))}),        // 〜たもの
+        (.NULL,         {NullOperator($0)}),
+        (.EXECUTE,      {ExecuteOperator($0)}),                         // 40 (関数)を実行
+        (.CREATE,       {CreateOperator($0)}),                          // (型)から生成
+        (.INITIALIZATION,   {InitializeOperator($0)}),
+        (.SURU,         {PerformOperator($0)}),                         // 〜にする、〜をする
+        (.AVAILABLE,    {AvailableOperator($0)}),
+        (.KOTO,         {NopOperator($0)}),                             // 45
+    ]
+    // アクセサ
+    subscript(_ name: String) -> ((Environment) -> PredicateOperable)? { // インデックス：名称
+        Self.predicates.first(where: {$0.keyword.rawValue == name})?.operator
+    }
+    subscript(_ token: Token) -> ((Environment) -> PredicateOperable)? { // インデックス：トークン
+        Self.predicates.first(where: {token.isKeyword($0.keyword)})?.operator
+    }
+    subscript(_ index: Int) -> ((Environment) -> PredicateOperable)? {  // インデックス：位置
+        guard (0..<Self.predicates.count).contains(index) else {return nil}
+        return Self.predicates[index].operator
+    }
+    // ファクトリーメソッド
     static func create(from token: Token, with environment: Environment) -> PredicateOperable? {
-        switch token.type {
-        case .keyword(.ADD):        return AddOperator(environment)
-        case .keyword(.MULTIPLY):   return MultiplyOperator(environment, by: token)
-        case .keyword(.SUBSTRACT):  return SubstractOperator(environment, by: token)
-        case .keyword(.DIVIDE):     return DivideOperator(environment, by: token)
-        case .keyword(.NEGATE):     return NegateOperator(environment, by: token)
-        case .keyword(.POSITIVE),.keyword(.NEGATIVE):
-                                    return SignOperator(environment, by: token)
-        case .keyword(.RETURN):     return ReturnOperator(environment)
-        case .keyword(.GOBACK):     return GobackOperator(environment)
-        case .keyword(.BREAK),.keyword(.CONTINUE):
-                                    return LoopControlOperator(environment, by: token)
-        case .keyword(.MONO):       return UnwrapOperator(environment, by: token)  // 〜たもの
-        case .keyword(.NULL):       return NullOperator(environment)
-        case .keyword(.INPUT):      return StackOperator(environment)
-        case .keyword(.DROP):       return DropOperator(environment)
-        case .keyword(.EMPTY):      return EmptyOperator(environment, by: token)
-        case .keyword(.DUPLICATE),.keyword(.PULL):
-                                    return PullOperator(environment, by: token)
-        case .keyword(.PUSH):       return PushOperator(environment, by: token)
-        case .keyword(.ASSIGN):     return AssignOperator(environment)
-        case .keyword(.SET):        return SetOperator(environment, by: token)
-        case .keyword(.SWAP):       return SwapOperator(environment, by: token)
-        case .keyword(.IDENTIFIERS):
-                                    return IdentifiersOperator(environment, by: token)
-        case .keyword(.EXECUTE):    return ExecuteOperator(environment) // (関数)を実行
-        case .keyword(.CREATE):     return CreateOperator(environment)  // (型)から生成
-        case .keyword(.INITIALIZATION):
-                                    return InitializeOperator(environment)
-        case .keyword(.SURU):       return PerformOperator(environment) // 〜にする、〜をする
-        case .keyword(.AVAILABLE):  return AvailableOperator(environment)
-        case .keyword(.APPEND):     return AppendOperator(environment, by: token)
-        case .keyword(.REMOVE):     return RemoveOperator(environment, by: token)
-        case .keyword(.CONTAINS):   return ContainsOperator(environment, by: token)
-        case .keyword(.FOREACH):    return ForeachOperator(environment, by: token)
-        case .keyword(.MAP):        return MapOperator(environment, by: token)
-        case .keyword(.FILTER):     return FilterOperator(environment, by: token)
-        case .keyword(.REDUCE):     return ReduceOperator(environment, by: token)
-        case .keyword(.SORT):       return SortOperator(environment, by: token)
-        case .keyword(.REVERSE):    return ReverseOperator(environment, by: token)
-        case .keyword(.PRINT),.keyword(.ASK):
-                                    return PrintOperator(environment, by: token)
-        case .keyword(.NEWLINE):    return NewlineOperator(environment)
-        case .keyword(.READ):       return ReadOperator(environment, by: token)
-        case .keyword(.FILES):      return FilesOperator(environment, by: token)
-        case .keyword(.EQUAL),.keyword(.BE),.keyword(.NOT):
-                                    return BooleanOperator(environment, by: token)
-        case .keyword(.LT),.keyword(.GT):
-                                    return CompareOperator(environment, by: token)
-        case .keyword(.KOTO):       return NopOperator(environment)
-        case .keyword(_):           return NopOperator(environment)
-        default:                    return nil
-        }
+        Self()[token]?(environment) ?? NopOperator(environment)
     }
 }
 /// stringをsplit()により、[String]に分解する。
@@ -148,13 +157,17 @@ extension String {  // 文字列を分割する。
 extension PredicateOperable {
     // Stack operations
     var isPeekNumber: Bool {environment.peek?.isNumber ?? false}
-    func isPeekParticle(_ expected: Token.Particle) -> Bool {environment.peek?.particle == .particle(expected)}
+    func isPeekParticle(_ expected: Token.Particle?) -> Bool {
+        guard let particle = expected else {return !environment.isPeekParticle}
+        return environment.isPeekParticle(particle)
+    }
     var leftOperand: JpfObject? {return environment.pull()}
     var leftNumber: Int? {
         guard let number = environment.peek?.number else {return nil}
         environment.drop()
         return number
     }
+    var unwrappedValue: JpfObject? {environment.unwrappedValue}
     /// object.stringをout()で出力する。
     /// - Parameters:
     ///   - object: 対象のオブジェクト
@@ -248,6 +261,7 @@ extension PredicateOperable {
     var equalUsage: JpfError            {JpfError("仕様：〜(と)〜(が)等しい。")}
     var beUsage: JpfError               {JpfError("仕様：(〜が)〜である。または、(〜は)〜である。")}
     var notUsage: JpfError              {JpfError("仕様：(〜が)〜で(は)ない。または、(〜は)〜で(は)ない。")}
+    var returnValueUsage: JpfError      {JpfError("仕様：(〜を)返す。")}
     var appendUsage: JpfError           {JpfError("仕様：〜(を)〜に追加する。または、〜(に)〜を追加する。")}
     var appendDictionaryUsage: JpfError {JpfError("仕様：〜が〜(を)〜に追加する。または、〜(に)〜が〜を追加する。")}
     var removeUsage: JpfError           {JpfError("仕様：(〜から)〜を削除する。")}
@@ -428,18 +442,6 @@ struct NegateOperator : PredicateOperable {
         return JpfInteger(name: ident, value: -number)
     }
 }
-struct SignOperator : PredicateOperable {
-    init(_ environment: Environment, by op: Token) {self.environment = environment; self.op = op}
-    let environment: Environment, op: Token
-    func operated() -> JpfObject? {
-        let particle = environment.peek?.particle
-        if let number = environment.unwrappedPeek as? JpfInteger {
-            environment.drop()
-            return number[op.literal, particle]
-        }
-        return "「\(op.literal)」" + cannotJudgeGenuineness
-    }
-}
 // MARK: - 判定/比較/論理演算
 struct BooleanOperator : PredicateOperable {
     init(_ environment: Environment, by op: Token) {self.environment = environment; self.op = op}
@@ -605,7 +607,9 @@ struct ReturnOperator : PredicateOperable {
     /// 返す：入力の値をラップしたオブジェクトを返す。
     /// - Returns: オブジェクト(返り値)。返す値がない場合は、エラー
     func operated() -> JpfObject? {
-        guard var value = isPeekParticle(.WO) ? environment.unwrapPhrase() : leftOperand else {return returnParamError}
+        guard isPeekParticle(.WO) || isPeekParticle(nil) else {return returnValueUsage}
+        guard var value = environment.unwrappedPeek else {return returnParamError}
+        environment.drop()
         value.name = ""
         return JpfReturnValue(value: value)
     }
@@ -1139,8 +1143,8 @@ struct EmptyOperator : PredicateOperable {
     init(_ environment: Environment, by op: Token) {self.environment = environment; self.op = op}
     let environment: Environment, op: Token
     func operated() -> JpfObject? {
-        if isPeekParticle(.GA), let object = leftOperand?.value {
-            return object[op.literal, Token(.GA)]   // <値>が空？
+        if isPeekParticle(.GA), let value = unwrappedValue {
+            return value.isEmpty                    // <値>が空？
         }
         environment.empty()                         // 入力を空にする
         return nil

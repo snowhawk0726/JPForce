@@ -120,8 +120,28 @@ final class VMTests: XCTestCase {
         ]
         try runVmTests(with: testPattern)
     }
-    func testIndexExpressions() throws {
+    func testNulls() throws {
         let testPattern: [VmTestCase] = [
+            ("無", nil),
+            ("無である。", false),
+            ("無と無は等しい。", true),
+            ("無と無は。等しくない。", false),
+        ]
+        try runVmTests(with: testPattern)
+    }
+    func testGenitiveExpressions() throws {
+        let testPattern: [VmTestCase] = [
+            ("配列【１、２、３】の1", 2),             // キャッシュ
+            ("配列【１、２、３】の先頭", 1),          // キャッシュ
+            ("1の負数", -1),                       // キャッシュ
+            ("iは1。配列【１、２、３】のi", 2),       // opGenitive
+            ("aは配列【１、２、３】。aの1", 2),       // opGenitive
+            ("aは配列【１、２、３】。iは１。aのi", 2), // opGenitive
+            ("aは配列【１、２、３】。aの最後", 3),     // opGetGlobal, opGetProperty
+            ("iは１。iの負数", -1),                 // opGetGlobal, opPredicate
+            ("１。負数の文字列", "-1"),             // opPredicate, opGetProperty
+            ("「１」。数値の負数", -1),             // opGetProperty, opPredicate
+            ("aは配列【１、２、配列【3】。aの最後の0の負数", -3),
             ("iは1。配列【１、２、３】のi", 2),
             ("iは、０と2を足す。配列【１、２、３】のi", 3),
             ("iは０。jは０。配列【配列【１、１、１】】のiのj", 1),
@@ -140,6 +160,24 @@ final class VMTests: XCTestCase {
             ("一は１。一", 1),
             ("一は１。二は２。一と二を足す", 3),
             ("一は１。二は、一と一を足す。一と二を足す", 3),
+        ]
+        try runVmTests(with: testPattern)
+    }
+    func testReturnValueStatements() throws {
+        let testPattern: [VmTestCase] = [
+            ("関数【1を返す】を実行", 1),
+            ("関数【返す】を実行", "返すべき値が無い。"),         // コンパイルエラー
+            ("関数【１と１を足し、返す】を実行する", 2),
+            ("関数【aは１。aを返す】を実行", 1),
+            ("関数【aは１。返す】を実行", "返すべき値が無い。"),   // コンパイルエラー
+            ("関数【aは１。aと1を足し、返す】を実行", 2),
+            ("関数【1に返す】を実行", "仕様：(〜を)返す。"),      // コンパイルエラー
+            ("関数【aは１。aで返す】を実行", "仕様：(〜を)返す。"),  // コンパイルエラー
+            ("１を返す。", 1),
+            ("１が返す。", "仕様：(〜を)返す。"),                // コンパイルエラー
+            ("返す", "返すべき値が無い。"),                    // コンパイルエラー
+            ("aは１。aを返す。", 1),
+            ("aは１。返す", "返すべき値が無い。"),                // コンパイルエラー
         ]
         try runVmTests(with: testPattern)
     }
@@ -225,16 +263,39 @@ final class VMTests: XCTestCase {
             }
         }
     }
+    func testBuiltinFunctions() throws {
+        let testPattern: [VmTestCase] = [
+            ("「」の数。", 0), ("「four」の数", 4), ("「Hello World」の数", 11),
+            ("1。数", "数値型の要素の数は、数えることができない。"),
+            ("配列【１、２、３】の数", 3), ("配列【】の数", 0),
+            ("「Hello World」を表示", nil),
+            ("配列【１、２、３】の最初", 1), ("配列【】の先頭", nil),
+            ("１。最初", "1(数値)を「最初」でアクセスすることはできない。"),
+            ("配列【１、２、３】の最後", 3), ("配列【】の後尾", nil),
+            ("１。最後", "1(数値)を「最後」でアクセスすることはできない。"),
+            ("配列【１、２、３】の残り", [2,3]), ("配列【】の残り", nil),
+            ("配列【】に１を追加", [1]), ("１に１を。追加", "仕様：〜(を)〜に追加する。または、〜(に)〜を追加する。"),
+            ("iは1。配列【１、２、３】のi", 2),
+            ("aは配列【１、２、３】。aの1", 2),
+            ("aは配列【１、２、３】。iは１。aのi", 2),
+        ]
+        try runVmTests(with: testPattern)
+    }
     // MARK: - Helpers
     private func runVmTests(with tests: [VmTestCase]) throws {
         for t in tests {
+            var result: JpfObject?
+            print("テスト開始：「\(t.input)」")
             let program = parseProgram(with: t.input)
             let compiler = Compiler(from: program)
-            XCTAssertNil(compiler.compile())
-            let vm = VM(with: compiler.bytecode)
-            XCTAssertNil(vm.run())
-            let element = vm.stackTop
-            try testExpectedObject(t.expected, element)
+            if let error = compiler.compile() {
+                result = error          // コンパイルエラー
+            } else {
+                let vm = VM(with: compiler.bytecode)
+                result = vm.run() ?? vm.stackTop    // 実行結果
+            }
+            try testExpectedObject(t.expected, result)
+            print("テスト結果：\(result?.string ?? "nil")")
         }
     }
     private func testExpectedObject(_ expected: Any?, _ actual: JpfObject?) throws {
@@ -265,15 +326,21 @@ final class VMTests: XCTestCase {
         }
     }
     private func testIntegerObject(_ expected: Int64, _ actual: JpfObject?) throws {
-        let integer = try XCTUnwrap(actual as? JpfInteger, "got = \(String(describing: actual))")
-        XCTAssertEqual(integer.value, Int(expected))
+        let integer = try XCTUnwrap(actual as? JpfInteger, "実際は、\(String(describing: actual))")
+        XCTAssertEqual(Int(expected), integer.value)
     }
     private func testBooleanObject(_ expected: Bool, _ actual: JpfObject?) throws {
-        let boolean = try XCTUnwrap(actual as? JpfBoolean, "got = \(String(describing: actual))")
-        XCTAssertEqual(boolean.value, expected)
+        let boolean = try XCTUnwrap(actual as? JpfBoolean, "実際は、\(String(describing: actual))")
+        XCTAssertEqual(expected, boolean.value)
     }
     private func testStringObject(_ expected: String, _ actual: JpfObject?) throws {
-        let string = try XCTUnwrap(actual as? JpfString, "got = \(String(describing: actual))")
-        XCTAssertEqual(string.value, expected)
+        switch actual {
+        case let string as JpfString:
+            XCTAssertEqual(expected, string.value)
+        case let error as JpfError:
+            XCTAssertEqual(expected, error.message)
+        default:
+            XCTFail("期待値は「\(expected)」だが、実際は「\(String(describing: actual))」。")
+        }
     }
 }

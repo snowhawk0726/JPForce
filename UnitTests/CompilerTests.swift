@@ -25,11 +25,11 @@ final class CompilerTests: XCTestCase {
                 make(op: .opConstant, operand: 0),
              ]),
             (input: "１と２を。足す",
-             expectedConstants: [1, 2],
+             expectedConstants: [(1,"と"), (2,"を")],
              expectedInstructions: [
                 make(op: .opConstant, operand: 0),
                 make(op: .opConstant, operand: 1),
-                make(op: .opAdd),
+                make(op: .opPredicate, operand: 24),
              ]),
             (input: "１から２を引く",
              expectedConstants: [-1],
@@ -37,11 +37,11 @@ final class CompilerTests: XCTestCase {
                 make(op: .opConstant, operand: 0),
              ]),
             (input: "１から２を。引く",
-             expectedConstants: [1, 2],
+             expectedConstants: [(1,"から"), (2,"を")],
              expectedInstructions: [
                 make(op: .opConstant, operand: 0),
                 make(op: .opConstant, operand: 1),
-                make(op: .opSub),
+                make(op: .opPredicate, operand: 26),
              ]),
             (input: "１と２を掛ける",
              expectedConstants: [2],
@@ -49,11 +49,11 @@ final class CompilerTests: XCTestCase {
                 make(op: .opConstant, operand: 0),
              ]),
             (input: "１と２を。掛ける",
-             expectedConstants: [1, 2],
+             expectedConstants: [(1,"と"), (2,"を")],
              expectedInstructions: [
                 make(op: .opConstant, operand: 0),
                 make(op: .opConstant, operand: 1),
-                make(op: .opMul),
+                make(op: .opPredicate, operand: 25),
              ]),
             (input: "２を１で割る",
              expectedConstants: [2],
@@ -61,11 +61,11 @@ final class CompilerTests: XCTestCase {
                 make(op: .opConstant, operand: 0),
              ]),
             (input: "２を１で。割る",
-             expectedConstants: [2, 1],
+             expectedConstants: [(2,"を"), (1,"で")],
              expectedInstructions: [
                 make(op: .opConstant, operand: 0),
                 make(op: .opConstant, operand: 1),
-                make(op: .opDiv),
+                make(op: .opPredicate, operand: 27),
              ]),
             (input: "１の負数",
              expectedConstants: [-1],
@@ -81,7 +81,7 @@ final class CompilerTests: XCTestCase {
              expectedConstants: [1],
              expectedInstructions: [
                 make(op: .opConstant, operand: 0),
-                make(op: .opNeg),
+                make(op: .opPredicate, operand: 28),
              ]),
         ]
         try runCompilerTests(testPatterns)
@@ -104,11 +104,11 @@ final class CompilerTests: XCTestCase {
                 make(op: .opFalse),
              ]),
             (input: "1が2より。大きい",
-             expectedConstants: [1, 2],
+             expectedConstants: [(1,"が"),(2,"より")],
              expectedInstructions: [
                 make(op: .opConstant, operand: 0),
                 make(op: .opConstant, operand: 1),
-                make(op: .opGreaterThan),
+                make(op: .opPredicate, operand: 30),
              ]),
             (input: "1が2より小さい",
              expectedConstants: [],
@@ -116,11 +116,11 @@ final class CompilerTests: XCTestCase {
                 make(op: .opTrue),
              ]),
             (input: "1が2より。小さい",
-             expectedConstants: [1, 2],
+             expectedConstants: [(1,"が"),(2,"より")],
              expectedInstructions: [
                 make(op: .opConstant, operand: 0),
                 make(op: .opConstant, operand: 1),
-                make(op: .opLessThan),
+                make(op: .opPredicate, operand: 29),
              ]),
             (input: "1が2に等しい",
              expectedConstants: [],
@@ -128,25 +128,24 @@ final class CompilerTests: XCTestCase {
                 make(op: .opFalse),
              ]),
             (input: "1が2に。等しい",
-             expectedConstants: [1, 2],
+             expectedConstants: [(1,"が"),(2,"に")],
              expectedInstructions: [
                 make(op: .opConstant, operand: 0),
                 make(op: .opConstant, operand: 1),
-                make(op: .opEqual),
+                make(op: .opPredicate, operand: 31),
              ]),
             (input: "1が2に等しくない",
              expectedConstants: [],
              expectedInstructions: [
-                make(op: .opFalse),
-                make(op: .opNot),
+                make(op: .opTrue),
              ]),
             (input: "1が2に。等しくない",
-             expectedConstants: [1, 2],
+             expectedConstants: [(1,"が"),(2,"に")],
              expectedInstructions: [
                 make(op: .opConstant, operand: 0),
                 make(op: .opConstant, operand: 1),
-                make(op: .opEqual),
-                make(op: .opNot),
+                make(op: .opPredicate, operand: 31),
+                make(op: .opPredicate, operand: 33),
              ]),
             (input: "真が偽に等しい",
              expectedConstants: [],
@@ -154,37 +153,35 @@ final class CompilerTests: XCTestCase {
                 make(op: .opFalse),
              ]),
             (input: "真が偽に。等しい",
-             expectedConstants: [true, false],
+             expectedConstants: [(true,"が"), (false,"に")],
              expectedInstructions: [
                 make(op: .opConstant, operand: 0),
                 make(op: .opConstant, operand: 1),
-                make(op: .opEqual),
+                make(op: .opPredicate, operand: 31),
              ]),
             (input: "真が偽に等しくない",
              expectedConstants: [],
              expectedInstructions: [
-                make(op: .opFalse),
-                make(op: .opNot),
+                make(op: .opTrue),
              ]),
             (input: "真が偽に。等しくない",
-             expectedConstants: [true, false],
+             expectedConstants: [(true,"が"), (false,"に")],
              expectedInstructions: [
                 make(op: .opConstant, operand: 0),
                 make(op: .opConstant, operand: 1),
-                make(op: .opEqual),
-                make(op: .opNot),
+                make(op: .opPredicate, operand: 31),
+                make(op: .opPredicate, operand: 33),
              ]),
             (input: "真でない",
-             expectedConstants: [true],
+             expectedConstants: [],
              expectedInstructions: [
-                make(op: .opConstant, operand: 0),
-                make(op: .opNot),
+                make(op: .opFalse),
              ]),
             (input: "真で。ない",
-             expectedConstants: [true],
+             expectedConstants: [(true,"で")],
              expectedInstructions: [
                 make(op: .opConstant, operand: 0),
-                make(op: .opNot),
+                make(op: .opPredicate, operand: 33),
              ]),
             (input: "1が正",
              expectedConstants: [],
@@ -192,11 +189,10 @@ final class CompilerTests: XCTestCase {
                 make(op: .opTrue),
              ]),
             (input: "1。正",
-             expectedConstants: [1, 0],
+             expectedConstants: [1],
              expectedInstructions: [
                 make(op: .opConstant, operand: 0),
-                make(op: .opConstant, operand: 1),
-                make(op: .opGreaterThan),
+                make(op: .opGetProperty, operand: 8),
              ]),
             (input: "-1が負",
              expectedConstants: [],
@@ -204,11 +200,10 @@ final class CompilerTests: XCTestCase {
                 make(op: .opTrue),
              ]),
             (input: "-1。負",
-             expectedConstants: [-1, 0],
+             expectedConstants: [-1],
              expectedInstructions: [
                 make(op: .opConstant, operand: 0),
-                make(op: .opConstant, operand: 1),
-                make(op: .opLessThan),
+                make(op: .opGetProperty, operand: 9),
              ]),
             (input: "0が正",
              expectedConstants: [],
@@ -216,11 +211,10 @@ final class CompilerTests: XCTestCase {
                 make(op: .opFalse),
              ]),
             (input: "0。正",
-             expectedConstants: [0, 0],
+             expectedConstants: [0],
              expectedInstructions: [
                 make(op: .opConstant, operand: 0),
-                make(op: .opConstant, operand: 1),
-                make(op: .opGreaterThan),
+                make(op: .opGetProperty, operand: 8),
              ]),
         ]
         try runCompilerTests(testPatterns)
@@ -238,11 +232,11 @@ final class CompilerTests: XCTestCase {
                 make(op: .opConstant, operand: 0),
              ]),
             (input: "「mon」と「key」を。足す",
-             expectedConstants: ["mon", "key"],
+             expectedConstants: [("mon","と"), ("key","を")],
              expectedInstructions: [
                 make(op: .opConstant, operand: 0),
                 make(op: .opConstant, operand: 1),
-                make(op: .opAdd),
+                make(op: .opPredicate, operand: 24),
              ]),
         ]
         try runCompilerTests(testPatterns)
@@ -265,9 +259,9 @@ final class CompilerTests: XCTestCase {
             (input: "配列【１と２を足す、３から４を引く、５と６を掛ける】",
              expectedConstants: [3, -1, 30],
              expectedInstructions: [
-                make(op: .opConstant, operand: 0),
-                make(op: .opConstant, operand: 1),
-                make(op: .opConstant, operand: 2),
+                make(op: .opConstant, operand: 0),  // 1 + 2
+                make(op: .opConstant, operand: 1),  // 3 - 4
+                make(op: .opConstant, operand: 2),  // 5 * 6
                 make(op: .opArray, operand: 3),
              ]),
         ]
@@ -294,10 +288,10 @@ final class CompilerTests: XCTestCase {
             (input: "辞書【１が２と３を足す、４が５と６を掛ける】",
              expectedConstants: [1, 5, 4, 30],
              expectedInstructions: [
-                make(op: .opConstant, operand: 0),
-                make(op: .opConstant, operand: 1),
-                make(op: .opConstant, operand: 2),
-                make(op: .opConstant, operand: 3),
+                make(op: .opConstant, operand: 0),  // 1が
+                make(op: .opConstant, operand: 1),  // 2と3を足す
+                make(op: .opConstant, operand: 2),  // 4が
+                make(op: .opConstant, operand: 3),  // 5と６を掛ける
                 make(op: .opDictionary, operand: 4),
              ]),
         ]
@@ -315,12 +309,26 @@ final class CompilerTests: XCTestCase {
                 make(op: .opConstant, operand: 3),
                 make(op: .opArray, operand: 3),
                 make(op: .opGetGlobal, operand: 0),
-                make(op: .opIndex),
+                make(op: .opGenitive),
              ]),
             (input: "配列【１、２、３】の２番目",
              expectedConstants: [3],
              expectedInstructions: [
                 make(op: .opConstant, operand: 0),
+             ]),
+            (input: "aは、配列【１、２、３】。iは２番目。aのi",
+             expectedConstants: [1, 2, 3, 2],
+             expectedInstructions: [
+                make(op: .opConstant, operand: 0),
+                make(op: .opConstant, operand: 1),
+                make(op: .opConstant, operand: 2),
+                make(op: .opArray, operand: 3),
+                make(op: .opSetGlobal, operand: 0),
+                make(op: .opConstant, operand: 3),
+                make(op: .opSetGlobal, operand: 1),
+                make(op: .opGetGlobal, operand: 0),
+                make(op: .opGetGlobal, operand: 1),
+                make(op: .opGenitive),
              ]),
             (input: "iは、2から1を引く。辞書【１が２】のi",
              expectedConstants: [1, 1, 2],
@@ -331,7 +339,7 @@ final class CompilerTests: XCTestCase {
                 make(op: .opConstant, operand: 2),
                 make(op: .opDictionary, operand: 2),
                 make(op: .opGetGlobal, operand: 0),
-                make(op: .opIndex),
+                make(op: .opGenitive),
              ]),
             (input: "辞書【１が２】の１",
              expectedConstants: [2],
@@ -343,12 +351,12 @@ final class CompilerTests: XCTestCase {
     }
     func testPhraseExpressions() throws {
         let testPatterns: [CompilerTestCase] = [
-            (input: "１と２を。足す。",                 // 句は定数
+            (input: "１と２を。足す。", // 句は定数
              expectedConstants: [(1, "と"), (2, "を")],
              expectedInstructions: [
                 make(op: .opConstant, operand: 0),  // 1と
                 make(op: .opConstant, operand: 1),  // 2を
-                make(op: .opAdd),
+                make(op: .opPredicate, operand: 24),
             ]),
             (input: "aは１。bは２。aとbを足す。",
              expectedConstants: [1, 2, (nil as Int?, "と"), (nil as Int?, "を")],
@@ -361,7 +369,7 @@ final class CompilerTests: XCTestCase {
                 make(op: .opPhrase, operand: 2),    // 「と」から「aと」を作る
                 make(op: .opGetGlobal, operand: 1), // b
                 make(op: .opPhrase, operand: 3),    // 「を」から「bを」を作る
-                make(op: .opAdd),
+                make(op: .opPredicate, operand: 24),
             ]),
             (input: "関数【】を実行する。",
              expectedConstants: [
@@ -369,7 +377,7 @@ final class CompilerTests: XCTestCase {
              ],
              expectedInstructions: [
                 make(op: .opConstant, operand: 0),
-                make(op: .opCall),                  // 「を」は取り除かれる
+                make(op: .opCall),                      // 「を」は取り除かれる
             ]),
             (input: "テストは関数【】。テストをする。",
              expectedConstants: [
@@ -379,7 +387,7 @@ final class CompilerTests: XCTestCase {
                 make(op: .opConstant, operand: 0),
                 make(op: .opSetGlobal, operand: 0),
                 make(op: .opGetGlobal, operand: 0),
-                make(op: .opCall),                  // 「を」は取り除かれる
+                make(op: .opCall),                      // 「を」は取り除かれる
             ]),
             (input: "1を負数にする。",
              expectedConstants: [-1],
@@ -390,7 +398,7 @@ final class CompilerTests: XCTestCase {
              expectedConstants: [(1, "を")],
              expectedInstructions: [
                 make(op: .opConstant, operand: 0),
-                make(op: .opNeg),                   // 「に(する）」は取り除かれる
+                make(op: .opPredicate, operand: 28),    // 「に(する）」は取り除かれる
             ]),
             (input: "１と２を。足したものに、3と４を。足したものを、掛ける。",
              expectedConstants: [
@@ -404,13 +412,13 @@ final class CompilerTests: XCTestCase {
              expectedInstructions: [
                 make(op: .opConstant, operand: 0),  // 1と
                 make(op: .opConstant, operand: 1),  // 2を
-                make(op: .opAdd),
+                make(op: .opPredicate, operand: 24),// 足し
                 make(op: .opPhrase, operand: 2),    // に (直前の「た」は取り除く
                 make(op: .opConstant, operand: 3),  // 3と
                 make(op: .opConstant, operand: 4),  // 4を
-                make(op: .opAdd),
+                make(op: .opPredicate, operand: 24),// 足し
                 make(op: .opPhrase, operand: 5),    // を (直前の「た」は取り除く
-                make(op: .opMul),
+                make(op: .opPredicate, operand: 25),// 掛ける
             ]),
         ]
         try runCompilerTests(testPatterns)
@@ -418,46 +426,38 @@ final class CompilerTests: XCTestCase {
     func testConditionals() throws {
         let testPatterns: [CompilerTestCase] = [
             (input: "真である場合、【１０】。３３３３。",
-             expectedConstants: [true, 10, 3333],
+             expectedConstants: [10, 3333],
              expectedInstructions: [
-                make(op: .opConstant, operand: 0),          // 0000 真
-                make(op: .opBe),                            // 0003
-                make(op: .opJumpNotTruthy, operand: 10),    // 0004
-                make(op: .opConstant, operand: 1),          // 0007 10
-                make(op: .opConstant, operand: 2),          // 0010 3333
+                make(op: .opConstant, operand: 0),          // 0000 10
+                make(op: .opConstant, operand: 1),          // 0003 3333
              ]),
             (input: "１が１に。等しい場合、【１０】。３３３３。",
-             expectedConstants: [1, 1, 10, 3333],
+             expectedConstants: [(1,"が"), (1,"に"), 10, 3333],
              expectedInstructions: [
                 make(op: .opConstant, operand: 0),          // 0000 1
                 make(op: .opConstant, operand: 1),          // 0003 1
-                make(op: .opEqual),                         // 0006
-                make(op: .opJumpNotTruthy, operand: 13),    // 0007
-                make(op: .opConstant, operand: 2),          // 0010 10
-                make(op: .opConstant, operand: 3),          // 0013 3333
+                make(op: .opPredicate, operand: 31),        // 0006
+                make(op: .opJumpNotTruthy, operand: 14),    // 0008
+                make(op: .opConstant, operand: 2),          // 0011 10
+                make(op: .opConstant, operand: 3),          // 0014 3333
              ]),
             (input: "真である場合、【１０】、それ以外は、【２０】。３３３３。",
-             expectedConstants: [true, 10, 20, 3333],
+             expectedConstants: [10, 3333],
              expectedInstructions: [
-                make(op: .opConstant, operand: 0),          // 0000 真
-                make(op: .opBe),                            // 0003
-                make(op: .opJumpNotTruthy, operand: 13),    // 0004
-                make(op: .opConstant, operand: 1),          // 0007 10
-                make(op: .opJump, operand: 16),             // 0010
-                make(op: .opConstant, operand: 2),          // 0013 20
-                make(op: .opConstant, operand: 3),          // 0016 3333
+                make(op: .opConstant, operand: 0),          // 0007 10
+                make(op: .opConstant, operand: 1),          // 0016 3333
              ]),
             (input: "１が１に。等しい場合、【１０】、それ以外は、【２０】。３３３３。",
-             expectedConstants: [1, 1, 10, 20, 3333],
+             expectedConstants: [(1,"が"), (1,"に"), 10, 20, 3333],
              expectedInstructions: [
                 make(op: .opConstant, operand: 0),          // 0000 1
                 make(op: .opConstant, operand: 1),          // 0003 1
-                make(op: .opEqual),                         // 0006
-                make(op: .opJumpNotTruthy, operand: 16),    // 0007
-                make(op: .opConstant, operand: 2),          // 0010 10
-                make(op: .opJump, operand: 19),             // 0013
-                make(op: .opConstant, operand: 3),          // 0016 20
-                make(op: .opConstant, operand: 4),          // 0019 3333
+                make(op: .opPredicate, operand: 31),        // 0006
+                make(op: .opJumpNotTruthy, operand: 17),    // 0008
+                make(op: .opConstant, operand: 2),          // 0011 10
+                make(op: .opJump, operand: 20),             // 0014
+                make(op: .opConstant, operand: 3),          // 0017 20
+                make(op: .opConstant, operand: 4),          // 0020 3333
              ]),
         ]
         try runCompilerTests(testPatterns)
@@ -546,29 +546,29 @@ final class CompilerTests: XCTestCase {
         try runCompilerTests(testPatterns)
     }
     func testCompilerScopes() throws {
-        let compiler = Compiler()
+        let compiler = Compiler(from: Program())
         XCTAssertEqual(compiler.scopeIndex, 0)
         let globalSymbolTable = SymbolTable()
-        _ = compiler.emit(op: .opMul)
+        _ = compiler.emit(op: .opTrue)
         //
         compiler.enterScope()
         XCTAssertEqual(compiler.scopeIndex, 1)
-        _ = compiler.emit(op: .opSub)
+        _ = compiler.emit(op: .opFalse)
         XCTAssertEqual(compiler.scopes[compiler.scopeIndex].instructions.count, 1)
         var last = compiler.scopes[compiler.scopeIndex].lastInstruction
-        XCTAssertEqual(last?.opcode, .opSub)
+        XCTAssertEqual(last?.opcode, .opFalse)
         XCTAssertEqual(compiler.symbolTable.outer, globalSymbolTable)
         _ = compiler.leaveScope()
         //
         XCTAssertEqual(compiler.scopeIndex, 0)
         XCTAssertEqual(compiler.symbolTable, globalSymbolTable)
         XCTAssertEqual(compiler.symbolTable.outer, nil)
-        _ = compiler.emit(op: .opAdd)
+        _ = compiler.emit(op: .opNull)
         XCTAssertEqual(compiler.scopes[compiler.scopeIndex].instructions.count, 2)
         last = compiler.scopes[compiler.scopeIndex].lastInstruction
-        XCTAssertEqual(last?.opcode, .opAdd)
+        XCTAssertEqual(last?.opcode, .opNull)
         let previous = compiler.scopes[compiler.scopeIndex].previousInstruction
-        XCTAssertEqual(previous?.opcode, .opMul)
+        XCTAssertEqual(previous?.opcode, .opTrue)
     }
     func testFunctionCalls() throws {
         let testPatterns: [CompilerTestCase] = [
@@ -726,7 +726,7 @@ final class CompilerTests: XCTestCase {
                     make(op: .opPhrase, operand: 2),
                     make(op: .opGetLocal, operand: 1),
                     make(op: .opPhrase, operand: 3),
-                    make(op: .opAdd),
+                    make(op: .opPredicate, operand: 24),
                     make(op: .opReturn),
                 ],
              ],
@@ -736,24 +736,69 @@ final class CompilerTests: XCTestCase {
         ]
         try runCompilerTests(testPatterns)
     }
+    func testBuiltins() throws {
+        let testPtterns: [CompilerTestCase] = [
+            (input: "配列【】の数。配列【】に１を追加",
+             expectedConstants: [0,1],
+             expectedInstructions: [
+                make(op: .opConstant, operand: 0),      // 0
+                make(op: .opConstant, operand: 1),      // 1
+                make(op: .opArray, operand: 1),         // 配列【1】
+             ]),
+            (input: "配列【】。数。配列【】。１を追加",
+             expectedConstants: [(1, "を")],
+             expectedInstructions: [
+                make(op: .opArray, operand: 0),         // 配列【】。
+                make(op: .opGetProperty, operand: 6),   // 数
+                make(op: .opArray, operand: 0),         // 配列【】。
+                make(op: .opConstant, operand: 0),      // 1を
+                make(op: .opPredicate, operand: 0),     // 追加
+             ]),
+            (input: "関数【配列【】の数】",
+             expectedConstants: [
+                0,
+                [
+                    make(op: .opConstant, operand: 0),      // 配列【】の数 = 0
+                    make(op: .opReturn),
+                ],
+             ],
+             expectedInstructions: [
+                make(op: .opConstant, operand: 1),      // 関数
+             ]),
+            (input: "関数【配列【】。数】",
+             expectedConstants: [
+                [
+                    make(op: .opArray, operand: 0),         // 配列【】。
+                    make(op: .opGetProperty, operand: 6),   // 数
+                    make(op: .opReturn),
+                ],
+             ],
+             expectedInstructions: [
+                make(op: .opConstant, operand: 0),      // 関数
+             ]),
+        ]
+        try runCompilerTests(testPtterns)
+    }
     // MARK: - Helpers
     private func runCompilerTests(_ tests: [CompilerTestCase]) throws {
         for t in tests {
+            print("テスト開始：「\(t.input)」")
             let program = parseProgram(with: t.input)
             let compiler = Compiler(from: program)
             XCTAssertNil(compiler.compile())
             let bytecode = compiler.bytecode
             testInstructions(t.expectedInstructions, bytecode.instructions)
             try testConstants(t.expectedConstants, bytecode.constants)
+            print("テスト終了：\(bytecode.instructions.string.quoted)")
         }
     }
     private func testInstructions(_ expected: [Instructions], _ actual: Instructions) {
         let concatted = concatInstructions(expected)
-        XCTAssertEqual(actual.count, concatted.count,
-                       "In \(#function): wrong instructions length.\nwant=\(concatted.string.quoted)\ngot= \(actual.string.quoted)")
-        for (i, ins) in actual.enumerated() {
-            XCTAssertEqual(ins, concatted[i],
-                           "In \(#function): wrong instruction at \(i).\nwant=\(concatted.string.quoted)\ngot= \(actual.string.quoted)")
+        XCTAssertEqual(concatted.count, actual.count,
+                       "関数「\(#function)」で、インストラクション長が違う。\n期待は、\(concatted.string.quoted)\n実際は、\(actual.string.quoted)")
+        for (i, (expectedByte, actualByte)) in zip(concatted, actual).enumerated() {
+            XCTAssertEqual(expectedByte, actualByte,
+                           "関数「\(#function)」で、\(i)番地のインストラクションが異なる。\n期待は、\(concatted.string.quoted)\n実際は、\(actual.string.quoted)")
         }
     }
     private func concatInstructions(_ s: [Instructions]) -> Instructions {
@@ -761,20 +806,20 @@ final class CompilerTests: XCTestCase {
     }
     private func testConstants(_ expected: [Any], _ actual: [JpfObject]) throws {
         XCTAssertEqual(expected.count, actual.count,
-                       "In \(#function): wrong number of constants. got=\(String(describing: actual.count)), want=\(expected.count)")
-        for (i, object) in actual.enumerated() {
-            switch expected[i] {
+                       "関数「\(#function)」で、定数の数が誤っている。期待値は\(expected.count)だが、実際値は\(actual.count)。")
+        for (expected, actual) in zip(expected, actual) {
+            switch expected {
             case let integer as Int:
-                try testIntegerObject(Int64(integer), object)
+                try testIntegerObject(Int64(integer), actual)
             case let boolean as Bool:
-                try testBooleanObject(boolean, object)
+                try testBooleanObject(boolean, actual)
             case let string as String:
-                try testStringObject(string, object)
+                try testStringObject(string, actual)
             case let instructions as [Instructions]:
-                let fn = try XCTUnwrap(actual[i] as? JpfCompiledFunction)
+                let fn = try XCTUnwrap(actual as? JpfCompiledFunction)
                 testInstructions(instructions, fn.instructions)
             case let (number, particle) as (Int?, String):
-                let phrase = object as? JpfPhrase
+                let phrase = actual as? JpfPhrase
                 if let n = number {
                     let object = try XCTUnwrap(phrase?.value)
                     try testIntegerObject(Int64(n), object)
@@ -787,16 +832,16 @@ final class CompilerTests: XCTestCase {
         }
     }
     private func testIntegerObject(_ expected: Int64, _ actual: JpfObject) throws {
-        let integer = try XCTUnwrap(actual.value as? JpfInteger)
+        let integer = try XCTUnwrap(actual as? JpfInteger, "実際は、\(actual.type)")
         XCTAssertEqual(integer.value, Int(expected))
     }
     private func testBooleanObject(_ expected: Bool, _ actual: JpfObject) throws {
-        let integer = try XCTUnwrap(actual.value as? JpfBoolean)
+        let integer = try XCTUnwrap(actual as? JpfBoolean, "実際は、\(actual.type)")
         XCTAssertEqual(integer.value, expected)
     }
     private func testStringObject(_ expected: String, _ actual: JpfObject) throws {
-        let string = try XCTUnwrap(actual.value as? JpfString)
-        XCTAssertEqual(string.value, expected)  
+        let string = try XCTUnwrap(actual as? JpfString, "実際は、\(actual.type)")
+        XCTAssertEqual(string.value, expected)
     }
 }
 extension String {

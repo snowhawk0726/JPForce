@@ -16,76 +16,58 @@ enum Opcode : Byte {
     case opConstant = 0
     case opSetGlobal
     case opGetGlobal
-    case opGetLocal
     case opSetLocal
-    case opPop
+    case opGetLocal
+    case opPop              // 5 (未使用)
     case opPhrase           // 句を形成する
     case opTrue
     case opFalse
     case opNull
-    case opArray
+    case opArray            // 10
     case opDictionary
-    case opIndex
-    case opBe
-    case opNot
-    case opEqual
-    case opGreaterThan
-    case opLessThan
+    case opGenitive
     case opJump
     case opJumpNotTruthy
-    case opAdd
-    case opSub
-    case opMul
-    case opDiv
-    case opNeg
-    case opCall
+    case opCall             // 15
     case opReturnValue
     case opReturn
+    case opPredicate
+    case opGetProperty
+    //
+    var definition: Definition {
+        switch self {
+        case .opConstant:       Definition(name: "OpConstant",      operandWidths: [2])
+        case .opSetGlobal:      Definition(name: "OpSetGlobal",     operandWidths: [2])
+        case .opGetGlobal:      Definition(name: "OpGetGlobal",     operandWidths: [2])
+        case .opSetLocal:       Definition(name: "OpSetLocal",      operandWidths: [1])
+        case .opGetLocal:       Definition(name: "OpGetLocal",      operandWidths: [1])
+        case .opPop:            Definition(name: "OpPop",           operandWidths: [])
+        case .opPhrase:         Definition(name: "OpPhrase",        operandWidths: [2])
+        case .opTrue:           Definition(name: "OpTrue",          operandWidths: [])
+        case .opFalse:          Definition(name: "OpFalse",         operandWidths: [])
+        case .opNull:           Definition(name: "OpNull",          operandWidths: [])
+        case .opArray:          Definition(name: "OpArray",         operandWidths: [2])
+        case .opDictionary:     Definition(name: "OpDictionary",    operandWidths: [2])
+        case .opGenitive:       Definition(name: "OpGenitive",      operandWidths: [])
+        case .opJump:           Definition(name: "OpJump",          operandWidths: [2])
+        case .opJumpNotTruthy:  Definition(name: "OpJumpNotTruthy", operandWidths: [2])
+        case .opCall:           Definition(name: "OpCall",          operandWidths: [])
+        case .opReturnValue:    Definition(name: "OpReturnValue",   operandWidths: [])
+        case .opReturn:         Definition(name: "OpReturn",        operandWidths: [])
+        case .opPredicate:      Definition(name: "OpPredicate",     operandWidths: [1])
+        case .opGetProperty:    Definition(name: "OpGetProperty",   operandWidths: [1])
+        }
+    }
+    var operandWidth: Int {self.definition.operandWidths.first ?? 0}    // オペランド長
 }
 /// 命令定義
 struct Definition {
     var name: String
     var operandWidths: [Int]
 }
-var definitions: [Opcode: Definition] = [
-    .opConstant:    Definition(name: "OpConstant", operandWidths: [2]),     // 0
-    .opSetGlobal:   Definition(name: "OpSetGlobal", operandWidths: [2]),
-    .opGetGlobal:   Definition(name: "OpGetGlobal", operandWidths: [2]),
-    .opSetLocal:    Definition(name: "OpSetLocal", operandWidths: [1]),
-    .opGetLocal:    Definition(name: "OpGetLocal", operandWidths: [1]),
-    .opPop:         Definition(name: "OpPop", operandWidths: []),           // 5
-    .opPhrase:      Definition(name: "OpPhrase", operandWidths: [2]),
-    .opTrue:        Definition(name: "OpTrue", operandWidths: []),
-    .opFalse:       Definition(name: "OpFalse", operandWidths: []),
-    .opNull:        Definition(name: "OpNull", operandWidths: []),
-    .opArray:       Definition(name: "OpArray", operandWidths: [2]),        // 10
-    .opDictionary:  Definition(name: "OpDictionary", operandWidths: [2]),
-    .opIndex:       Definition(name: "OpIndex", operandWidths: []),
-    .opBe:          Definition(name: "OpBe", operandWidths: []),
-    .opNot:         Definition(name: "OpNot", operandWidths: []),
-    .opEqual:       Definition(name: "OpEqual", operandWidths: []),         // 15
-    .opGreaterThan: Definition(name: "OpGreaterThan", operandWidths: []),
-    .opLessThan:    Definition(name: "OpLessThan", operandWidths: []),
-    .opJump:        Definition(name: "OpJump", operandWidths: [2]),
-    .opJumpNotTruthy:
-                    Definition(name: "OpJumpNotTruthy", operandWidths: [2]),
-    .opAdd:         Definition(name: "OpAdd", operandWidths: []),           // 20
-    .opSub:         Definition(name: "OpSub", operandWidths: []),
-    .opMul:         Definition(name: "OpMul", operandWidths: []),
-    .opDiv:         Definition(name: "OpDiv", operandWidths: []),
-    .opNeg:         Definition(name: "OpNeg", operandWidths: []),
-    .opCall:        Definition(name: "OpCall", operandWidths: []),          // 25
-    .opReturnValue: Definition(name: "OpReturnValue", operandWidths: []),
-    .opReturn:      Definition(name: "OpReturn", operandWidths: []),
-]
-func operandWidth(of op: Opcode) -> Int? {
-    guard let definitions = definitions[op] else {return nil}
-    return definitions.operandWidths.first ?? 0
-}
 // MARK: - implements for instruction
 func lookUp(_ op: Byte) -> Definition? {
-    guard let op = Opcode(rawValue: op) else {return nil}
-    return definitions[op]
+    Opcode(rawValue: op)?.definition
 }
 /// バイト列（インストラクション）を生成する。
 /// - Parameters:
@@ -93,13 +75,12 @@ func lookUp(_ op: Byte) -> Definition? {
 ///   - operands: オペランド
 /// - Returns: バイト列
 func make(op: Opcode, operands: [Int] = []) -> [Byte] {
-    guard let def = definitions[op] else {return []}
-    let instrunctionLength = def.operandWidths.reduce(1) {$0 + $1}
+    let instrunctionLength = 1 + op.operandWidth
     var instrunction = [Byte](repeating: 0, count: instrunctionLength)
     instrunction[0] = op.rawValue
     var offset = 1
-    for (operand, operandWidth) in zip(operands, def.operandWidths) {
-        switch operandWidth {
+    for operand in operands {
+        switch op.operandWidth {
         case 2:
             let bytes = withUnsafeBytes(of: UInt16(operand).bigEndian) {Array($0)}
             instrunction.replaceSubrange(offset..<offset+2, with: bytes)
@@ -108,36 +89,12 @@ func make(op: Opcode, operands: [Int] = []) -> [Byte] {
         default:
             break
         }
-        offset += operandWidth
+        offset += op.operandWidth
     }
     return instrunction
 }
 func make(op: Opcode, operand: Int) -> [Byte] {
     return make(op: op, operands: [operand])
-}
-extension Instructions {
-    /// インストラクション(バイト列)を文字列形式に整形(逆アセンブル)する。
-    var string: String {
-        var s = ""
-        var i = 0
-        while i < self.count {
-            guard let def = lookUp(self[i]) else {
-                s = "Error: opcode \(self[i]) undefined."
-                continue
-            }
-            let (operands, read) = readOperands(with: def, from: Array(self[(i+1)...]))
-            s += String(format: "%04d %@\n", i, formattedInstruction(def, operands))
-            i += 1 + read
-        }
-        return s
-    }
-    /// インストラクション(バイト列)を１６進表示する。
-    var quoted: String {
-        "\"" + (self.map {String(format: "0x%02x", $0)}).joined(separator: ", ") + "\""
-    }
-}
-extension Byte {
-    var quoted: String {"\"" + String(format: "0x%02x", self) + "\""}
 }
 /// インストラクションからオペランドを読み込み、数値列と読み込んだバイト数を返す。
 /// - Parameters:
@@ -165,22 +122,47 @@ func readOperands(with def: Definition, from ins: Instructions) -> ([Int], Int) 
 /// - Returns: ビッグエンディアンの16ビットデータ(UInt16)
 func readUInt16(from ins: Instructions) -> UInt16 {Data(ins).withUnsafeBytes {$0.load(as: UInt16.self)}.bigEndian}
 func readUInt8(from ins: Instructions) -> UInt8 {ins[0]}
-/// 命令定義とオペランド列から、文字列形式を作成する。("命令語 オペランド")
-/// - Parameters:
-///   - def: 命令定義
-///   - operands: オペランド列
-/// - Returns: 整形された文字列
-private func formattedInstruction(_ def: Definition, _ operands: [Int]) -> String {
-    let operandCount = def.operandWidths.count
-    if operands.count != operandCount {
-        return "Error: operand count \(operands.count) does not match defined \(operandCount)"
+//
+extension Instructions {
+    /// インストラクション(バイト列)を文字列形式に整形(逆アセンブル)する。
+    var string: String {
+        var s = ""
+        var i = 0
+        while i < self.count {
+            guard let def = lookUp(self[i]) else {
+                s = "Error: opcode \(self[i]) undefined."
+                continue
+            }
+            let (operands, read) = readOperands(with: def, from: Array(self[(i+1)...]))
+            s += String(format: "%04d %@\n", i, formattedInstruction(def, operands))
+            i += 1 + read
+        }
+        return s
     }
-    switch operandCount {
-    case 0:
-        return def.name
-    case 1:
-        return "\(def.name) \(operands[0])"
-    default:
-        return "Error: unhandled operandCount for \(def.name)"
+    /// インストラクション(バイト列)を１６進表示する。
+    var quoted: String {
+        "\"" + (self.map {String(format: "0x%02x", $0)}).joined(separator: ", ") + "\""
     }
+    /// 命令定義とオペランド列から、文字列形式を作成する。("命令語 オペランド")
+    /// - Parameters:
+    ///   - def: 命令定義
+    ///   - operands: オペランド列
+    /// - Returns: 整形された文字列
+    private func formattedInstruction(_ def: Definition, _ operands: [Int]) -> String {
+        let operandCount = def.operandWidths.count
+        if operands.count != operandCount {
+            return "Error: operand count \(operands.count) does not match defined \(operandCount)"
+        }
+        switch operandCount {
+        case 0:
+            return def.name
+        case 1:
+            return "\(def.name) \(operands[0])"
+        default:
+            return "Error: unhandled operandCount for \(def.name)"
+        }
+    }
+}
+extension Byte {
+    var quoted: String {"\"" + String(format: "0x%02x", self) + "\""}
 }

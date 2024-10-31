@@ -104,4 +104,45 @@ final class SymbolTableTests : XCTestCase {
             }
         }
     }
+    func testDefineResolevePredicates() throws {
+        let global = SymbolTable()
+        let firstLocal = SymbolTable(outer: global)
+        let secondLocal = SymbolTable(outer: firstLocal)
+        let expected = [
+            Symbol(name: "a", scope: .PREDICATE, index: 0),
+            Symbol(name: "c", scope: .PREDICATE, index: 1),
+            Symbol(name: "e", scope: .PREDICATE, index: 2),
+            Symbol(name: "f", scope: .PREDICATE, index: 3),
+        ]
+        for (index, symbol) in expected.enumerated() {
+            _ = global.define(name: symbol.name, index: index, scope: .PREDICATE)
+        }
+        for table in [global, firstLocal, secondLocal] {
+            for symbol in expected {
+                let result = try XCTUnwrap(table.resolve(symbol.name))
+                XCTAssertEqual(result, symbol)
+            }
+        }
+    }
+    func testDefineResoleveProperties() throws {
+        let global = SymbolTable()
+        let firstLocal = SymbolTable(outer: global)
+        let secondLocal = SymbolTable(outer: firstLocal)
+        let expected = [
+            Symbol(name: "a", scope: .PROPETRY, index: 0),
+            Symbol(name: "c", scope: .PROPETRY, index: 1),
+            Symbol(name: "e", scope: .PROPETRY, index: 2),
+            Symbol(name: "f", scope: .PROPETRY, index: 3),
+        ]
+        for (index, symbol) in expected.enumerated() {
+            _ = global.define(name: symbol.name, index: index, scope: .PROPETRY)
+        }
+        for table in [global, firstLocal, secondLocal] {
+            for symbol in expected {
+                let result = try XCTUnwrap(table.resolve(symbol.name))
+                XCTAssertEqual(result, symbol)
+            }
+        }
+    }
 }
+
