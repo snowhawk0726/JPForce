@@ -122,7 +122,7 @@ class VM {
         self.constants = bytecode.constants
         self.globals = GlobalStore()
         self.stack = Stack()
-        //
+        // メインフレームを含むフレームを作成
         frames = [Frame](repeating: Frame(), count: maxFrames)
         let mainFunction = JpfCompiledFunction(instructions: bytecode.instructions)
         let mainFrame = Frame(with: mainFunction, basePointer: 0)
@@ -135,113 +135,28 @@ class VM {
         self.stack = stack
     }
     //
-    private let constants: [JpfObject]
-    var stack: Stack
-    private var globals: GlobalStore
-    //
+    let constants: [JpfObject]  // 定数
+    var stack: Stack            // スタック
+    var globals: GlobalStore    // 大域領域
+    // フレーム
     private let maxFrames = 1024
     private var frames: [Frame] = []
     private var framesIndex: Int = 0
     // エラー
-    private let codeNotSupported =          JpfError("は、未実装。")
-    private let failedToSetGlobal =         JpfError("大域変数の定義に失敗した。")
-    private let failedToBuildArray =        JpfError("配列の定義に失敗した。")
-    private let failedToBuildDictionary =   JpfError("辞書の定義に失敗した。")
-    private let failedToGetProperty =       JpfError("属性の取得に失敗した。")
-    private let cannotFoundPredicate =      JpfError("述語が定義されていない。")
-    // Fetch instructions
+    private let codeNotSupported = JpfError("は、未実装。")
+    /// Fetch instructions
     func run() -> JpfError? {
         while currentFrame.isIpInRange {
             let ip = currentFrame.advancedIp()
             let instructions = currentFrame.insturctions!
             let opcode = Opcode(rawValue: instructions[ip])!
-            switch opcode {
-            case .opConstant:
-                let constIndex = Int(readUInt16(from: Array(instructions[(ip+1)...])))
-                currentFrame.advanceIp(by: 2)
-                if let error = push(constants[constIndex]) {return error}
-            case .opSetGlobal:
-                let globalIndex = Int(readUInt16(from: Array(instructions[(ip+1)...])))
-                currentFrame.advanceIp(by: 2)
-                guard let result = pull() else {return failedToSetGlobal}
-                globals[globalIndex] = result
-            case .opGetGlobal:
-                let globalIndex = Int(readUInt16(from: Array(instructions[(ip+1)...])))
-                currentFrame.advanceIp(by: 2)
-                if let error = push(globals[globalIndex]) {return error}
-            case .opSetLocal:
-                let localIndex = Int(readUInt8(from: Array(instructions[(ip+1)...])))
-                currentFrame.advanceIp(by: 1)
-                stack[currentFrame.basePointer + localIndex] = pull()
-            case .opGetLocal:
-                let localIndex = Int(readUInt8(from: Array(instructions[(ip+1)...])))
-                currentFrame.advanceIp(by: 1)
-                if let error = push(stack[currentFrame.basePointer + localIndex]!) {return error}
-            case .opGetProperty:
-                let index = Int(readUInt8(from: Array(instructions[(ip+1)...])))
-                currentFrame.advanceIp(by: 1)
-                guard let getPropertyOf = ObjectProperties()[index]?.accessor,
-                      let object = pull(),
-                      let result = getPropertyOf(object) else {
-                    return failedToGetProperty
-                }
-                if let error = push(result) {return error}
-            case .opPredicate:
-                let index = Int(readUInt8(from: Array(instructions[(ip+1)...])))
-                currentFrame.advanceIp(by: 1)
-                guard let predicate = PredicateOperableFactory()[index] else {return cannotFoundPredicate}
-                let environment = Environment(with: stack)
-                guard let result = predicate(environment).operated() else {return nil}
-                if let error = push(result) {return error}
-            case .opArray:
-                let numberOfElements = Int(readUInt16(from: Array(instructions[(ip+1)...])))
-                currentFrame.advanceIp(by: 2)
-                guard let array = buildArray(with: numberOfElements) else {return failedToBuildArray}
-                if let error = push(array) {return error}
-            case .opDictionary:
-                let numberOfElements = Int(readUInt16(from: Array(instructions[(ip+1)...])))
-                currentFrame.advanceIp(by: 2)
-                guard let dictionary = buildDictionary(with: numberOfElements) else {return failedToBuildDictionary}
-                if let error = push(dictionary) {return error}
-            case .opPhrase: // スタックのオブジェクトと、定数からJpfPhraseオブジェクトを作成
-                let constIndex = Int(readUInt16(from: Array(instructions[(ip+1)...])))
-                currentFrame.advanceIp(by: 2)
-                let p = constants[constIndex] as! JpfPhrase
-                let phrase = JpfPhrase(value: pull()?.value, particle: p.particle)
-                if let error = push(phrase) {return error}
-            case .opPop:
-                _ = pull()
-            case .opJump:
-                let position = Int(readUInt16(from: Array(instructions[(ip+1)...])))
-                currentFrame.setIp(to: position - 1)    // 飛び先
-            case .opJumpNotTruthy:
-                let position = Int(readUInt16(from: Array(instructions[(ip+1)...])))
-                currentFrame.advanceIp(by: 2)
-                if let condition = pull(), !condition.isTrue {  // Not Truthy
-                    currentFrame.setIp(to: position - 1)    // 飛び先
-                }
-            default:
-                guard let executer = CodeExecutableFactory.create(from: opcode, with: self) else {return "命令語(\(opcode.definition.name))" + codeNotSupported}
-                if let error = executer.execute() {return error}
+            let bytes = instructions[(ip+1)..<min(ip+1+opcode.operandWidth, instructions.count)].bytes
+            guard let executer = CodeExecutableFactory.create(from: opcode, operandBytes: bytes, with: self) else {
+                return "命令語(\(opcode.name))" + codeNotSupported
             }
+            if let error = executer.execute() {return error}
         }
         return nil
-    }
-    private func buildArray(with n: Int) -> JpfArray? {
-        guard let objects = peek(n) else {return nil}
-        drop(n)
-        return JpfArray(elements: objects)
-    }
-    private func buildDictionary(with n: Int) -> JpfDictionary? {
-        var pairs: [JpfHashKey: (key: JpfObject, value: JpfObject)] = [:]
-        guard let objects = peek(n) else {return nil}
-        drop(n)
-        for i in stride(from: 0, to: n, by: 2) {
-            let key = objects[i], value = objects[i+1]
-            guard let hash = key as? JpfHashable else {return nil}
-            pairs[hash.hashKey] = (key, value)
-        }
-        return JpfDictionary(pairs: pairs)
     }
     //
     var currentFrame: Frame {frames[framesIndex - 1]}

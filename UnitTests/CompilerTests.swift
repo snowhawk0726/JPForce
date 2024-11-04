@@ -11,7 +11,7 @@ final class CompilerTests: XCTestCase {
     typealias CompilerTestCase = (
         input: String,
         expectedConstants: [Any],
-        expectedInstructions: [Instructions]
+        expectedInstructions: [Instruction]
     )
     override func setUpWithError() throws {
     }
@@ -792,17 +792,14 @@ final class CompilerTests: XCTestCase {
             print("テスト終了：\(bytecode.instructions.string.quoted)")
         }
     }
-    private func testInstructions(_ expected: [Instructions], _ actual: Instructions) {
-        let concatted = concatInstructions(expected)
-        XCTAssertEqual(concatted.count, actual.count,
-                       "関数「\(#function)」で、インストラクション長が違う。\n期待は、\(concatted.string.quoted)\n実際は、\(actual.string.quoted)")
-        for (i, (expectedByte, actualByte)) in zip(concatted, actual).enumerated() {
+    private func testInstructions(_ expected: [Instruction], _ actual: Instructions) {
+        let instructions = Instructions(expected)
+        XCTAssertEqual(instructions.count, actual.count,
+                       "関数「\(#function)」で、インストラクション長が違う。\n期待は、\(instructions.string.quoted)\n実際は、\(actual.string.quoted)")
+        for (i, (expectedByte, actualByte)) in zip(instructions.bytes, actual.bytes).enumerated() {
             XCTAssertEqual(expectedByte, actualByte,
-                           "関数「\(#function)」で、\(i)番地のインストラクションが異なる。\n期待は、\(concatted.string.quoted)\n実際は、\(actual.string.quoted)")
+                           "関数「\(#function)」で、\(i)番地のインストラクションが異なる。\n期待は、\(instructions.string.quoted)\n実際は、\(actual.string.quoted)")
         }
-    }
-    private func concatInstructions(_ s: [Instructions]) -> Instructions {
-        s.reduce(Instructions()) {$0 + $1}
     }
     private func testConstants(_ expected: [Any], _ actual: [JpfObject]) throws {
         XCTAssertEqual(expected.count, actual.count,
@@ -815,7 +812,7 @@ final class CompilerTests: XCTestCase {
                 try testBooleanObject(boolean, actual)
             case let string as String:
                 try testStringObject(string, actual)
-            case let instructions as [Instructions]:
+            case let instructions as [Instruction]:
                 let fn = try XCTUnwrap(actual as? JpfCompiledFunction)
                 testInstructions(instructions, fn.instructions)
             case let (number, particle) as (Int?, String):

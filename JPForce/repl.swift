@@ -7,6 +7,8 @@
 
 import Foundation
 
+var numberOfStack = 0
+//
 struct Repl {
     func start() {
         enum Mode {case interpriter, vm}
@@ -68,10 +70,7 @@ struct Repl {
         }
         constants = compiler.bytecode.constants
         print("翻訳結果：")
-        print(compiler.bytecode.instructions.string)
-        print("定数表：")
-        print(constants.string)
-        print()
+        print(compiler.bytecode.instructions.disassemble(with: constants, symbolTable))
         // 実行部
         let machine = VM(with: compiler.bytecode, globals, stack)
         if let error = machine.run() {
@@ -80,9 +79,11 @@ struct Repl {
             return
         }
         // 結果表示
-        if let result = machine.stackTop {
+        if let result = machine.stackTop,
+           numberOfStack != machine.stack.count {   // スタック数が増減した場合
             print("実行結果: \(result.string)")
         }
+        numberOfStack = machine.stack.count
         print("入力: (\(machine.string))")
     }
 }

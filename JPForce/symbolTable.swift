@@ -69,4 +69,8 @@ class SymbolTable : Equatable {
     }
     func resolve(_ name: String) -> Symbol? {store[name] ?? outer?.resolve(name)}
     func resolve(_ token: Token) -> Symbol? {resolve(token.unwrappedLiteral)}
+    //
+    subscript(index: Int) -> String? {
+        store.first(where: {$0.value.isVariable && $0.value.index == index})?.key
+    }
 }

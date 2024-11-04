@@ -75,6 +75,7 @@ extension JpfObject {
     func contains(type: String) -> Bool {type == self.type}
     var hasValue: Bool {value != nil}
     func emit(with c: Compiler) {assertionFailure("翻訳出力方法：未実装")}
+    var formattedString: String {String(format: "%@(%@)", string, type)}
 }
 struct JpfInteger : JpfObject, JpfHashable, Comparable {
     static let type = "数値"
@@ -390,7 +391,9 @@ struct JpfCompiledFunction : JpfObject {
     var instructions: Instructions
     var numberOfLocals = 0          // ローカル変数の数
     var numberOfParameters = 0      // 仮引数の数
-    var string: String {"\(name.isEmpty ? type : name)(入力:\(numberOfParameters)個、本体:\(instructions.count)バイト)"}
+    var string: String {
+        "\(type.color(.magenta))であって、【入力が、\(numberOfParameters)個。本体が、\(instructions.decimalStrings)】"
+    }
 }
 ///  Object Extentions
 extension JpfFunction {
@@ -478,13 +481,5 @@ extension JpfInstance {
            let result = outer.call(type.initializers, with: environment),
            result.isError {return result.error}
         return nil
-    }
-}
-extension Array<JpfObject> {
-    /// オブジェクト列を表示
-    var string: String {
-        self.enumerated().map { (i, object) in
-            String(format: "%d: %@(%@)", i, object.string, object.type)
-        }.joined(separator: ", ")
     }
 }

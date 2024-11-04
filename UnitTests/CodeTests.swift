@@ -29,7 +29,7 @@ final class CodeTests: XCTestCase {
         }
     }
     func testInstructionsString() throws {
-        let instructions: [Instructions] = [
+        let instructions: [Instruction] = [
             make(op: .opReturn),
             make(op: .opGetLocal, operand: 1),
             make(op: .opConstant, operand: 2),
@@ -42,8 +42,7 @@ final class CodeTests: XCTestCase {
         0006 OpConstant 65535
         
         """
-        let concatted = instructions.reduce(Instructions()) {$0 + $1}
-        XCTAssertEqual(concatted.string, expected, "instructions wrongly formatted.")
+        XCTAssertEqual(Instructions(instructions).string, expected, "instructions wrongly formatted.")
     }
     func testReadOperands() throws {
         let testPattern: [(op: Opcode, operands: [Int], bytesRead: Int)] = [
@@ -52,8 +51,7 @@ final class CodeTests: XCTestCase {
         ]
         for test in testPattern {
             let instruction = make(op: test.op, operands: test.operands)
-            let def = try XCTUnwrap(lookUp(test.op.rawValue))
-            let (opearndsRead, n) = readOperands(with: def, from: Array(instruction[1...]))
+            let (opearndsRead, n) = test.op.readOperands(with: Array(instruction[1...]))
             XCTAssertEqual(n, test.bytesRead, "n wrong.")
             for (i, exptected) in test.operands.enumerated() {
                 XCTAssertEqual(opearndsRead[i], exptected, "operand wrong.")

@@ -7,44 +7,45 @@
 
 import Foundation
 
+/// バイトコード(インストラクションと定数表)
 struct Bytecode {
     init(_ instructions: Instructions, _ constants: [JpfObject]) {self.instructions = instructions; self.constants = constants}
     let instructions: Instructions
     let constants: [JpfObject]
 }
+/// 出力インストラクション
 struct EmittedInstruction {
     let opcode: Opcode
     let position: Int
 }
+/// スコープ単位のインストラクション
 class CompilationScope {
-    var instructions: Instructions = []
-    var lastInstruction: EmittedInstruction?
-    var previousInstruction: EmittedInstruction?
+    var instructions: Instructions = []             // 現インストラクション列
+    var lastInstruction: EmittedInstruction?        // 直前のインストラクション
+    var previousInstruction: EmittedInstruction?    // 前インストラクション
     //
-    func append(_ instruction: Instructions) {
-        instructions += instruction
+    func append(_ instruction: Instruction) {       // インストラクションを追加
+        self.instructions.bytes += instruction
     }
-    subscript(_ index: Int) -> Byte {
+    subscript(index: Int) -> Byte {                 // インストラクション中のコードアクセス
         get {instructions[index]}
         set {instructions[index] = newValue}
     }
-    func setLastInstruction(op: Opcode, at pos: Int) {
+    func setLastInstruction(op: Opcode, at pos: Int) {  // 最新のインストラクションを設定
         previousInstruction = lastInstruction
         lastInstruction = EmittedInstruction(opcode: op, position: pos)
     }
 }
-//
+/// 翻訳器
 class Compiler {
-    init(from node: Node) {
-        self.node = node
-    }
+    init(from node: Node) {self.node = node}
     convenience init(from node: Node, _ symbolTable: SymbolTable, _ constants: [JpfObject]) {
         self.init(from: node)
         self.symbolTable = symbolTable
         self.constants = constants
     }
-    private let node: Node      // コンパイルするASTノード
-    private var constants: [JpfObject] = []
+    private let node: Node          // コンパイルするASTノード
+    private var constants: [JpfObject] = [] // 定数表
     var symbolTable = SymbolTable() // シンボルテーブル
     let environment = Environment() // 定数計算を行うstackを提供する。
     var scopes: [CompilationScope] = [CompilationScope()]   // main scope
@@ -53,7 +54,7 @@ class Compiler {
     var bytecode: Bytecode {Bytecode(currentInstructions, constants)}   // バイトコードを返す
     var lastPosition: Int {currentInstructions.count}                   // 最新インストラクション・ポイント
     var currentScope: CompilationScope {scopes[scopeIndex]}             // 現スコープ
-    var currentInstructions: Instructions {                             // 現スコープのインストラクション
+    var currentInstructions: Instructions {                             // 現スコープのインストラクション列
         get {currentScope.instructions}
         set {currentScope.instructions = newValue}
     }
@@ -81,9 +82,9 @@ class Compiler {
     /// インストラクションを記録(追加)し、新たなインストラクション位置を返す。
     /// - Parameter ins: 追加するバイト列
     /// - Returns: 新たなip(インストラクション・ポイント)
-    private func addInstruction(_ ins: [Byte]) -> Int {
+    private func addInstruction(_ instruction: Instruction) -> Int {
         let postionOfNewInstruction = lastPosition
-        currentScope.append(ins)
+        currentScope.append(instruction)
         return postionOfNewInstruction
     }
     /// 定数(JpfObject)を記録(追加)し、追加位置を返す。
@@ -96,9 +97,11 @@ class Compiler {
     var lastOpcode: Opcode? {
         return currentScope.lastInstruction?.opcode
     }
+    /// 直前の(定数表の)句の助詞をチェック
+    /// - Parameter particle: 助詞
+    /// - Returns: 助詞が一致
     func isLastPhrase(particle: Token.Particle) -> Bool {
-        if lastOpcode == .opPhrase,
-           let phrase = constants.last as? JpfPhrase {
+        if lastOpcode == .opPhrase, let phrase = constants.last as? JpfPhrase {
             return phrase.isParticle(particle)
         }
         return false
@@ -110,7 +113,7 @@ class Compiler {
     func changeOperand(at opPosition: Int, operand: Int) {
         let op = Opcode(rawValue: currentScope[opPosition])!
         let instruction = make(op: op, operand: operand)
-        replaceInstruction(at: opPosition, newInstructions: instruction)
+        replaceInstruction(at: opPosition, newInstruction: instruction)
     }
     func changeConstant(at pos: Int, with constant: JpfObject) {
         constants[pos] = constant
@@ -127,7 +130,7 @@ class Compiler {
         guard let lastEmittied = currentScope.lastInstruction else {return}
         let previousEmitted = currentScope.previousInstruction
         let old = currentInstructions
-        let new = Array(old.dropLast(1 + lastEmittied.opcode.operandWidth))
+        let new = Instructions(old.bytes.dropLast(1 + lastEmittied.opcode.operandWidth))
         currentInstructions = new
         currentScope.lastInstruction = previousEmitted
         if lastEmittied.opcode == .opConstant || lastEmittied.opcode == .opPhrase {
@@ -146,9 +149,9 @@ class Compiler {
     /// - Parameters:
     ///   - pos: 置き換える位置
     ///   - newInstructions: 置き換えるインストラクション
-    private func replaceInstruction(at pos: Int, newInstructions: Instructions) {
-        newInstructions.enumerated().forEach { index, instructions in
-            currentScope[pos + index] = instructions
+    private func replaceInstruction(at pos: Int, newInstruction: Instruction) {
+        newInstruction.enumerated().forEach { index, byte in
+            currentScope[pos + index] = byte
         }
     }
     /// Scope制御

@@ -8,10 +8,10 @@
 import Foundation
 
 // MARK: - definitions for instruction
-typealias Byte = UInt8
-typealias Instructions = [Byte]
+typealias Byte = UInt8          // 1バイト
+typealias Instruction = [Byte]  // 命令語
 
-/// 命令語
+/// 命令語(オペコードとオペランド)
 enum Opcode : Byte {
     case opConstant = 0
     case opSetGlobal
@@ -58,29 +58,50 @@ enum Opcode : Byte {
         case .opGetProperty:    Definition(name: "OpGetProperty",   operandWidths: [1])
         }
     }
-    var operandWidth: Int {self.definition.operandWidths.first ?? 0}    // オペランド長
+    var name: String {definition.name}                  // オペコード名
+    var operandWidths: [Int] {definition.operandWidths} // オペランド長の配列
+    var operandWidth: Int {operandWidths.first ?? 0}    // 第一オペランド長
+    /// バイト列からオペコードに応じたオペランドを読み込み、オペランドの配列と読み込んだバイト数を返す。
+    /// - Parameter bytes: オペランドのバイト列
+    /// - Returns: オペランドの配列と読み込んだバイト数
+    func readOperands(with bytes: [Byte]) -> ([Int], Int) {
+        var operands = [Int](repeating: 0, count: operandWidths.count)
+        var offset = 0
+        for (i, width) in operandWidths.enumerated() {
+            switch width {
+            case 2:
+                operands[i] = Int(readUInt16(from: Array(bytes[offset...])))
+            case 1:
+                operands[i] = Int(readUInt8(from: Array(bytes[offset...])))
+            default:
+                break
+            }
+            offset += width
+        }
+        return (operands, offset)
+    }
 }
-/// 命令定義
+/// 命令語(インストラクション)定義
 struct Definition {
-    var name: String
-    var operandWidths: [Int]
+    var name: String            // オペコード名
+    var operandWidths: [Int]    // 複数オペランド(インデックス)
 }
 // MARK: - implements for instruction
 func lookUp(_ op: Byte) -> Definition? {
     Opcode(rawValue: op)?.definition
 }
-/// バイト列（インストラクション）を生成する。
+/// インストラクションを生成する。
 /// - Parameters:
 ///   - op: オペコード
 ///   - operands: オペランド
-/// - Returns: バイト列
-func make(op: Opcode, operands: [Int] = []) -> [Byte] {
+/// - Returns: インストラクション(命令語)
+func make(op: Opcode, operands: [Int] = []) -> Instruction {
     let instrunctionLength = 1 + op.operandWidth
-    var instrunction = [Byte](repeating: 0, count: instrunctionLength)
+    var instrunction = Instruction(repeating: 0, count: instrunctionLength)
     instrunction[0] = op.rawValue
     var offset = 1
     for operand in operands {
-        switch op.operandWidth {
+        switch op.operandWidth {    // オペランド長(バイト数)
         case 2:
             let bytes = withUnsafeBytes(of: UInt16(operand).bigEndian) {Array($0)}
             instrunction.replaceSubrange(offset..<offset+2, with: bytes)
@@ -93,64 +114,82 @@ func make(op: Opcode, operands: [Int] = []) -> [Byte] {
     }
     return instrunction
 }
-func make(op: Opcode, operand: Int) -> [Byte] {
+func make(op: Opcode, operand: Int) -> Instruction {
     return make(op: op, operands: [operand])
 }
-/// インストラクションからオペランドを読み込み、数値列と読み込んだバイト数を返す。
-/// - Parameters:
-///   - definition: 命令定義
-///   - instruction: インストラクション
-/// - Returns: 読み込んだオペランド([Int])と、バイト数(Int)
-func readOperands(with def: Definition, from ins: Instructions) -> ([Int], Int) {
-    var operands = [Int](repeating: 0, count: def.operandWidths.count)
-    var offset = 0
-    for (i, width) in def.operandWidths.enumerated() {
-        switch width {
-        case 2:
-            operands[i] = Int(readUInt16(from: Array(ins[offset...])))
-        case 1:
-            operands[i] = Int(readUInt8(from: Array(ins[offset...])))
-        default:
-            break
-        }
-        offset += width
-    }
-    return (operands, offset)
-}
-/// インストラクションから、16ビットをビッグエンディアンで読み込む。
-/// - Parameter ins: インストラクション
+/// バイト列から、16/8ビットをビッグエンディアンで読み込む。
+/// - Parameter bytes: バイト列
 /// - Returns: ビッグエンディアンの16ビットデータ(UInt16)
-func readUInt16(from ins: Instructions) -> UInt16 {Data(ins).withUnsafeBytes {$0.load(as: UInt16.self)}.bigEndian}
-func readUInt8(from ins: Instructions) -> UInt8 {ins[0]}
+func readUInt16(from bytes: [Byte]) -> UInt16 {Data(bytes).withUnsafeBytes {$0.load(as: UInt16.self)}.bigEndian}
+func readUInt8(from bytes: [Byte]) -> UInt8 {bytes[0]}
 //
-extension Instructions {
+struct Instructions : ExpressibleByArrayLiteral {
+    init(arrayLiteral elements: Byte...) {self.bytes = elements}
+    init(_ bytes: [Byte]) {self.bytes = bytes}
+    init(_ bytes: [Instruction]) {self.bytes = bytes.flatMap(\.self)}   // インストラクション列から生成
+    //
+    var bytes: [Byte] = []
+    //
+    var count: Int {bytes.count}
+    subscript(index: Int) -> Byte {
+        get {bytes[index]}
+        set {bytes[index] = newValue}
+    }
+    // 範囲型による呼び出し
+    subscript(range: Range<Int>) -> Self {
+        get {Self(Array(bytes[range]))}
+        set {bytes.replaceSubrange(range, with: newValue.bytes)}
+    }
+    subscript(range: ClosedRange<Int>) -> Self {
+        get {Self(Array(bytes[range]))}
+        set {bytes.replaceSubrange(range, with: newValue.bytes)}
+    }
+    subscript(range: PartialRangeFrom<Int>) -> Self {
+        get {Self(Array(bytes[range]))}
+        set {bytes.replaceSubrange(range, with: newValue.bytes)}
+    }
     /// インストラクション(バイト列)を文字列形式に整形(逆アセンブル)する。
     var string: String {
         var s = ""
         var i = 0
         while i < self.count {
-            guard let def = lookUp(self[i]) else {
+            guard let op = Opcode(rawValue: bytes[i]) else {
                 s = "Error: opcode \(self[i]) undefined."
                 continue
             }
-            let (operands, read) = readOperands(with: def, from: Array(self[(i+1)...]))
-            s += String(format: "%04d %@\n", i, formattedInstruction(def, operands))
+            let (operands, read) = op.readOperands(with: Array(bytes[(i+1)...]))
+            s += String(format: "%04d %@\n", i, formattedInstruction(op.definition, operands))
+            i += 1 + read
+        }
+        return s
+    }
+    func disassemble(with constants: [JpfObject], _ symbolTable: SymbolTable) -> String {
+        var s = ""
+        var i = 0
+        while i < self.count {
+            guard let op = Opcode(rawValue: bytes[i]) else {
+                s = "Error: opcode \(self[i]) undefined."
+                continue
+            }
+            let (operands, read) = op.readOperands(with: Array(bytes[(i+1)...]))
+            s += String(format: "%04d %@\n", i, formattedInstruction(op, operands, with: constants, symbolTable))
             i += 1 + read
         }
         return s
     }
     /// インストラクション(バイト列)を１６進表示する。
     var quoted: String {
-        "\"" + (self.map {String(format: "0x%02x", $0)}).joined(separator: ", ") + "\""
+        "\"" + (bytes.map {String(format: "0x%02x", $0)}).joined(separator: ", ") + "\""
     }
+    var decimalStrings: String {bytes.map {String(format: "%02d", $0)}.joined(separator: " ")}
     /// 命令定義とオペランド列から、文字列形式を作成する。("命令語 オペランド")
     /// - Parameters:
     ///   - def: 命令定義
     ///   - operands: オペランド列
     /// - Returns: 整形された文字列
     private func formattedInstruction(_ def: Definition, _ operands: [Int]) -> String {
-        let operandCount = def.operandWidths.count
-        if operands.count != operandCount {
+        let operandCount = def.operandWidths.count  // 定義されているオペランド数
+        if operands.count != operandCount {         // 入力のオペランド数
             return "Error: operand count \(operands.count) does not match defined \(operandCount)"
         }
         switch operandCount {
@@ -161,6 +200,26 @@ extension Instructions {
         default:
             return "Error: unhandled operandCount for \(def.name)"
         }
+    }
+    /// オペランド(インデックス)に、シンボルテーブルと定数表の情報を付加した文字列形式を返す。
+    private func formattedInstruction(_ op: Opcode, _ operands: [Int], with constants: [JpfObject], _ symbolTable: SymbolTable) -> String {
+        guard let index = operands.first else {
+            return formattedInstruction(op.definition, operands)
+        }
+        var s = ""
+        switch op {
+        case .opConstant, .opPhrase:
+            s = constants[index].formattedString                            // 定数のオブジェクト
+        case .opGetGlobal, .opSetGlobal, .opGetLocal, .opSetLocal:
+            s = (symbolTable[index] ?? "??") + "(識別子名)"
+        case .opGetProperty:
+            s = ObjectProperties().names[index]                             // 属性名
+        case .opPredicate:
+            s = PredicateOperableFactory.predicates[index].keyword.rawValue // 述語名
+        default :
+            return formattedInstruction(op.definition, operands)
+        }
+        return formattedInstruction(op.definition, operands) + "\t: " + s
     }
 }
 extension Byte {
