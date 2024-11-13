@@ -125,7 +125,8 @@ class VM {
         // メインフレームを含むフレームを作成
         frames = [Frame](repeating: Frame(), count: maxFrames)
         let mainFunction = JpfCompiledFunction(instructions: bytecode.instructions)
-        let mainFrame = Frame(with: mainFunction, basePointer: 0)
+        let mainClosure = JpfClosure(with: mainFunction)
+        let mainFrame = Frame(with: mainClosure, basePointer: 0)
         frames[framesIndex] = mainFrame
         framesIndex += 1
     }

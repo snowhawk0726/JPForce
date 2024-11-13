@@ -105,6 +105,23 @@ final class VMTests: XCTestCase {
         ]
         try runVmTests(with: testPattern)
     }
+    func testConditionalBranchings() throws {
+        let testPattern: [VmTestCase] = [
+            // キャッシュ
+            ("1が1の場合【10】。", 10),
+            ("1が1の場合【10】、それ以外は【20】。", 10),
+            ("1が2の場合【10】、それ以外は【20】。", 20),
+            ("2が1の場合【10】、2の場合【20】、それ以外は【30】。", 20),
+            // コンパイル
+            ("xは1。xが1の場合【10】。", "「〜の場合」に続く、「それ以外は」が定義されていない。"),
+            ("xは1。xが1の場合【10】、それ以外は【20】。", 10),
+            ("xは1。xが2の場合【10】、それ以外は【20】。", 20),
+            ("xは2。xが1の場合【10】、2の場合【20】、それ以外は【30】。", 20),
+            ("xは3。xが1の場合【10】、2の場合【20】、それ以外は【30】。", 30),
+            ("xは2。xが、1の場合、【1と2を足し】、3の場合、【1と4を足し】、それ以外は、1と5を足す。", 6),
+        ]
+        try runVmTests(with: testPattern)
+    }
     func testArrayLiterals() throws {
         let testPattern: [VmTestCase] = [
             ("配列【】", []),
@@ -212,7 +229,8 @@ final class VMTests: XCTestCase {
     }
     func testFirstClassFunctions() throws {
         let testPattern: [VmTestCase] = [
-            ("返り値１は、関数【１】。返り値１返却は、関数【返り値１】。返り値１返却し、実行。", 1),
+            ("returnOneは、関数【１】。returnOne返却は、関数【returnOne】。returnOne返却し、実行。", 1),
+            ("returnOne返却は、関数【returnOneは、関数【１】。returnOne】。returnOne返却し、実行。", 1),
         ]
         try runVmTests(with: testPattern)
     }
@@ -290,6 +308,53 @@ final class VMTests: XCTestCase {
             ("配列【１、２、３】。残り", [2,3]), ("配列【】。残り", nil),
             ("配列【】に１を追加", [1]), ("配列【】。１を追加", [1]),
             ("１に１を。追加", "仕様：〜(を)〜に追加する。または、〜(に)〜を追加する。"),
+        ]
+        try runVmTests(with: testPattern)
+    }
+    func testClosures() throws {
+        let testPattern: [VmTestCase] = [
+            ("newClosureは、関数【入力がa。関数【a】】。closureは、99で、newClosureを実行。closureを実行。", 99),
+            ("newAdderは、関数【入力がaとb。関数【入力がc。aとbとcを足す】】。adderは、1と2で、newAdderを実行。8でadderを実行。", 11),
+            ("""
+                newAdderOuterは、関数【入力がaとb。cは、aとbを足す。関数【入力がd。eは、dとcを足す。関数【入力がf。fとeを足す】】】。
+                newAdderInnerは、1と2で、newAdderOuterを実行。
+                adderは、3で、newAdderInnerを実行。
+                8で、adderを実行。
+            """, 14),
+            ("""
+                aは、１。
+                newAdderOuterは、関数【入力がb。関数【入力がc。関数【入力がd。aとbとcとdを足す】】】。
+                newAdderInnerは、2で、newAdderOuterを実行。
+                adderは、3で、newAdderInnerを実行。
+                8で、adderを実行。
+            """, 14),
+            ("""
+                newClosureは、関数【入力がaとb。oneは、関数【a】。twoは、関数【b】。関数【oneを実行したものと、twoを実行したものを足す】】】。
+                closureは、9と90で、newClosureを実行。
+                closureを実行。
+            """, 99),
+        ]
+        try runVmTests(with: testPattern)
+    }
+    func testRecursiveFunctions() throws {
+        let testPattern: [VmTestCase] = [
+            ("""
+            countDownは、関数【入力がx。xが0に等しい場合【0を返す】、それ以外は【xから1を引き、countDownを実行する】】。
+            １をcountDownする。
+            """, 0),
+            ("""
+            countDownは、関数【入力がx。xが0である場合【0を返す】、それ以外は【xから1を引き、countDownを実行】】。
+            wrapperは、関数【１をcountDownする】。wrapperを実行する。
+            """, 0),
+            ("""
+            wrapperは、関数【
+                countDownは、関数【入力がx。
+                    xが0の場合【0を返す】、それ以外は【xから1を引き、countDownする】。
+                】。
+                １をcountDownする。
+            】。
+            wrapperを実行する。
+            """, 0),
         ]
         try runVmTests(with: testPattern)
     }

@@ -8,7 +8,7 @@
 import Foundation
 
 enum SymbolScope: String {
-    case GLOBAL, LOCAL, PREDICATE, PROPETRY
+    case GLOBAL, LOCAL, PREDICATE, PROPETRY, FREE, FUNCTION
     //
     var opCode: Opcode {
         switch self {
@@ -16,6 +16,8 @@ enum SymbolScope: String {
         case .LOCAL: return .opGetLocal         // 局所
         case .PREDICATE: return .opPredicate    // 述語
         case .PROPETRY: return .opGetProperty   // 属性
+        case .FREE: return .opGetFree           // 自由変数
+        case .FUNCTION: return .opCurrentClosure// 関数
         }
     }
 }
@@ -24,12 +26,14 @@ struct Symbol : Equatable {
     let scope: SymbolScope
     let index: Int
     //
-    var opCode: Opcode {scope.opCode}
     var isProperty: Bool {scope == .PROPETRY}
     var isPredicate: Bool {scope == .PREDICATE}
-    var isVariable: Bool {scope == .LOCAL || scope == .GLOBAL}
+    var isVariable: Bool {scope == .LOCAL || scope == .GLOBAL || scope == .FREE}
     var isGlobal: Bool {scope == .GLOBAL}
     var isLocal: Bool {scope == .LOCAL}
+    var isFree: Bool {scope == .FREE}
+    /// シンボルに応じた命令語を出力する。
+    func emit(with c: Compiler) {_ = c.emit(op: scope.opCode, operand: index)}
 }
 class SymbolTable : Equatable {
     init() {
@@ -47,12 +51,21 @@ class SymbolTable : Equatable {
     var outer: SymbolTable?
     private var store: [String: Symbol] = [:]
     var numberOfDefinitions = 0
+    var freeSymbols: [Symbol] = []
     //
     static func == (lhs: SymbolTable, rhs: SymbolTable) -> Bool {
         lhs.store == rhs.store
         && lhs.numberOfDefinitions == rhs.numberOfDefinitions
     }
-    //
+    subscript(index: Int) -> String? {  // シンボルテーブルから識別子名を取得
+        store.first(where: {$0.value.isVariable && $0.value.index == index})?.key
+    }
+    // シンボル定義
+    func define(name: String, index: Int, scope: SymbolScope) -> Symbol {
+        let symbol = Symbol(name: name, scope: scope, index: index)
+        store[name] = symbol
+        return symbol
+    }
     func define(_ name: String) -> Symbol {
         let symbol = define(
             name: name,
@@ -62,15 +75,19 @@ class SymbolTable : Equatable {
         numberOfDefinitions += 1
         return symbol
     }
-    func define(name: String, index: Int, scope: SymbolScope) -> Symbol {
-        let symbol = Symbol(name: name, scope: scope, index: index)
-        store[name] = symbol
-        return symbol
+    func define(free orignal: Symbol) -> Symbol {
+        freeSymbols.append(orignal)
+        return define(name: orignal.name, index: freeSymbols.count - 1, scope: .FREE)
     }
-    func resolve(_ name: String) -> Symbol? {store[name] ?? outer?.resolve(name)}
+    func define(functionName: String) -> Symbol {
+        define(name: functionName, index: 0, scope: .FUNCTION)
+    }
+    // シンボル解決
+    func resolve(_ name: String) -> Symbol? {
+        if let symbol = store[name] {return symbol}
+        // 外側で解決
+        guard let symbol = outer?.resolve(name) else {return nil}
+        return (symbol.isFree || symbol.isLocal) ? define(free: symbol) : symbol
+    }
     func resolve(_ token: Token) -> Symbol? {resolve(token.unwrappedLiteral)}
-    //
-    subscript(index: Int) -> String? {
-        store.first(where: {$0.value.isVariable && $0.value.index == index})?.key
-    }
 }

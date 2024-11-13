@@ -395,6 +395,16 @@ struct JpfCompiledFunction : JpfObject {
         "\(type.color(.magenta))であって、【入力が、\(numberOfParameters)個。本体が、\(instructions.decimalStrings)】"
     }
 }
+struct JpfClosure : JpfObject {
+    init(with fn: JpfCompiledFunction, _ free: [JpfObject] = []) {self.fn = fn; self.free = free}
+    static let type = "クロージャ"
+    var name: String = ""
+    var fn: JpfCompiledFunction?
+    var free: [JpfObject] = []
+    var string: String {
+        "\(type.color(.magenta))であって、\(free.count)個の自由変数を閉包。"
+    }
+}
 ///  Object Extentions
 extension JpfFunction {
     /// 関数を実行する。

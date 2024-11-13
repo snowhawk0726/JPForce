@@ -54,11 +54,11 @@ extension BlockStatement : Compilable {
 }
 extension DefineStatement : Compilable {
     func compiled(with c: Compiler) -> JpfObject? {
+        let symbol = c.symbolTable.define(name.value)
         if let object = value.compiled(with: c), object.isError {return object}
         if c.lastOpcode == .opConstant {
             c.setLastConstant(name: name.value)
         }
-        let symbol = c.symbolTable.define(name.value)
         _ = c.emit(
             op: symbol.isGlobal ? .opSetGlobal : .opSetLocal,
             operand: symbol.index
@@ -75,7 +75,7 @@ extension Identifier : Compilable {
             return evaluated(with: c.environment)
         }
         c.pullAll().forEach {$0.emit(with: c)}          // キャッシュを翻訳
-        _ = c.emit(op: symbol.opCode, operand: symbol.index)
+        symbol.emit(with: c)
         return nil
     }
 }
@@ -92,7 +92,7 @@ extension PredicateExpression : Compilable {
         }
         c.pullAll().forEach {$0.emit(with: c)}
         if let symbol = c.symbolTable.resolve(token) {
-            _ = c.emit(op: symbol.opCode, operand: symbol.index)
+            symbol.emit(with: c)
         } else {
             fatalError("『\(token.literal)』が未登録。")
         }
@@ -118,19 +118,29 @@ extension CaseExpression : Compilable {
     /// 条件処理(場合分け)。
     /// 形式１：　(条件)場合、【処理】(、それ以外は、【処理】)
     /// 形式２：   (〜が、〜の)場合、【処理】(、(〜の)場合、【処理】...)(、それ以外は、【処理】)
+    /// *: 形式２の場合、Compiler.isInSwitchExpression = true (「〜が」をスタックに積んでいる)
     /// - Returns: ReturnValueまたはnil、エラー
     func compiled(with c: Compiler) -> JpfObject? {
         guard c.isEmpty else {
             return evaluated(with: c.environment)
         }
         let opJumpNotTruthyPosition = c.emit(op: .opJumpNotTruthy, operand: 9999)
+        if c.isInSwitchExpression {_ = c.emit(predicate: .DROP)}                // 「〜が」を捨てる
         if let err = consequence.compiled(with: c) {return err}
-        let opJumpPosition = (alternative != nil) ? c.emit(op: .opJump, operand: 9999) : -1
-        c.changeOperand(at: opJumpNotTruthyPosition, operand: c.lastPosition)   // Jump先書換え
-        if let alternative = alternative {
-            if let err = alternative.compiled(with: c) {return err}
-            c.changeOperand(at: opJumpPosition, operand: c.lastPosition)        // Jump先書換え
+        if alternative != nil || c.isInSwitchExpression {
+            let opJumpPosition = c.emit(op: .opJump, operand: 9999)
+            c.jumpPositions.append(opJumpPosition)
         }
+        c.changeOperand(at: opJumpNotTruthyPosition, operand: c.lastPosition)   // Jump先書換え
+        if let alternative {
+            if c.isInSwitchExpression {_ = c.emit(predicate: .DROP)}            // 「〜が」を捨てる
+            if let err = alternative.compiled(with: c) {return err}
+            c.jumpPositions.forEach { position in
+                c.changeOperand(at: position, operand: c.lastPosition)          // Jump先書換え
+            }
+            c.jumpPositions.removeAll()
+        }
+        c.isInSwitchExpression = false
         return nil
     }
 }
@@ -143,6 +153,13 @@ extension GenitiveExpression : Compilable {
             if let symbol = c.symbolTable.resolve(right.tokenLiteral),
                symbol.isVariable {                      // rightが変数
                 cash.emit(with: c)                      // キャッシュを出力
+            } else if right is CaseExpression && c.isEmpty {    // 〜の場合、(switch-case)
+                c.isInSwitchExpression = true
+                _ = c.emit(predicate: .DUPLICATE)               // スタック(〜が)をコピー
+                let phrase = JpfPhrase(value: cash, particle: Token(.DE))
+                phrase.emit(with: c)                            // キャッシュを出力
+                _ = c.emit(predicate: .BE)                      // 「である」を出力
+                return right.compiled(with: c)
             } else {
                 return evaluated(with: c.environment)   // キャッシュで評価
             }
@@ -189,9 +206,12 @@ extension DictionaryLiteral : Compilable {
 }
 extension FunctionLiteral : Compilable {
     func compiled(with c: Compiler) -> JpfObject? {
-        c.pullAll().forEach {$0.emit(with: c)}  // キャッシュをバイトコードに出力
+        c.pullAll().forEach {$0.emit(with: c)}      // キャッシュをバイトコードに出力
         // TODO: 関数をキャッシュとして維持できないか？
         c.enterScope()
+        if !name.isEmpty {
+            _ = c.symbolTable.define(functionName: name)
+        }
         functions.array[0].parameters.forEach {
             _ = c.symbolTable.define($0.value)
         }
@@ -202,13 +222,16 @@ extension FunctionLiteral : Compilable {
         if c.lastOpcode != .opReturnValue {
             _ = c.emit(op: .opReturn)
         }
-        let numberOfLocals = c.symbolTable.numberOfDefinitions
+        let freeSymbols = c.symbolTable.freeSymbols // 自由シンボルテーブル
+        let numberOfLocals = c.symbolTable.numberOfDefinitions  // ローカル変数の数
         let instructions = c.leaveScope()
+        freeSymbols.forEach {$0.emit(with: c)}
         let compiledFunction = JpfCompiledFunction(
                                     instructions: instructions,
                                     numberOfLocals: numberOfLocals,
                                     numberOfParameters: functions.array[0].parameters.count)
-        _ = c.emit(op: .opConstant, operand: c.addConstant(compiledFunction))
+        let functionIndex = c.addConstant(compiledFunction)
+        _ = c.emit(op: .opClosure, operand: functionIndex, freeSymbols.count)
         return nil
     }
 }

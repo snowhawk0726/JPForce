@@ -71,6 +71,12 @@ struct Repl {
         constants = compiler.bytecode.constants
         print("翻訳結果：")
         print(compiler.bytecode.instructions.disassemble(with: constants, symbolTable))
+        constants.enumerated().forEach {
+            if let function = $1 as? JpfCompiledFunction {
+                print("翻訳済み関数(\($0))：")
+                print(function.instructions.disassemble(with: constants, symbolTable))
+            }
+        }
         // 実行部
         let machine = VM(with: compiler.bytecode, globals, stack)
         if let error = machine.run() {

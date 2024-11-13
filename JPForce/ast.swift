@@ -231,6 +231,7 @@ struct LoopExpression : Expression {
 }
 struct FunctionLiteral : Expression {
     var token: Token                // 関数トークン
+    var name = ""                   // 名前
     var functions: FunctionBlocks   // 関数部
     //
     var tokenLiteral: String {token.literal}

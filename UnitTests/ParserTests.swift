@@ -239,6 +239,14 @@ final class ParserTests: XCTestCase {
             print("テスト終了: \(statement.string)")
         }
     }
+    func testFunctionLiteralWithName() throws {
+        let input = "myFunctionは、関数であって、【】。"
+        let program = try XCTUnwrap(parseProgram(with: input))
+        XCTAssertEqual(program.statements.count, 1)
+        let define = try XCTUnwrap(program.statements.first as? DefineStatement)
+        let function = try XCTUnwrap(define.value.expressions.first as? FunctionLiteral)
+        XCTAssertEqual(function.name, "myFunction")
+    }
     func testFunctionLiteralParsings() throws {
         let testPatterns = [
             "関数であって、【入力が、xとyであり、本体が、xにyを足して、返す。】",

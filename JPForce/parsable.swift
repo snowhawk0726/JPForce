@@ -504,7 +504,7 @@ struct DefStatementParser : StatementParsable {
         let isExtended = getNext(whenNextIs: DefineStatement.further)   // 「さらに、」
         _ = getNext(whenNextIs: .COMMA)
         getNext()
-        guard let parsed = ExpressionStatementParser(parser).parse() as? ExpressionStatement else {
+        guard var parsed = ExpressionStatementParser(parser).parse() as? ExpressionStatement else {
             error(message: "\(syntax)で、式の解釈に失敗した。")
             return nil
         }
@@ -513,6 +513,10 @@ struct DefStatementParser : StatementParsable {
             _ = getNext(whenNextIs: DefineStatement.dearu + DefineStatement.desu, matchAll: false)
             _ = getNext(whenNextIs: .PERIOD)
             skipNextEols()                  // EOLの前で解析を停止する。
+        }
+        if var function = parsed.expressions.first as? FunctionLiteral {
+            function.name = identifier.value// 関数の名前を記録
+            parsed.expressions[0] = function// DefineStatement.valueに反映する。
         }
         return DefineStatement(token: token, name: identifier, value: parsed, isExtended: isExtended)
     }

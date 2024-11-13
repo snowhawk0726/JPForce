@@ -27,6 +27,8 @@ struct PredicateCompilableFactory {
         case .keyword(.SURU):       return PerformCompiler(compiler)    // 〜にする、〜をする
         case .keyword(.RETURN):     return ReturnCompiler(compiler)     // (〜を)返す
         case .keyword(.NULL):       return NullCompiler(compiler)
+        case .keyword(.BE),.keyword(.NOT):
+                                    return LogicalOperationCompiler(compiler, by: token)
         default:                    return nil
         }
     }
@@ -74,8 +76,11 @@ struct PerformCompiler : PredicateCompilable {
         if compiler.lastOpcode == .opPhrase {       // をする、にする
             compiler.removeLastInstruction()        // 助詞を除く
         }
-        if compiler.lastOpcode == .opGetGlobal {    // <動名詞>する = 実行
+        switch compiler.lastOpcode {                // <動名詞>する = 実行
+        case .opGetGlobal,.opGetLocal,.opGetFree,.opCurrentClosure:
             _ = compiler.emit(op: .opCall)
+        default:
+            break
         }
         return nil
     }
@@ -107,4 +112,22 @@ struct NullCompiler : PredicateCompilable {
     init(_ compiler: Compiler) {self.compiler = compiler}
     let compiler: Compiler
     func compiled() -> JpfObject? {JpfNull.object}
+}
+struct LogicalOperationCompiler : PredicateCompilable {
+    init(_ compiler: Compiler, by token: Token) {self.compiler = compiler; self.op = token}
+    let compiler: Compiler, op: Token
+    func compiled() -> JpfObject? {
+        if compiler.count >= 2 {                            // キャッシュで計算可
+            let booleanOperator = BooleanOperator(compiler.environment, by: op)
+            return booleanOperator.operated()
+        }
+        if compiler.count == 1 {                            // キャッシュで計算不可
+            compiler.pull()!.emit(with: compiler)
+        }
+        guard let symbol = compiler.symbolTable.resolve(op) else {
+            fatalError("『\(op.literal)』が未登録。")
+        }
+        symbol.emit(with: compiler)                         // opPredicate
+        return nil
+    }
 }

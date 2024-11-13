@@ -24,6 +24,9 @@ extension CodeExecutable {
     var failedToBuildArray: JpfError        {JpfError("配列の定義に失敗した。")}
     var failedToBuildDictionary: JpfError   {JpfError("辞書の定義に失敗した。")}
     var failedToGetProperty: JpfError       {JpfError("属性の取得に失敗した。")}
+    var failedToGetFunction: JpfError       {JpfError("翻訳済み関数の取得に失敗した。")}
+    var failedToGetClosure: JpfError        {JpfError("クロージャの取得に失敗した。")}
+    var failedToGetFreeVariables: JpfError  {JpfError("自由変数の取得に失敗した。")}
     var cannotFoundPredicate: JpfError      {JpfError("述語が定義されていない。")}
 }
 // MARK: - instance factory
@@ -49,6 +52,9 @@ struct CodeExecutableFactory {
         case .opGetLocal:       return GetLocalExecuter(vm, with: operandBytes)
         case .opGetProperty:    return GetPropertyExecuter(vm, with: operandBytes)
         case .opPredicate:      return PredicateExecuter(vm, with: operandBytes)
+        case .opClosure:        return ClosureExecuter(vm, with: operandBytes)
+        case .opGetFree:        return GetFreeExecuter(vm, with: operandBytes)
+        case .opCurrentClosure: return CurrentClosureExecuter(vm)
         }
     }
 }
@@ -57,8 +63,7 @@ struct BooleanExecuter : CodeExecutable {
     init(_ vm: VM, by op: Opcode) {self.vm = vm; self.op = op}
     let vm: VM, op: Opcode
     func execute() -> JpfError? {
-        if let error = vm.push(JpfBoolean.object(of: op == .opTrue)) {return error}
-        return nil
+        vm.push(JpfBoolean.object(of: op == .opTrue))
     }
 }
 struct NullExecuter : CodeExecutable {
@@ -76,8 +81,7 @@ struct ArrayExecuter : CodeExecutable {
         let numberOfElements = Int(readUInt16(from: bytes))
         vm.currentFrame.advanceIp(by: 2)
         guard let array = buildArray(with: numberOfElements) else {return failedToBuildArray}
-        if let error = vm.push(array) {return error}
-        return nil
+        return vm.push(array)
     }
     private func buildArray(with n: Int) -> JpfArray? {
         guard let objects = vm.peek(n) else {return nil}
@@ -92,8 +96,7 @@ struct DictionaryExecuter : CodeExecutable {
         let numberOfElements = Int(readUInt16(from: bytes))
         vm.currentFrame.advanceIp(by: 2)
         guard let dictionary = buildDictionary(with: numberOfElements) else {return failedToBuildDictionary}
-        if let error = vm.push(dictionary) {return error}
-        return nil
+        return vm.push(dictionary)
     }
     private func buildDictionary(with n: Int) -> JpfDictionary? {
         var pairs: [JpfHashKey: (key: JpfObject, value: JpfObject)] = [:]
@@ -115,22 +118,22 @@ struct GenitiveExecuter : CodeExecutable {
         let environment = Environment(with: vm.stack)
         guard let result = left.accessed(by: index, with: environment) else {return nil}
         if result.isError {return result.error}
-        if let error = vm.push(result) {return error}
-        return nil
+        return vm.push(result)
     }
 }
 struct CallExecuter : CodeExecutable {
     init(_ vm: VM) {self.vm = vm}
     let vm: VM
     func execute() -> JpfError? {
-        guard let function = vm.pull()?.value as? JpfCompiledFunction else {return callingFunctionNotFound}
+        guard let closure = vm.pull()?.value as? JpfClosure,
+              let function = closure.fn else {return callingFunctionNotFound}
         let arguments = vm.peekAll()                        // 引数候補
         // TODO: - 引数をチェックし、実行する関数を特定し、Frameに割り当てる。
         guard arguments.count >= function.numberOfParameters else {
             return InputFormatError.numberOfParameters(function.numberOfParameters).message
         }
         vm.drop(function.numberOfParameters)
-        let frame = Frame(with: function, basePointer: vm.sp)
+        let frame = Frame(with: closure, basePointer: vm.sp)
         vm.push(frame)
         // TODO: - 助詞をチェックし、引数をローカル変数に割り当てる。
         if let error = vm.push(Array(arguments.suffix(function.numberOfParameters)).map {$0.value!}) {return error}
@@ -147,8 +150,7 @@ struct ReturnValueExecuter : CodeExecutable {
         if let frame = vm.popFrame() {
             vm.movePushed(from: frame.sp, to: frame.basePointer)
         }
-        if let error = vm.push(returnValue) {return error}
-        return nil
+        return vm.push(returnValue)
     }
 }
 struct ReturnExecuter : CodeExecutable {
@@ -183,8 +185,7 @@ struct ConstantExecuter : CodeExecutable {
     func execute() -> JpfError? {
         let constIndex = Int(readUInt16(from: bytes))
         vm.currentFrame.advanceIp(by: 2)
-        if let error = vm.push(vm.constants[constIndex]) {return error}
-        return nil
+        return vm.push(vm.constants[constIndex])
     }
 }
 struct PhraseExecuter : CodeExecutable {
@@ -226,8 +227,7 @@ struct GetGlobalExecuter : CodeExecutable {
     func execute() -> JpfError? {
         let globalIndex = Int(readUInt16(from: bytes))
         vm.currentFrame.advanceIp(by: 2)
-        if let error = vm.push(vm.globals[globalIndex]) {return error}
-        return nil
+        return vm.push(vm.globals[globalIndex])
     }
 }
 struct SetLocalExecuter : CodeExecutable {
@@ -262,8 +262,7 @@ struct GetPropertyExecuter : CodeExecutable {
             return failedToGetProperty
         }
         if result.isError {return result.error}
-        if let error = vm.push(result) {return error}
-        return nil
+        return vm.push(result)
     }
 }
 struct PredicateExecuter : CodeExecutable {
@@ -276,7 +275,42 @@ struct PredicateExecuter : CodeExecutable {
         let environment = Environment(with: vm.stack)
         guard let result = predicate(environment).operated() else {return nil}
         if result.isError {return result.error}
-        if let error = vm.push(result) {return error}
-        return nil
+        return vm.push(result)
+    }
+}
+struct ClosureExecuter : CodeExecutable {
+    init(_ vm: VM, with bytes: [Byte]) {self.vm = vm; self.bytes = bytes}
+    let vm: VM, bytes: [Byte]
+    func execute() -> JpfError? {
+        let functionIndex = Int(readUInt16(from: bytes))
+        let numberOfFreeVariables = Int(readUInt8(from: Array(bytes[2...])))
+        vm.currentFrame.advanceIp(by: 3)
+        return pushClosure(with: functionIndex, numberOfFreeVariables)
+    }
+    private func pushClosure(with index: Int, _ number: Int) -> JpfError? {
+        guard let function = vm.constants[index] as? JpfCompiledFunction else {return failedToGetFunction}
+        let freeVariables = (0..<number).compactMap {vm.stack[vm.sp - number + $0]}
+        guard freeVariables.count == number else {return "\(number)個の" + failedToGetFreeVariables}
+        vm.sp -= number         // 自由変数領域解放
+        let closure = JpfClosure(with: function, freeVariables)
+        return vm.push(closure)
+    }
+}
+struct GetFreeExecuter : CodeExecutable {
+    init(_ vm: VM, with bytes: [Byte]) {self.vm = vm; self.bytes = bytes}
+    let vm: VM, bytes: [Byte]
+    func execute() -> JpfError? {
+        let index = Int(readUInt8(from: bytes))
+        vm.currentFrame.advanceIp(by: 1)
+        guard let freeVariable = vm.currentFrame.cl?.free[index] else {return failedToGetClosure}
+        return vm.push(freeVariable)
+    }
+}
+struct CurrentClosureExecuter : CodeExecutable {
+    init(_ vm: VM) {self.vm = vm}
+    let vm: VM
+    func execute() -> JpfError? {
+        guard let currentClosure = vm.currentFrame.cl else {return failedToGetClosure}
+        return vm.push(currentClosure)
     }
 }

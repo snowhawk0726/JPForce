@@ -14,9 +14,10 @@ final class CodeTests: XCTestCase {
     }
     func testMake() throws {
         let testPatterns: [(op: Opcode, operands: [Int], expected: [Byte]) ] = [
-            (.opConstant, [65534], [Opcode.opConstant.rawValue, 255, 254]),
-            (.opReturn, [], [Opcode.opReturn.rawValue]),
-            (.opGetLocal, [255], [Opcode.opGetLocal.rawValue, 255]),
+            (.opConstant,   [65534],        [Opcode.opConstant.rawValue, 255, 254]),
+            (.opReturn,     [],             [Opcode.opReturn.rawValue]),
+            (.opGetLocal,   [255],          [Opcode.opGetLocal.rawValue, 255]),
+            (.opClosure,    [65534, 255],   [Opcode.opClosure.rawValue, 255, 254, 255]),
         ]
         for test in testPatterns {
             let instruction = make(op: test.op, operands: test.operands)
@@ -34,24 +35,27 @@ final class CodeTests: XCTestCase {
             make(op: .opGetLocal, operand: 1),
             make(op: .opConstant, operand: 2),
             make(op: .opConstant, operand: 65535),
+            make(op: .opClosure,  operand: 65535, 255),
         ]
         let expected = """
         0000 OpReturn
         0001 OpGetLocal 1
         0003 OpConstant 2
         0006 OpConstant 65535
-        
+        0009 OpClosure 65535, 255
+
         """
-        XCTAssertEqual(Instructions(instructions).string, expected, "instructions wrongly formatted.")
+        XCTAssertEqual(expected, Instructions(instructions).string, "instructions wrongly formatted.")
     }
     func testReadOperands() throws {
         let testPattern: [(op: Opcode, operands: [Int], bytesRead: Int)] = [
             (.opConstant, [65535], 2),
             (.opGetLocal, [255], 1),
+            (.opClosure,  [65535, 255], 3)
         ]
         for test in testPattern {
             let instruction = make(op: test.op, operands: test.operands)
-            let (opearndsRead, n) = test.op.readOperands(with: Array(instruction[1...]))
+            let (opearndsRead, n) = test.op.readOperand(from: Array(instruction[1...]))
             XCTAssertEqual(n, test.bytesRead, "n wrong.")
             for (i, exptected) in test.operands.enumerated() {
                 XCTAssertEqual(opearndsRead[i], exptected, "operand wrong.")

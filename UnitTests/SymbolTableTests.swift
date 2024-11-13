@@ -144,5 +144,98 @@ final class SymbolTableTests : XCTestCase {
             }
         }
     }
+    func testResolveFree() throws {
+        let global = SymbolTable()
+        _ = global.define("a")
+        _ = global.define("b")
+        let firstLocal = SymbolTable(outer: global)
+        _ = firstLocal.define("c")
+        _ = firstLocal.define("d")
+        let secondLocal = SymbolTable(outer: firstLocal)
+        _ = secondLocal.define("e")
+        _ = secondLocal.define("f")
+        let tests: [(table: SymbolTable, expectedSymbols: [Symbol], expectedFreeSymbols: [Symbol])] = [
+            (firstLocal,
+             [
+                Symbol(name: "a", scope: .GLOBAL, index: 0),
+                Symbol(name: "b", scope: .GLOBAL, index: 1),
+                Symbol(name: "c", scope: .LOCAL, index: 0),
+                Symbol(name: "d", scope: .LOCAL, index: 1),
+             ],
+             []
+            ),
+            (secondLocal,
+             [
+                Symbol(name: "a", scope: .GLOBAL, index: 0),
+                Symbol(name: "b", scope: .GLOBAL, index: 1),
+                Symbol(name: "c", scope: .FREE, index: 0),
+                Symbol(name: "d", scope: .FREE, index: 1),
+                Symbol(name: "e", scope: .LOCAL, index: 0),
+                Symbol(name: "f", scope: .LOCAL, index: 1),
+             ],
+             [
+                Symbol(name: "c", scope: .LOCAL, index: 0),
+                Symbol(name: "d", scope: .LOCAL, index: 1),
+             ]
+            ),
+        ]
+        for t in tests {
+            for s in t.expectedSymbols {
+                guard let result = t.table.resolve(s.name) else {
+                    XCTFail("シンボル「\(s.name)」の解決に失敗した。")
+                    continue
+                }
+                XCTAssertEqual(s, result)   // 解決結果の確認
+            }
+            // 自由シンボルテーブルの確認
+            XCTAssertEqual(t.expectedFreeSymbols.count, t.table.freeSymbols.count)
+            for (i, s) in t.expectedFreeSymbols.enumerated() {
+                let result = t.table.freeSymbols[i]
+                XCTAssertEqual(s, result)
+            }
+        }
+    }
+    func testResolveUnresolvableFree() {
+        let global = SymbolTable()
+        _ = global.define("a")
+        let firstLocal = SymbolTable(outer: global)
+        _ = firstLocal.define("c")
+        let secondLocal = SymbolTable(outer: firstLocal)
+        _ = secondLocal.define("e")
+        _ = secondLocal.define("f")
+        let expected: [Symbol] = [
+            Symbol(name: "a", scope: .GLOBAL, index: 0),
+            Symbol(name: "c", scope: .FREE, index: 0),
+            Symbol(name: "e", scope: .LOCAL, index: 0),
+            Symbol(name: "f", scope: .LOCAL, index: 1),
+        ]
+        for s in expected {
+            guard let result = secondLocal.resolve(s.name) else {
+                XCTFail("シンボル「\(s.name)」の解決に失敗した。")
+                continue
+            }
+            XCTAssertEqual(s, result)   // 解決結果の確認
+        }
+        // 解決失敗の確認
+        let expectedUnresolvable = ["b", "d"]
+        for name in expectedUnresolvable {
+            XCTAssertNil(secondLocal.resolve(name)) // 解決失敗(nil)
+        }
+    }
+    func testDefineAndResolveFunctionName() throws {
+        let global = SymbolTable()
+        _ = global.define(functionName: "a")
+        let exptected = Symbol(name: "a", scope: .FUNCTION, index: 0)
+        let result = try XCTUnwrap(global.resolve(exptected.name))
+        XCTAssertEqual(exptected, result)
+    }
+    func testShadowingFunctionName() throws {
+        let global = SymbolTable()
+        _ = global.define(functionName: "a")
+        _ = global.define("a")
+        let exptected = Symbol(name: "a", scope: .GLOBAL, index: 0)
+        let result = try XCTUnwrap(global.resolve(exptected.name))
+        XCTAssertEqual(exptected, result)
+    }
 }
 

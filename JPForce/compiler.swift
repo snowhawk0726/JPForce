@@ -50,6 +50,8 @@ class Compiler {
     let environment = Environment() // 定数計算を行うstackを提供する。
     var scopes: [CompilationScope] = [CompilationScope()]   // main scope
     var scopeIndex = 0
+    var isInSwitchExpression = false// 〜が〜の場合、
+    var jumpPositions: [Int] = []   // jump先書き換え位置
     //
     var bytecode: Bytecode {Bytecode(currentInstructions, constants)}   // バイトコードを返す
     var lastPosition: Int {currentInstructions.count}                   // 最新インストラクション・ポイント
@@ -58,11 +60,13 @@ class Compiler {
         get {currentScope.instructions}
         set {currentScope.instructions = newValue}
     }
+    let switchCaseError = JpfError("「〜の場合」に続く、「それ以外は」が定義されていない。")
     //
     /// 指定されたASTノードをコンパイルする。
     /// - Returns: エラー(無しは、nil)
     func compile() -> JpfError? {
         if let error = node.compiled(with: self) as? JpfError {return error}
+        guard jumpPositions.isEmpty else {return switchCaseError}
         return nil
     }
     /// インストラクションを出力し、新たなインストラクション位置を返す。
@@ -70,14 +74,14 @@ class Compiler {
     ///   - op: オペコード
     ///   - operands: オペランド
     /// - Returns: 新たなip(インストラクション・ポイント)
-    func emit(op: Opcode, operands: [Int] = []) -> Int {
+    func emit(op: Opcode, operand operands: Int...) -> Int {
         let instruction = make(op: op, operands: operands)
         let position = addInstruction(instruction)
         currentScope.setLastInstruction(op: op, at: position)
         return position
     }
-    func emit(op: Opcode, operand: Int) -> Int {
-        return emit(op: op, operands: [operand])
+    func emit(predicate keyword: Token.Keyword) -> Int {
+        emit(op: .opPredicate, operand: PredicateOperableFactory.index(of: keyword)!)
     }
     /// インストラクションを記録(追加)し、新たなインストラクション位置を返す。
     /// - Parameter ins: 追加するバイト列
@@ -110,9 +114,9 @@ class Compiler {
     /// - Parameters:
     ///   - opPosition: オペコードの位置
     ///   - operand: 書き換えるオペランド
-    func changeOperand(at opPosition: Int, operand: Int) {
+    func changeOperand(at opPosition: Int, operand operands: Int...) {
         let op = Opcode(rawValue: currentScope[opPosition])!
-        let instruction = make(op: op, operand: operand)
+        let instruction = make(op: op, operands: operands)
         replaceInstruction(at: opPosition, newInstruction: instruction)
     }
     func changeConstant(at pos: Int, with constant: JpfObject) {

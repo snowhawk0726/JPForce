@@ -10,17 +10,17 @@ import Foundation
 /// 実行フレーム(アクティベーションレコード)
 class Frame {
     init() {}
-    init(with fn : JpfCompiledFunction, basePointer: Int) {
-        self.fn = fn
+    init(with cl: JpfClosure, basePointer: Int) {
+        self.cl = cl
         self.basePointer = basePointer
-        self.sp = basePointer + fn.numberOfLocals
+        self.sp = basePointer + cl.fn!.numberOfLocals
     }
-    var fn: JpfCompiledFunction?
+    var cl: JpfClosure?
     var ip = -1             // フレーム内の実行位置
     var basePointer = 0     // ローカル変数のスロット位置
     var sp = 0              // Frameのsp初期値
     //
-    var insturctions: Instructions? {fn?.instructions}
+    var insturctions: Instructions? {cl?.fn?.instructions}
     // ip制御
     var isIpInRange: Bool {
         guard let i = insturctions else {return false}

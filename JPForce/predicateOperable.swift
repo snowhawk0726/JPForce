@@ -76,6 +76,9 @@ struct PredicateOperableFactory {
         guard (0..<Self.predicates.count).contains(index) else {return nil}
         return Self.predicates[index].operator
     }
+    static func index(of keyword: Token.Keyword) -> Int? {
+        predicates.firstIndex(where: {$0.keyword == keyword})
+    }
     // ファクトリーメソッド
     static func create(from token: Token, with environment: Environment) -> PredicateOperable? {
         Self()[token]?(environment) ?? NopOperator(environment)
