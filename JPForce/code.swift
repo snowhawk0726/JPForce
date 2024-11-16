@@ -39,28 +39,28 @@ enum Opcode : Byte {
     //
     var definition: (name: String, operandWidths: [Int]) {
         switch self {
-        case .opConstant:       (name: "OpConstant",      operandWidths: [2])
-        case .opSetGlobal:      (name: "OpSetGlobal",     operandWidths: [2])
-        case .opGetGlobal:      (name: "OpGetGlobal",     operandWidths: [2])
-        case .opSetLocal:       (name: "OpSetLocal",      operandWidths: [1])
-        case .opGetLocal:       (name: "OpGetLocal",      operandWidths: [1])
+        case .opConstant:       (name: "OpConstant",      operandWidths: [2])   // 定数表位置
+        case .opSetGlobal:      (name: "OpSetGlobal",     operandWidths: [2])   // 大域表位置
+        case .opGetGlobal:      (name: "OpGetGlobal",     operandWidths: [2])   // 大域表位置
+        case .opSetLocal:       (name: "OpSetLocal",      operandWidths: [1])   // 局所表位置
+        case .opGetLocal:       (name: "OpGetLocal",      operandWidths: [1])   // 局所表位置
         case .opPop:            (name: "OpPop",           operandWidths: [])
-        case .opPhrase:         (name: "OpPhrase",        operandWidths: [2])
+        case .opPhrase:         (name: "OpPhrase",        operandWidths: [1])   // 格インデックス
         case .opTrue:           (name: "OpTrue",          operandWidths: [])
         case .opFalse:          (name: "OpFalse",         operandWidths: [])
         case .opNull:           (name: "OpNull",          operandWidths: [])
-        case .opArray:          (name: "OpArray",         operandWidths: [2])
-        case .opDictionary:     (name: "OpDictionary",    operandWidths: [2])
+        case .opArray:          (name: "OpArray",         operandWidths: [2])   // 要素数
+        case .opDictionary:     (name: "OpDictionary",    operandWidths: [2])   // 要素数 x ２
         case .opGenitive:       (name: "OpGenitive",      operandWidths: [])
-        case .opJump:           (name: "OpJump",          operandWidths: [2])
-        case .opJumpNotTruthy:  (name: "OpJumpNotTruthy", operandWidths: [2])
+        case .opJump:           (name: "OpJump",          operandWidths: [2])   // 飛び先
+        case .opJumpNotTruthy:  (name: "OpJumpNotTruthy", operandWidths: [2])   // 飛び先
         case .opCall:           (name: "OpCall",          operandWidths: [])
         case .opReturnValue:    (name: "OpReturnValue",   operandWidths: [])
         case .opReturn:         (name: "OpReturn",        operandWidths: [])
-        case .opPredicate:      (name: "OpPredicate",     operandWidths: [1])
-        case .opGetProperty:    (name: "OpGetProperty",   operandWidths: [1])
-        case .opClosure:        (name: "OpClosure",       operandWidths: [2, 1])
-        case .opGetFree:        (name: "OpGetFree",       operandWidths: [1])
+        case .opPredicate:      (name: "OpPredicate",     operandWidths: [1])   // 述語インデックス
+        case .opGetProperty:    (name: "OpGetProperty",   operandWidths: [1])   // 属性インデックス
+        case .opClosure:        (name: "OpClosure",       operandWidths: [2, 1])// 関数インデックス、自由変数数
+        case .opGetFree:        (name: "OpGetFree",       operandWidths: [1])   // 自由変数位置
         case .opCurrentClosure: (name: "OpCurrentClosure",operandWidths: [])
         }
     }
@@ -114,6 +114,9 @@ func make(op: Opcode, operand: Int...) -> Instruction {
 }
 func make(predicate keyword: Token.Keyword) -> Instruction {
     make(op: .opPredicate, operand: PredicateOperableFactory.index(of: keyword)!)
+}
+func make(phraseWith particle: Token.Particle) -> Instruction {
+    make(op: .opPhrase, operand: Token(particle).particleIndex!)
 }
 /// バイト列から、16/8ビットをビッグエンディアンで読み込む。
 /// - Parameter bytes: バイト列
@@ -197,8 +200,10 @@ struct Instructions : ExpressibleByArrayLiteral {
         }
         var s = ""
         switch op {
-        case .opConstant, .opPhrase, .opClosure:
+        case .opConstant, .opClosure:
             s = constants[index].formattedString                            // 定数のオブジェクト
+        case .opPhrase:
+            s = Token.particles[index].rawValue + "(格)"                     // 格
         case .opGetGlobal, .opSetGlobal:
             s = (symbolTable[index] ?? "??") + "(識別子名)"                  // 識別子名
         case .opGetLocal, .opSetLocal, .opGetFree:

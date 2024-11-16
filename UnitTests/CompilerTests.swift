@@ -362,16 +362,16 @@ final class CompilerTests: XCTestCase {
                 make(predicate: .ADD),              // 足す
             ]),
             (input: "aは１。bは２。aとbを足す。",
-             expectedConstants: [1, 2, (nil as Int?, "と"), (nil as Int?, "を")],
+             expectedConstants: [1, 2],
              expectedInstructions: [
                 make(op: .opConstant, operand: 0),  // 1
                 make(op: .opSetGlobal, operand: 0), // a
                 make(op: .opConstant, operand: 1),  // 2
                 make(op: .opSetGlobal, operand: 1), // b
                 make(op: .opGetGlobal, operand: 0), // a
-                make(op: .opPhrase, operand: 2),    // 「と」から「aと」を作る
+                make(phraseWith: .TO),              // 「と」から「aと」を作る
                 make(op: .opGetGlobal, operand: 1), // b
-                make(op: .opPhrase, operand: 3),    // 「を」から「bを」を作る
+                make(phraseWith: .WO),              // 「を」から「bを」を作る
                 make(predicate: .ADD),              // 足す
             ]),
             (input: "関数【】を実行する。",
@@ -407,20 +407,18 @@ final class CompilerTests: XCTestCase {
              expectedConstants: [
                 (1, "と"),
                 (2, "を"),
-                (nil as Int?, "に"),                 // 「〜たものに」→「〜に」
                 (3, "と"),
                 (4, "を"),
-                (nil as Int?, "を"),                 // 「〜たものを」→「〜を」
              ],
              expectedInstructions: [
                 make(op: .opConstant, operand: 0),  // 1と
                 make(op: .opConstant, operand: 1),  // 2を
                 make(predicate: .ADD),              // 足し
-                make(op: .opPhrase, operand: 2),    // に (直前の「た」は取り除く
-                make(op: .opConstant, operand: 3),  // 3と
-                make(op: .opConstant, operand: 4),  // 4を
+                make(phraseWith: .NI),              // に (直前の「た」は取り除く
+                make(op: .opConstant, operand: 2),  // 3と
+                make(op: .opConstant, operand: 3),  // 4を
                 make(predicate: .ADD),              // 足し
-                make(op: .opPhrase, operand: 5),    // を (直前の「た」は取り除く
+                make(phraseWith: .WO),              // を (直前の「た」は取り除く
                 make(predicate: .MULTIPLY),         // 掛ける
             ]),
         ]
@@ -760,23 +758,21 @@ final class CompilerTests: XCTestCase {
              expectedConstants: [
                 55,
                 77,
-                (nil as Int?, "と"),
-                (nil as Int?, "を"),
                 [
                     make(op: .opConstant, operand: 0),
                     make(op: .opSetLocal, operand: 0),
                     make(op: .opConstant, operand: 1),
                     make(op: .opSetLocal, operand: 1),
                     make(op: .opGetLocal, operand: 0),
-                    make(op: .opPhrase, operand: 2),
+                    make(phraseWith: .TO),
                     make(op: .opGetLocal, operand: 1),
-                    make(op: .opPhrase, operand: 3),
+                    make(phraseWith: .WO),
                     make(predicate: .ADD),
                     make(op: .opReturn),
                 ],
              ],
              expectedInstructions: [
-                make(op: .opClosure, operand: 4, 0),
+                make(op: .opClosure, operand: 2, 0),
              ]),
         ]
         try runCompilerTests(testPatterns)
@@ -828,54 +824,49 @@ final class CompilerTests: XCTestCase {
         let testPtterns: [CompilerTestCase] = [
             (input: "関数【入力がa。関数【入力がb。aとbを足す】】",
              expectedConstants: [
-                (nil as Int?, "と"),
-                (nil as Int?, "を"),
                 [
                     make(op: .opGetFree, operand: 0),   // a
-                    make(op: .opPhrase, operand: 0),    // と
+                    make(phraseWith: .TO),              // と
                     make(op: .opGetLocal, operand: 0),  // b
-                    make(op: .opPhrase, operand: 1),    // を
+                    make(phraseWith: .WO),              // を
                     make(predicate: .ADD),              // 足す
                     make(op: .opReturn),
                 ],
                 [
                     make(op: .opGetLocal, operand: 0),  // a
-                    make(op: .opClosure, operand: 2, 1),// 関数【入力がb。...
+                    make(op: .opClosure, operand: 0, 1),// 関数【入力がb。...
                     make(op: .opReturn),
                 ],
              ],
              expectedInstructions: [
-                make(op: .opClosure, operand: 3, 0),    // 関数【入力がa。...
+                make(op: .opClosure, operand: 1, 0),    // 関数【入力がa。...
              ]),
             (input: "関数【入力がa。関数【入力がb。関数【入力がc。aとbとcを足す】】】",
              expectedConstants: [
-                (nil as Int?, "と"),
-                (nil as Int?, "と"),
-                (nil as Int?, "を"),
                 [
                     make(op: .opGetFree, operand: 0),   // a
-                    make(op: .opPhrase, operand: 0),    // と
+                    make(phraseWith: .TO),              // と
                     make(op: .opGetFree, operand: 1),   // b
-                    make(op: .opPhrase, operand: 1),    // と
+                    make(phraseWith: .TO),              // と
                     make(op: .opGetLocal, operand: 0),  // c
-                    make(op: .opPhrase, operand: 2),    // を
+                    make(phraseWith: .WO),              // を
                     make(predicate: .ADD),              // 足す
                     make(op: .opReturn),
                 ],
                 [
                     make(op: .opGetFree, operand: 0),   // a
                     make(op: .opGetLocal, operand: 0),  // b
-                    make(op: .opClosure, operand: 3, 2),// 関数【入力がc。...
+                    make(op: .opClosure, operand: 0, 2),// 関数【入力がc。...
                     make(op: .opReturn),
                 ],
                 [
                     make(op: .opGetLocal, operand: 0),  // a
-                    make(op: .opClosure, operand: 4, 1),// 関数【入力がb。...
+                    make(op: .opClosure, operand: 1, 1),// 関数【入力がb。...
                     make(op: .opReturn),
                 ],
              ],
              expectedInstructions: [
-                make(op: .opClosure, operand: 5, 0),    // 関数【入力がa。...
+                make(op: .opClosure, operand: 2, 0),    // 関数【入力がa。...
              ]),
             (input: """
                 globalは、55。
@@ -887,21 +878,17 @@ final class CompilerTests: XCTestCase {
             """,
              expectedConstants: [
                 55, 66, 77, 88,
-                (nil as Int?, "と"),
-                (nil as Int?, "と"),
-                (nil as Int?, "と"),
-                (nil as Int?, "を"),
                 [
                     make(op: .opConstant, operand: 3),  // 88
                     make(op: .opSetLocal, operand: 0),  // c
                     make(op: .opGetGlobal, operand: 0), // global(55)
-                    make(op: .opPhrase, operand: 4),    // と
+                    make(phraseWith: .TO),              // と
                     make(op: .opGetFree, operand: 0),   // a
-                    make(op: .opPhrase, operand: 5),    // と
+                    make(phraseWith: .TO),              // と
                     make(op: .opGetFree, operand: 1),   // b
-                    make(op: .opPhrase, operand: 6),    // と
+                    make(phraseWith: .TO),              // と
                     make(op: .opGetLocal, operand: 0),  // c
-                    make(op: .opPhrase, operand: 7),    // を
+                    make(phraseWith: .WO),              // を
                     make(predicate: .ADD),              // 足す
                     make(op: .opReturn),
                 ],
@@ -910,21 +897,21 @@ final class CompilerTests: XCTestCase {
                     make(op: .opSetLocal, operand: 0),  // b
                     make(op: .opGetFree, operand: 0),   // a
                     make(op: .opGetLocal, operand: 0),  // b
-                    make(op: .opClosure, operand: 8, 2),// 関数【cは、88。...
+                    make(op: .opClosure, operand: 4, 2),// 関数【cは、88。...
                     make(op: .opReturn),
                 ],
                 [
                     make(op: .opConstant, operand: 1),  // 66
                     make(op: .opSetLocal, operand: 0),  // a
                     make(op: .opGetLocal, operand: 0),  // a
-                    make(op: .opClosure, operand: 9, 1),// 関数【bは、77。...
+                    make(op: .opClosure, operand: 5, 1),// 関数【bは、77。...
                     make(op: .opReturn),
                 ],
              ],
              expectedInstructions: [
                 make(op: .opConstant, operand: 0),      // 55
                 make(op: .opSetGlobal, operand: 0),     // global
-                make(op: .opClosure, operand: 10, 0),    // 関数【aは、66。...
+                make(op: .opClosure, operand: 6, 0),    // 関数【aは、66。...
              ]),
         ]
         try runCompilerTests(testPtterns)
@@ -933,12 +920,11 @@ final class CompilerTests: XCTestCase {
         let tests: [CompilerTestCase] = [
             (input: "countDownは、関数【入力がx。xから1を引き、countDownする】。１をcountDownする。",
              expectedConstants: [
-                (nil as Int?,"から"),
                 (1,"を"),
                 [
                     make(op: .opGetLocal, operand: 0),
-                    make(op: .opPhrase, operand: 0),
-                    make(op: .opConstant, operand: 1),
+                    make(phraseWith: .KARA),
+                    make(op: .opConstant, operand: 0),
                     make(predicate: .SUBSTRACT),
                     make(op: .opCurrentClosure),
                     make(op: .opCall),
@@ -947,21 +933,20 @@ final class CompilerTests: XCTestCase {
                 (1,"を"),
              ],
              expectedInstructions: [
-                make(op: .opClosure, operand: 2, 0),
+                make(op: .opClosure, operand: 1, 0),
                 make(op: .opSetGlobal, operand: 0),
-                make(op: .opConstant, operand: 3),
+                make(op: .opConstant, operand: 2),
                 make(op: .opGetGlobal, operand: 0),
                 make(op: .opCall),
              ]
             ),
             (input: "wrapperは、関数【countDownは、関数【入力がx。xから1を引き、countDownする】。1をcountDownする】。wrapperを実行。",
              expectedConstants: [
-                (nil as Int?,"から"),
                 (1,"を"),
                 [
                     make(op: .opGetLocal, operand: 0),
-                    make(op: .opPhrase, operand: 0),
-                    make(op: .opConstant, operand: 1),
+                    make(phraseWith: .KARA),
+                    make(op: .opConstant, operand: 0),
                     make(predicate: .SUBSTRACT),
                     make(op: .opCurrentClosure),
                     make(op: .opCall),
@@ -969,16 +954,16 @@ final class CompilerTests: XCTestCase {
                 ],
                 (1,"を"),
                 [
-                    make(op: .opClosure, operand: 2, 0),
+                    make(op: .opClosure, operand: 1, 0),
                     make(op: .opSetLocal, operand: 0),
-                    make(op: .opConstant, operand: 3),
+                    make(op: .opConstant, operand: 2),
                     make(op: .opGetLocal, operand: 0),
                     make(op: .opCall),
                     make(op: .opReturn),
                 ],
              ],
              expectedInstructions: [
-                make(op: .opClosure, operand: 4, 0),
+                make(op: .opClosure, operand: 3, 0),
                 make(op: .opSetGlobal, operand: 0),
                 make(op: .opGetGlobal, operand: 0),
                 make(op: .opCall),

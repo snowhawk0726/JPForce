@@ -100,7 +100,7 @@ struct ReturnCompiler : PredicateCompilable {
             result.value?.emit(with: compiler)              // resultはJpfReturnValue
         } else {                                            // 直前の出力で計算
             guard compiler.lastOpcode != .opPhrase ||
-                  compiler.removeLastPhrase(particle: .WO) else {
+                  compiler.removeLastOpPhrase(particle: .WO) else {
                 return op.returnValueUsage                  // 前句の助詞が間違っている
             }
         }

@@ -12,6 +12,7 @@ class Environment {
     let outer: Environment?     // 拡張環境
     static let OUTER = Token.Keyword.OUTER.rawValue // 外部
     var isExecutable: Bool = true                   // false: 実行抑止
+    var switchCase = SwitchCase()                   // switch-case制御
     private var store: [String: JpfObject] = [:]
     private var stack: Stack
     private var arguments: [String: JpfObject] = [:]// 引数

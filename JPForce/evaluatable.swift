@@ -43,6 +43,7 @@ extension Node {
     var cannotExtend: JpfError              {JpfError("拡張することはできない。")}
     var enumuratorError: JpfError           {JpfError("「列挙」の列挙子(識別子)が正しくない。：")}
     var cannotUseAsKeyword: JpfError        {JpfError("は、ラベルの値として使用できない。")}
+    var switchCaseError: JpfError           {JpfError("「〜の場合」に続く、「それ以外は」が定義されていない。")}
     var notSupportedCall: JpfError          {JpfError("呼び出し式は未対応。対象：")}
     // 仕様表示
     var strideLoopUsage: JpfError           {JpfError("仕様：<数値>から<数値>まで（<数値>ずつ）反復【入力が<識別子(カウント値)>、<処理>】。")}
@@ -65,6 +66,7 @@ extension Program : Evaluatable {
 }
 extension ExpressionStatement : Evaluatable {
     func evaluated(with environment: Environment) -> JpfObject? {
+        environment.switchCase.enter()
         var result: JpfObject?
         for expression in expressions {
             result = expression.evaluated(with: environment)
@@ -73,6 +75,8 @@ extension ExpressionStatement : Evaluatable {
                 if let err = environment.push(object) {return err}
             }
         }
+        if environment.switchCase.isActive {return switchCaseError}
+        environment.switchCase.leave()
         environment.remove(name: Environment.OUTER)
         return result
     }
@@ -386,6 +390,7 @@ extension CaseExpression : Evaluatable {
     /// 形式２：   (〜が、〜の)場合、【処理】(、(〜の)場合、【処理】...)(、それ以外は、【処理】)
     /// - Returns: ReturnValueまたはnil、エラー
     func evaluated(with environment: Environment) -> JpfObject? {
+        if alternative != nil {environment.switchCase.isActive = false}
         if let condition = getCondition(from: environment) {
             guard !condition.isError else {return condition}
             let result =  condition.isTrue ?
@@ -395,36 +400,40 @@ extension CaseExpression : Evaluatable {
         }
         return nil
     }
-    /// 「場合」の前の条件式を評価し、結果(JpfObject)を返す。
+    /// 「場合」の前の条件式を評価し、結果(JpfObject)またはnilを返す。
     /// - Parameter environment: 入力を参照し、必要に応じて破棄する。
-    /// - Returns: 〜が〜の場合：一致したら真を、そうでなければ偽を返す。入力は、真の場合２つ、偽の場合１つ捨てる。
-    ///            〜の場合：入力を１つ捨て、nilを返す。(後続処理をスキップ)
-    ///            〜場合：入力を真偽判定し、結果を返す。入力が拾えなければ、エラー
+    /// - Returns: 〜が〜の場合：二項の比較結果を返す。
+    ///            〜の場合：    　nilを返す。(後続処理をスキップ)
+    ///            〜場合：         　入力を真偽判定結果を返す。(入力が拾えなければエラー)
     ///            （入力から値(.value)が取れない場合、エラー(想定外)
     private func getCondition(from environment: Environment) -> JpfObject? {
-        if let params = environment.peek(2) {
-            if params[0].isParticle(.GA) && params[1].isParticle(.NO) {
-                guard let left = params[0].value, let right = params[1].value else {return caseConditionError}
-                environment.drop()
-                var result: JpfObject
-                switch right {
-                case let array as JpfArray:
-                    result = array.contains(left)
-                case let range as JpfRange:
-                    result = range.contains(left)
-                default:
-                    result = JpfBoolean.object(of: left.isEqual(to: right))
-                }
-                if alternative != nil || result.isTrue {environment.drop()} // 条件成立、または「それ以外」がある場合は、「〜が」を捨てる
-                return result
+        if let params = environment.peek(2),
+           params[0].isParticle(.GA) && params[1].isParticle(.NO) {
+            guard let left = params[0].value,
+                  let right = params[1].value else {return caseConditionError}
+            environment.drop()
+            let result = compared(left: left, right: right)
+            if result.isTrue || alternative != nil {    // 条件成立時
+                environment.drop()              // 「〜が」を捨てる
             }
-        }
-        if environment.peek?.particle == .particle(.NO) {        // 「〜が」が捨てられていた場合
+            return result
+        } else
+        if environment.isPeekParticle(.NO) {    // 「〜の場合」(「〜が」が捨てられていた場合)
             environment.drop()
             return nil
         }
         guard let result = environment.pull() else {return caseConditionError}
         return JpfBoolean.object(of: result.isTrue)
+    }
+    private func compared(left: JpfObject, right: JpfObject) -> JpfObject {
+        switch right {
+        case let array as JpfArray: // leftが配列に含まれる
+            return array.contains(left)
+        case let range as JpfRange: // leftが範囲に含まれる
+            return range.contains(left)
+        default:
+            return JpfBoolean.object(of: left.isEqual(to: right))
+        }
     }
 }
 extension LogicalExpression : Evaluatable {
@@ -876,7 +885,10 @@ extension GenitiveExpression : Evaluatable {
         case let expression as PhraseExpression:
             let object = evaluated(object, expression.left, with: environment)
             return JpfPhrase(name: "", value: object, particle: expression.token)
-        case is PredicateExpression, is CaseExpression, is Label:
+        case is CaseExpression:
+            environment.switchCase.isActive = true
+            fallthrough
+        case is PredicateExpression, is Label:
             if let err = environment.push(phrase) {return err}
             return right.evaluated(with: environment)
         default:

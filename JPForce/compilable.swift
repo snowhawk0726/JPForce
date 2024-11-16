@@ -33,11 +33,14 @@ extension Program : Compilable {
 }
 extension ExpressionStatement : Compilable {
     func compiled(with c: Compiler) -> JpfObject? {
+        c.switchCase.enter()
         for expression in expressions {
             guard let object = expression.compiled(with: c) else {continue}
             if object.isError {return object}
             if let err = c.push(object), err.isError {return err}   // キャッシュで計算を継続
         }
+        if c.switchCase.hasJumpPositions {return switchCaseError}
+        c.switchCase.leave()
         c.pullAll().forEach {$0.emit(with: c)}  // キャッシュをバイトコードに出力
         return nil
     }
@@ -102,11 +105,11 @@ extension PredicateExpression : Compilable {
 extension PhraseExpression : Compilable {
     func compiled(with c: Compiler) -> JpfObject? {
         guard let object = left.compiled(with: c) else {    // キャッシュ無し = 翻訳済み
-            let phrase = JpfPhrase(value: nil, particle: token)
+            let particleIndex = token.particleIndex!
             if c.lastOpcode != .opPhrase {
-                _ = c.emit(op: .opPhrase, operand: c.addConstant(phrase))
-            } else {    // 直前が opPhrase であれば、直前は省略
-                c.changeLastConstant(with: phrase)
+                _ = c.emit(op: .opPhrase, operand: particleIndex)
+            } else {    // 直前が opPhrase であれば、直前は省略(格を替える)
+                c.changeOperand(at: c.lastPosition!, operand: particleIndex)
             }
             return nil
         }
@@ -116,31 +119,42 @@ extension PhraseExpression : Compilable {
 }
 extension CaseExpression : Compilable {
     /// 条件処理(場合分け)。
-    /// 形式１：　(条件)場合、【処理】(、それ以外は、【処理】)
-    /// 形式２：   (〜が、〜の)場合、【処理】(、(〜の)場合、【処理】...)(、それ以外は、【処理】)
-    /// *: 形式２の場合、Compiler.isInSwitchExpression = true (「〜が」をスタックに積んでいる)
     /// - Returns: ReturnValueまたはnil、エラー
     func compiled(with c: Compiler) -> JpfObject? {
         guard c.isEmpty else {
             return evaluated(with: c.environment)
         }
+        return c.switchCase.isActive ? switchCaseCompiled(with: c) : ifThenCompiled(with: c)
+    }
+    /// 形式１：　(条件)場合、【処理】(、それ以外は、【処理】)
+    private func ifThenCompiled(with c: Compiler) -> JpfObject? {
         let opJumpNotTruthyPosition = c.emit(op: .opJumpNotTruthy, operand: 9999)
-        if c.isInSwitchExpression {_ = c.emit(predicate: .DROP)}                // 「〜が」を捨てる
         if let err = consequence.compiled(with: c) {return err}
-        if alternative != nil || c.isInSwitchExpression {
-            let opJumpPosition = c.emit(op: .opJump, operand: 9999)
-            c.jumpPositions.append(opJumpPosition)
-        }
-        c.changeOperand(at: opJumpNotTruthyPosition, operand: c.lastPosition)   // Jump先書換え
+        let opJumpPosition = alternative != nil ? c.emit(op: .opJump, operand: 9999) : -1
+        c.changeOperand(at: opJumpNotTruthyPosition, operand: c.nextPosition)   // Jump先書換え
         if let alternative {
-            if c.isInSwitchExpression {_ = c.emit(predicate: .DROP)}            // 「〜が」を捨てる
             if let err = alternative.compiled(with: c) {return err}
-            c.jumpPositions.forEach { position in
-                c.changeOperand(at: position, operand: c.lastPosition)          // Jump先書換え
-            }
-            c.jumpPositions.removeAll()
+            c.changeOperand(at: opJumpPosition, operand: c.nextPosition)
         }
-        c.isInSwitchExpression = false
+        return nil
+    }
+    /// 形式２：   〜が、〜の場合、【処理】(、〜の場合、【処理】...)、それ以外は、【処理】
+    /// *: 「〜が」をスタックに積んでいる
+    private func switchCaseCompiled(with c: Compiler) -> JpfObject? {
+        let opJumpNotTruthyPosition = c.emit(op: .opJumpNotTruthy, operand: 9999)
+        _ = c.emit(predicate: .DROP)                 // 「〜が」を捨てる
+        if let err = consequence.compiled(with: c) {return err}
+        let opJumpPosition = c.emit(op: .opJump, operand: 9999)
+        c.switchCase.append(opJumpPosition)
+        c.changeOperand(at: opJumpNotTruthyPosition, operand: c.nextPosition)   // Jump先書換え
+        if let alternative {
+            _ = c.emit(predicate: .DROP)             // 「〜が」を捨てる
+            if let err = alternative.compiled(with: c) {return err}
+            c.switchCase.jumpPositions?.forEach { position in
+                c.changeOperand(at: position, operand: c.nextPosition)          // Jump先書換え
+            }
+            c.switchCase.isActive = false
+        }
         return nil
     }
 }
@@ -154,7 +168,7 @@ extension GenitiveExpression : Compilable {
                symbol.isVariable {                      // rightが変数
                 cash.emit(with: c)                      // キャッシュを出力
             } else if right is CaseExpression && c.isEmpty {    // 〜の場合、(switch-case)
-                c.isInSwitchExpression = true
+                c.switchCase.isActive = true
                 _ = c.emit(predicate: .DUPLICATE)               // スタック(〜が)をコピー
                 let phrase = JpfPhrase(value: cash, particle: Token(.DE))
                 phrase.emit(with: c)                            // キャッシュを出力

@@ -36,6 +36,32 @@ class CompilationScope {
         lastInstruction = EmittedInstruction(opcode: op, position: pos)
     }
 }
+/// 「〜が〜の場合」のjumpPositionを管理
+class SwitchCase {
+    var currentId = 0
+    var positions: [Int: [Int]] = [:]
+    // ASTの親(ExpressionStatement)での入出
+    func enter() {currentId += 1}
+    func leave() {currentId -= 1}
+    // switch-caseをコンパイル中(「〜が〜の場合」から「それ以外は」まで）
+    var isActive: Bool {
+        get {positions[currentId] != nil}
+        set {
+            switch newValue {
+            case true:
+                if !isActive {positions[currentId] = []}
+            case false:
+                positions[currentId] = nil
+            }
+        }
+    }
+    // opJumpのip管理
+    func append(_ position: Int) {
+        positions[currentId]?.append(position)
+    }
+    var jumpPositions: [Int]? {positions[currentId]}
+    var hasJumpPositions: Bool {positions[currentId]?.isEmpty == false}
+}
 /// 翻訳器
 class Compiler {
     init(from node: Node) {self.node = node}
@@ -50,23 +76,19 @@ class Compiler {
     let environment = Environment() // 定数計算を行うstackを提供する。
     var scopes: [CompilationScope] = [CompilationScope()]   // main scope
     var scopeIndex = 0
-    var isInSwitchExpression = false// 〜が〜の場合、
-    var jumpPositions: [Int] = []   // jump先書き換え位置
+    var switchCase = SwitchCase()   // Switch-caseの監視
     //
     var bytecode: Bytecode {Bytecode(currentInstructions, constants)}   // バイトコードを返す
-    var lastPosition: Int {currentInstructions.count}                   // 最新インストラクション・ポイント
+    var nextPosition: Int {currentInstructions.count}                   // 最新インストラクション・ポイント
     var currentScope: CompilationScope {scopes[scopeIndex]}             // 現スコープ
     var currentInstructions: Instructions {                             // 現スコープのインストラクション列
         get {currentScope.instructions}
         set {currentScope.instructions = newValue}
     }
-    let switchCaseError = JpfError("「〜の場合」に続く、「それ以外は」が定義されていない。")
-    //
     /// 指定されたASTノードをコンパイルする。
     /// - Returns: エラー(無しは、nil)
     func compile() -> JpfError? {
         if let error = node.compiled(with: self) as? JpfError {return error}
-        guard jumpPositions.isEmpty else {return switchCaseError}
         return nil
     }
     /// インストラクションを出力し、新たなインストラクション位置を返す。
@@ -87,7 +109,7 @@ class Compiler {
     /// - Parameter ins: 追加するバイト列
     /// - Returns: 新たなip(インストラクション・ポイント)
     private func addInstruction(_ instruction: Instruction) -> Int {
-        let postionOfNewInstruction = lastPosition
+        let postionOfNewInstruction = nextPosition
         currentScope.append(instruction)
         return postionOfNewInstruction
     }
@@ -98,15 +120,15 @@ class Compiler {
         constants.append(obj)
         return constants.count - 1
     }
-    var lastOpcode: Opcode? {
-        return currentScope.lastInstruction?.opcode
-    }
-    /// 直前の(定数表の)句の助詞をチェック
+    var lastOpcode: Opcode? {currentScope.lastInstruction?.opcode}
+    var lastPosition: Int? {currentScope.lastInstruction?.position}
+    /// 直前のopPhrase命令の助詞をチェック
     /// - Parameter particle: 助詞
     /// - Returns: 助詞が一致
-    func isLastPhrase(particle: Token.Particle) -> Bool {
-        if lastOpcode == .opPhrase, let phrase = constants.last as? JpfPhrase {
-            return phrase.isParticle(particle)
+    func isLastOpPhrase(particle: Token.Particle) -> Bool {
+        if lastOpcode == .opPhrase {
+            let index = Int(readUInt8(from: Array(currentInstructions.bytes[(lastPosition! + 1)...])))
+            return particle == Token.particles[index]
         }
         return false
     }
@@ -137,15 +159,15 @@ class Compiler {
         let new = Instructions(old.bytes.dropLast(1 + lastEmittied.opcode.operandWidth))
         currentInstructions = new
         currentScope.lastInstruction = previousEmitted
-        if lastEmittied.opcode == .opConstant || lastEmittied.opcode == .opPhrase {
+        if lastEmittied.opcode == .opConstant || lastEmittied.opcode == .opClosure {
             constants.removeLast()
         }
     }
-    /// 句の格が正しければ、その句を出力から取り除く
+    /// opPhraseの格が正しければ、命令語を出力から取り除く
     /// - Parameter particle: 格
     /// - Returns: 格の成否
-    func removeLastPhrase(particle: Token.Particle) -> Bool {
-        guard isLastPhrase(particle: particle) else {return false}
+    func removeLastOpPhrase(particle: Token.Particle) -> Bool {
+        guard isLastOpPhrase(particle: particle) else {return false}
         removeLastInstruction()
         return true
     }

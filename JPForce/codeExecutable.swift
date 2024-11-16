@@ -192,11 +192,11 @@ struct PhraseExecuter : CodeExecutable {
     init(_ vm: VM, with bytes: [Byte]) {self.vm = vm; self.bytes = bytes}
     let vm: VM, bytes: [Byte]
     func execute() -> JpfError? {
-        let constIndex = Int(readUInt16(from: bytes))
-        vm.currentFrame.advanceIp(by: 2)
-        let p = vm.constants[constIndex] as! JpfPhrase
+        let particleIndex = Int(readUInt8(from: bytes))
+        vm.currentFrame.advanceIp(by: 1)
         if let value = vm.pull() {
-            let phrase = JpfPhrase(value: value, particle: p.particle)
+            let p = Token.particles[particleIndex]
+            let phrase = JpfPhrase(value: value, particle: Token(p))
             if let error = vm.push(phrase) {return error}
         }
         return nil

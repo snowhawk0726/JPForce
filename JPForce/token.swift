@@ -38,7 +38,7 @@ enum Token : Equatable {
         case EOF        = "\0"  // 終端(end mark)
     }
     /// 主に格助詞。Keyword, identの関係を表す。
-    enum Particle : String {    // 助詞(postpositional particle)
+    enum Particle : String, CaseIterable {  // 助詞(postpositional particle)
         case WA         = "は"   // 係助詞
         case GA         = "が"   // 格助詞
         case WO         = "を"
@@ -277,6 +277,9 @@ enum Token : Equatable {
         d["．"] = .PERIOD;   d["."] = .PERIOD
         return d
     }()
+    /// 助詞一覧
+    static let particles = Particle.allCases
+    var particleIndex: Int? {Token.particles.firstIndex {self.isParticle($0)}}
 }
     
 // MARK: - String extension
