@@ -2,7 +2,8 @@
 
 - [言語の説明](#言語の説明)
 - [文法・言語仕様](./ProgrammingLanguageGuide.md)(別ドキュメント)
-- [コマンド(REPL)](#インタープリタjpforce-コマンド)
+- [仮想マシンの仕様](./VirtualMachineSpecification.md)(別ドキュメント)
+- [コマンド(REPL)](#インタープリタコンパイラjpforce-コマンド)
 
 ## 言語の説明
 
@@ -190,7 +191,8 @@ _例:_
 
 ### 仕様
 
-仕様・言語の使い方については、[「文法」](./ProgrammingLanguageGuide.md)に記載しています。
+仕様・言語の使い方については、[「文法」](./ProgrammingLanguageGuide.md)に記載しています。  
+仮想マシン(VM)の仕様について、「[仮想マシンの仕様](VirtualMachineSpecification.md)」に記載しています。
 
 ### 今後の見通し
 
@@ -496,7 +498,7 @@ _例：プログラムの翻訳・実行結果_
 - `OpPGetProperty`の場合、取得する`属性名`を表示します。
 - `OpPhrase`の場合、`格`を表示します。
 
-例えば、上記では、`0016`番地に`OpJumpNotTruthy`命令が記載されており、`真`でない場合、`0025`に分岐することを示します。
+例えば、上記では、`0016`番地に`OpJumpNotTruthy`命令が記載されており、`真`でない場合、`0025`番地に分岐することを示します。
 
 ###### 翻訳済み関数
 
