@@ -996,7 +996,8 @@ struct CaseExpressionParser : ExpressionParsable {
             error(message: "「場合、」に続くブロック解析に失敗した。")
             return nil
         }
-        _ = getNext(whenNextIs: .COMMA)                     // (、)のみ読み飛ばす
+        _ = getNext(whenNextIs: .COMMA)                     // 読点(、)を読み飛ばす
+        _ = getNext(whenNextIs: .EOL)                       // EOLを読み飛ばす
         var alternative: BlockStatement? = nil
         if getNext(whenNextIs: CaseExpression.soreigai) {   // それ以外
             _ = getNext(whenNextIs: ExpressionStatement.wa) // (は)

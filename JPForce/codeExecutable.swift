@@ -31,7 +31,7 @@ extension CodeExecutable {
 }
 // MARK: - instance factory
 struct CodeExecutableFactory {
-    static func create(from op: Opcode, operandBytes: [Byte], with vm: VM) -> CodeExecutable? {
+    static func create(from op: Opcode, operandBytes: [Byte], with vm: VM) -> CodeExecutable {
         switch op {
         case .opTrue,.opFalse:  return BooleanExecuter(vm, by: op)
         case .opNull:           return NullExecuter(vm)
@@ -271,7 +271,7 @@ struct PredicateExecuter : CodeExecutable {
     func execute() -> JpfError? {
         let index = Int(readUInt8(from: bytes))
         vm.currentFrame.advanceIp(by: 1)
-        guard let predicate = PredicateOperableFactory()[index] else {return cannotFoundPredicate}
+        let predicate = PredicateOperableFactory.predicates[index].operator
         let environment = Environment(with: vm.stack)
         guard let result = predicate(environment).operated() else {return nil}
         if result.isError {return result.error}

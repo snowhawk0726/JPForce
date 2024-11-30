@@ -286,7 +286,7 @@ struct JpfInstance : JpfObject {
     var name: String = ""
     var environment: Environment    // 要素(メンバー)を含む環境
     var protocols: [String]         // 準拠する規約
-    var available: [String]         // 外部から利用可能なメンバー
+    var available: Set<String>      // 外部から利用可能なメンバー
     var string: String {"型が、\(type)で、要素が、\(environment.enumerated.map {$0.key}.joined(separator: "と、"))。" + available.map {"「\($0)」"}.joined(separator: "と") + "は利用可能。"}
 }
 struct JpfProtocol : JpfObject {
@@ -429,7 +429,10 @@ extension JpfComputation {
     func getter(with environment: Environment) -> JpfObject? {
         guard !getters.isEmpty else {return getterNotFound}
         let local = Environment(outer: self.environment)    // 環境を拡張
-        return environment.execute(getters, with: local)
+        guard let value = environment.execute(getters, with: local) else {
+            return environment.pull()   // 返り値が無ければスタックから値を取る。
+        }
+        return value
     }
     /// 算出(設定)を行う。
     /// - Parameter environment: 実行中の(通常もしくは算出の)環境
@@ -464,7 +467,7 @@ extension JpfType {
         for p in protocols {    // 規約条項のメンバーリストを利用可能なメンバーリストに追加
             p.clauses.forEach {members.append($0.identifier.value)}
         }
-        return JpfInstance(type: self.name, environment: local, protocols: self.protocols, available: members)
+        return JpfInstance(type: self.name, environment: local, protocols: self.protocols, available: Set(members))
     }
 }
 extension JpfInstance {

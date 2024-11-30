@@ -25,33 +25,36 @@ extension Node {
 }
 extension Program : Compilable {
     func compiled(with c: Compiler) -> JpfObject? {
+        c.switchCase.enter()
         for statement in statements {
             if let object = statement.compiled(with: c), object.isError {return object}
         }
+        if c.switchCase.hasJumpPositions {return switchCaseError}
+        c.switchCase.leave()
         return nil
     }
 }
 extension ExpressionStatement : Compilable {
     func compiled(with c: Compiler) -> JpfObject? {
-        c.switchCase.enter()
         for expression in expressions {
             guard let object = expression.compiled(with: c) else {continue}
             if object.isError {return object}
             if let err = c.push(object), err.isError {return err}   // キャッシュで計算を継続
         }
-        if c.switchCase.hasJumpPositions {return switchCaseError}
-        c.switchCase.leave()
         c.pullAll().forEach {$0.emit(with: c)}  // キャッシュをバイトコードに出力
         return nil
     }
 }
 extension BlockStatement : Compilable {
     func compiled(with c: Compiler) -> JpfObject? {
+        c.switchCase.enter()
         var result: JpfObject?
         for statement in statements {
             result = statement.compiled(with: c)
             if let object = result, object.isBreakFactor {break}
         }
+        if c.switchCase.hasJumpPositions {return switchCaseError}
+        c.switchCase.leave()
         return result
     }
 }

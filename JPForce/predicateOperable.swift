@@ -65,23 +65,19 @@ struct PredicateOperableFactory {
         (.AVAILABLE,    {AvailableOperator($0)}),
         (.KOTO,         {NopOperator($0)}),                             // 45
     ]
+    static let dictionary: [Token.Keyword : (Environment) -> PredicateOperable] = {
+        Dictionary(uniqueKeysWithValues: predicates.map {($0.keyword, $0.operator)})
+    }()
     // アクセサ
-    subscript(_ name: String) -> ((Environment) -> PredicateOperable)? { // インデックス：名称
-        Self.predicates.first(where: {$0.keyword.rawValue == name})?.operator
-    }
-    subscript(_ token: Token) -> ((Environment) -> PredicateOperable)? { // インデックス：トークン
-        Self.predicates.first(where: {token.isKeyword($0.keyword)})?.operator
-    }
-    subscript(_ index: Int) -> ((Environment) -> PredicateOperable)? {  // インデックス：位置
-        guard (0..<Self.predicates.count).contains(index) else {return nil}
-        return Self.predicates[index].operator
-    }
     static func index(of keyword: Token.Keyword) -> Int? {
         predicates.firstIndex(where: {$0.keyword == keyword})
     }
     // ファクトリーメソッド
-    static func create(from token: Token, with environment: Environment) -> PredicateOperable? {
-        Self()[token]?(environment) ?? NopOperator(environment)
+    static func create(from keyword: Token.Keyword, with environment: Environment) -> PredicateOperable {
+        dictionary[keyword]?(environment) ?? NopOperator(environment)
+    }
+    static func create(from token: Token, with environment: Environment) -> PredicateOperable {
+        dictionary[token.unwrappedKeyword!]?(environment) ?? NopOperator(environment)
     }
 }
 /// stringをsplit()により、[String]に分解する。
@@ -462,16 +458,22 @@ struct BooleanOperator : PredicateOperable {
             switch (params[0].particle, params[1].particle, op.type) {
             case (.particle(.GA),.particle(.DE),.keyword(.BE)),(.particle(.WA),.particle(.DE),.keyword(.BE)),
                 (.particle(.GA),.particle(.DE),.keyword(.NOT)),(.particle(.WA),.particle(.DE),.keyword(.NOT)),
-                (.particle(.GA),.particle(.DEWA),.keyword(.NOT)),(.particle(.WA),.particle(.DEWA),.keyword(.NOT)),
-                (_,_,.keyword(.EQUAL)):                         // 当否判定
+                (.particle(.GA),.particle(.DEWA),.keyword(.NOT)),(.particle(.WA),.particle(.DEWA),.keyword(.NOT)),  // 真偽判定
+                (_,_,.keyword(.EQUAL)):                                                                             // 等値判定
                 guard let left = params[0].value, let right = params[1].value else {
                     return "「\(op.literal)」:" + valueNotFound + ": \(params[0])または\(params[1])"
                 }
                 environment.drop(2)
+                if left.type == right.type {
+                    return determined(JpfBoolean.object(of: left.isEqual(to: right)), op.type)
+                    /* 「または」は配列になるため、「配列【「あ」、「い」】が、「あ」または「い」に等しい」は真になる。 */
+                }
                 return determined(left, op.type, right)
             case (.particle(.GA),.particle(.NI),.keyword(.BE)),(.particle(.WA),.particle(.NI),.keyword(.BE)),
-                (.particle(.GA),.particle(.NI),.keyword(.NOT)),(.particle(.WA),.particle(.NI),.keyword(.NOT)): // 有無判定(含む)
-                guard let left = params[0].value, let right = params[1].value else {return determineUsage + "\(op.literal)。"}
+                (.particle(.GA),.particle(.NI),.keyword(.NOT)),(.particle(.WA),.particle(.NI),.keyword(.NOT)): // 存在判定(含む)
+                guard let left = params[0].value, let right = params[1].value else {
+                    return determineUsage + "\(op.literal)。"
+                }
                 switch right {
                 case is JpfRange:
                     guard left.isNumber else {return rangeFormatError + rangeCheckUsage  + "\(op.literal)。"}
@@ -496,18 +498,12 @@ struct BooleanOperator : PredicateOperable {
         }
         return "「\(op.literal)」" + atLeastOneParamError + (op.type == .keyword(.BE) ? beUsage : notUsage)
     }
+    /// rightがコンテナ(contains(_:)を持つ)の場合は存在判定を、それ以外は等値判定を行う。
     private func determined(_ left: JpfObject, _ opType: Token.TokenType, _ right: JpfObject) -> JpfObject {
-        if !(left is JpfArray && opType == .keyword(.EQUAL)) &&
-            !(left is JpfRange && opType == .keyword(.EQUAL)) {
-            if let array = right as? JpfArray {
-                let result = array.contains(left)
-                return determined(result, opType)
-            }
-            if let range = right as? JpfRange {
-                let result = range.contains(left)
-                guard !result.isError else {return result} // 範囲の形式エラー
-                return determined(result, opType)
-            }
+        if let container = right as? any ContainerProtocol {
+            let result = container.contains(left)
+            if result.isError {return result}
+            return determined(result, op.type)
         }
         switch opType {
         case .keyword(.BE),

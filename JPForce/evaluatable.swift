@@ -19,6 +19,17 @@ extension Node {
     func evaluated(with environment: Environment) -> JpfObject? {
         return (self.string + "(\(type(of: self)))" + notImplementedError)
     }
+    /// ASTを走査し、「それ以外は」があるかチェックする。
+    func hasAlternativeBlock(in statements: [Statement]) -> Bool {
+        for case let es as ExpressionStatement in statements {
+            for case let ge as GenitiveExpression in es.expressions {
+                if let ce = ge.right as? CaseExpression, ce.alternative != nil {
+                    return true
+                }
+            }
+        }
+        return false
+    }
     // 評価エラー
     var notImplementedError: JpfError       {JpfError("の評価を未実装")}
     var phaseValueNotFound: JpfError        {JpfError("句の値が無かった。(例：関数の返り値が無い。)")}
@@ -56,51 +67,67 @@ extension Node {
 // MARK: Program/Statement/Block evaluators
 extension Program : Evaluatable {
     func evaluated(with environment: Environment) -> JpfObject? {
-        var result: JpfObject?
+        environment.switchCase.enter()
+        var lastResult: JpfObject?
         for statement in statements {
-            result = statement.evaluated(with: environment)
-            if let object = result, object.isBreakFactor {return object.value}
+            lastResult = statement.evaluated(with: environment)
+            if let result = lastResult, result.isBreakFactor {return result.value}
         }
-        return result
+        // 「〜の場合」に続く「それ以外は」の有無チェック
+        if environment.switchCase.isActive {
+            guard hasAlternativeBlock(in: statements) else {return switchCaseError}
+            environment.switchCase.isActive = false
+        }
+        environment.switchCase.leave()
+        return lastResult
     }
 }
 extension ExpressionStatement : Evaluatable {
     func evaluated(with environment: Environment) -> JpfObject? {
-        environment.switchCase.enter()
-        var result: JpfObject?
+        var lastResult: JpfObject?
         for expression in expressions {
-            result = expression.evaluated(with: environment)
-            if let object = result {
-                if object.isBreakFactor {break}
-                if let err = environment.push(object) {return err}
+            lastResult = expression.evaluated(with: environment)
+            if let result = lastResult {
+                if result.isBreakFactor {break}
+                if let err = environment.push(result) {return err}
             }
         }
-        if environment.switchCase.isActive {return switchCaseError}
-        environment.switchCase.leave()
         environment.remove(name: Environment.OUTER)
-        return result
+        return lastResult
     }
 }
 extension BlockStatement : Evaluatable {
     func evaluated(with environment: Environment) -> JpfObject? {
-        var result: JpfObject?
+        environment.switchCase.enter()
+        var lastResult: JpfObject?
         for statement in statements {
-            result = statement.evaluated(with: environment)
-            if let object = result, object.isBreakFactor {break}
+            lastResult = statement.evaluated(with: environment)
+            if let result = lastResult, result.isBreakFactor {break}
         }
-        return result
+        // 「〜の場合」に続く「それ以外は」の有無チェック
+        if environment.switchCase.isActive {
+            guard hasAlternativeBlock(in: statements) else {return switchCaseError}
+            environment.switchCase.isActive = false
+        }
+        environment.switchCase.leave()
+        return lastResult
     }
 }
 extension DefineStatement : Evaluatable {
     func evaluated(with environment: Environment) -> JpfObject? {
         if let result = value.evaluated(with: environment), result.isError {return result}
         guard var definition = environment.pull() else {return nil}
-        if isExtended {
+        if let keyword = Token.Keyword(rawValue: name.value),
+           Token.redefinables.contains(keyword) {   // 再定義可能な識別子
+            environment.redefineds.insert(keyword)
+        }
+        if isExtended {                             // さらに
             if environment.contains(name.value) {
                 definition = extend(environment, by: name.value, with: definition)
                 if definition.isError {return definition}
             } else
-            if let keyword = Token.Keyword(rawValue: name.value), Token.redefinables.contains(keyword) {
+            if let keyword = Token.Keyword(rawValue: name.value),
+               environment.redefineds.contains(keyword) {
                 definition = extend(definition, with: keyword)
             }
         }
@@ -251,29 +278,25 @@ extension RangeLiteral : Evaluatable {
     }
 }
 extension Identifier : Evaluatable {
-    /// 識別子をキーに、辞書からオブジェクトを取り出す。(あれば入力に積まれる。)
-    /// - 識別子が列挙子であれば、列挙子オブジェクトを返す。
-    /// - スタックに積まれたオブジェクトに識別子で添字演算をし、オブジェクトを返す。
-    /// - 返すオブジェクトが算出で実行可であれば、取得を呼び出す。
+    /// 識別子名をキーに、オブジェクトを得る。(あれば入力に積まれる。)
+    /// - 「の」による属性、メソッド、値、その他属性、の順にオブジェクト取得
+    /// - 返すオブジェクトが算出で実行可であれば、取得(getter)を呼び出す。
     func evaluated(with environment: Environment) -> JpfObject? {
         var object: JpfObject? = nil
-        if let o = getMethod(of: value, from: environment) {    // スタックのオブジェクトからメソッドを取得
+        if let o = getProperty(of: value, from: environment, check: true) { // 「ノ格」による属性アクセス
             object = o
-        } else
-        if let o = getObject(of: value, from: environment) {    // ローカル辞書から取得
-            object = o
-        } else
-        if let target = environment.unwrappedPeek,              // スタックから対象を取得
-           let o = target[value, environment.peek?.particle] {  // 対象をsubscriptでアクセス
-            environment.drop()
-            object = o
-        } else
-        if let keyword = Token.Keyword(rawValue: token.unwrappedLiteral),
-           Token.redefinables.contains(keyword) {               // 再定義可能な予約語
-            guard let predicate = PredicateOperableFactory.create(from: Token(keyword: keyword), with: environment) else {return predicateNotSupported}
-            return predicate.operated()
         } else {
-            return "『\(value)』" + identifierNotFound
+            if let o = getMethod(of: value, from: environment) {    // スタックのオブジェクトからメソッドを取得
+                object = o
+            } else
+            if let o = getObject(of: value, from: environment) {    // ローカル辞書からオブジェクトを取得
+                object = o
+            } else
+            if let o = getProperty(of: value, from: environment) {  // スタックのオブジェクトの属性を取得
+                object = o
+            } else {
+                return "『\(value)』" + identifierNotFound
+            }
         }
         if let computation = object as? JpfComputation, environment.isExecutable {
             return computation.getter(with: environment)
@@ -304,9 +327,24 @@ extension Identifier : Evaluatable {
             default:
                 return false
             }
-        }) as? JpfPhrase,
-            let obj = target.value?[name, target.particle] {    // 対象オブジェクトの要素
-                return obj
+        }), let obj = target.value?[name, target.particle] {    // 対象オブジェクトの要素
+            return obj
+        }
+        return nil
+    }
+    /// スタックのオブジェクトの属性を返す
+    /// - Parameters:
+    ///   - name: 属性名
+    ///   - env: スタックの環境
+    ///   - check: true: アクセスする格「の」をチェクする
+    /// - Returns: 属性
+    private func getProperty(of name: String, from env: Environment, check: Bool = false) -> JpfObject? {
+        let particle = env.peek?.particle
+        if let target = env.unwrappedPeek,          // スタックから対象オブジェクトを取得
+           !check || particle == Token(.NO),        // check = trueの場合、「の格」をチェック
+           let obj = target[value, particle] {      // 対象の属性
+            env.drop()
+            return obj
         }
         return nil
     }
@@ -315,11 +353,11 @@ extension PredicateExpression : Evaluatable {
     /// 述語を実行する。(結果があれば返す。= スタックに積まれる。)
     /// self.tokenは述語(Token.Keywordもしくは Token.IDENT(_))
     func evaluated(with environment: Environment) -> JpfObject? {
-        if Token.redefinables.contains(where: {token.isKeyword($0)}) {  // 再定義可？
+        if let keyword = token.unwrappedKeyword, environment.contains(keyword) {    // 再定義済み？
             let ident = Identifier(from: token)
             return ident.evaluated(with: environment)
         }
-        guard let predicate = PredicateOperableFactory.create(from: token, with: environment) else {return predicateNotSupported}
+        let predicate = PredicateOperableFactory.create(from: token, with: environment)
         return predicate.operated()
     }
 }
@@ -426,14 +464,10 @@ extension CaseExpression : Evaluatable {
         return JpfBoolean.object(of: result.isTrue)
     }
     private func compared(left: JpfObject, right: JpfObject) -> JpfObject {
-        switch right {
-        case let array as JpfArray: // leftが配列に含まれる
-            return array.contains(left)
-        case let range as JpfRange: // leftが範囲に含まれる
-            return range.contains(left)
-        default:
-            return JpfBoolean.object(of: left.isEqual(to: right))
+        if let container = right as? (any ContainerProtocol) {
+            return container.contains(left)
         }
+        return JpfBoolean.object(of: left.isEqual(to: right))
     }
 }
 extension LogicalExpression : Evaluatable {
@@ -593,7 +627,7 @@ extension Label : Evaluatable {
             }
         case .keyword(let k):
             if token.isKeyword(.RESERVEDWORD) {
-                guard let predicate = PredicateOperableFactory.create(from: value, with: environment) else {return predicateNotSupported}
+                let predicate = PredicateOperableFactory.create(from: k, with: environment)
                 return predicate.operated()
             }
             guard k == .TRUE || k == .FALSE else {return "『\(value.literal)』" + cannotUseAsKeyword}

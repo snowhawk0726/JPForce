@@ -7,6 +7,10 @@
 
 import Foundation
 
+protocol ContainerProtocol {
+    func contains(_ element: JpfObject) -> JpfObject
+}
+
 /// オブジェクトの属性(属性名(name)とアクセス方法(acessor))
 struct ObjectProperties {
     init() {
@@ -137,7 +141,7 @@ extension JpfInteger {
         }
     }
 }
-extension JpfRange {
+extension JpfRange : ContainerProtocol {
     /// 範囲の比較（未満と他の上限は不一致）
     func isEqual(to object: JpfObject) -> Bool {
         guard let rhs = object as? Self else {return false}
@@ -282,7 +286,7 @@ extension JpfRange {
         environment.pull() ?? initial
     }
 }
-extension JpfString {
+extension JpfString : ContainerProtocol {
     var count: JpfObject {JpfInteger(value: value.count)}
     var isEmpty: JpfObject {JpfBoolean.object(of: value.isEmpty)}
     var number: Int? {Int(value)}
@@ -362,7 +366,7 @@ extension JpfInput {
         }
     }
 }
-extension JpfArray {
+extension JpfArray : ContainerProtocol {
     func isEqual(to object: JpfObject) -> Bool {
         guard let rhs = object as? Self else {return false}
         return elements.count == rhs.elements.count &&

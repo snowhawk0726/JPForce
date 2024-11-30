@@ -15,6 +15,7 @@ class Environment {
     var switchCase = SwitchCase()                   // switch-case制御
     private var store: [String: JpfObject] = [:]
     private var stack: Stack
+    var redefineds: Set<Token.Keyword> = []         // 再定義された予約語
     private var arguments: [String: JpfObject] = [:]// 引数
     // MARK: - 辞書操作
     subscript(_ name: String) -> JpfObject? {
@@ -118,6 +119,11 @@ class Environment {
     var argumentPairs: [(String, JpfObject)] {
         arguments.map {($0, $1)}
     }
+    func contains(_ keyword: Token.Keyword) -> Bool {
+        if redefineds.contains(keyword) {return true}
+        guard let instance = peek?.value as? JpfInstance else {return false}
+        return instance.available.contains(keyword.rawValue)
+    }
     // MARK: - スタック操作
     func push(_ object: JpfObject) -> JpfError?     {stack.push(object)}
     func push(_ objects: [JpfObject]) -> JpfError?  {stack.push(objects)}
@@ -140,7 +146,8 @@ class Environment {
     // MARK: - 入力操作
     var isPeekParticle: Bool {peek?.particle != nil}
     func isPeekParticle(_ particle: Token.Particle) -> Bool {
-        peek?.particle.map {$0.type} == Token.particle(particle).type
+        if case .particle(particle) = peek?.particle {return true}
+        return false
     }
     var unwrappedPeek: JpfObject? {
         if peek is JpfPhrase {return peek?.value}
@@ -175,7 +182,7 @@ class Environment {
             }
         }
         if let keyword = functions.keyword {        // 予約語再定義の既定動作
-            let predicate = PredicateOperableFactory.create(from: Token(keyword: keyword), with: self)!
+            let predicate = PredicateOperableFactory.create(from: keyword, with: self)
             return predicate.operated()
         }
         if functions.array.count == 1 {             // 単体の定義の場合、エラーメッセージを作成する
@@ -196,7 +203,7 @@ class Environment {
             return execute(function, with: local)
         }
         if let keyword = functions.keyword {        // 予約語再定義の既定動作
-            let predicate = PredicateOperableFactory.create(from: Token(keyword: keyword), with: self)!
+            let predicate = PredicateOperableFactory.create(from: keyword, with: self)
             return predicate.operated()
         }
         if functions.array.count == 1 {             // 単体の定義の場合、エラーメッセージを作成する
@@ -218,8 +225,8 @@ class Environment {
     private func execute(_ function: FunctionBlock, with local: Environment) -> JpfObject? {
         defer {_ = push(local.pullAll())}   // スタックを戻す
         if let body = function.body, let result = Evaluator(from: body, with: local).object {
-            if result.isError {return result}
             if result.isReturnValue {return result.value}
+            if result.isError {return result}
         }
         return nil
     }

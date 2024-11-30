@@ -15,6 +15,7 @@
 		501240E62C2590C300CC2F7C /* vm.swift in Sources */ = {isa = PBXBuildFile; fileRef = 501240E52C2590C300CC2F7C /* vm.swift */; };
 		501240E72C2590C300CC2F7C /* vm.swift in Sources */ = {isa = PBXBuildFile; fileRef = 501240E52C2590C300CC2F7C /* vm.swift */; };
 		50175F9B2C8C426200DD0F4A /* predicateCompilable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50175F9A2C8C426200DD0F4A /* predicateCompilable.swift */; };
+		503E27842CE87D7600300B1B /* Benchmark.swift in Sources */ = {isa = PBXBuildFile; fileRef = 503E27832CE87D7600300B1B /* Benchmark.swift */; };
 		5042122729B58DAD00D2EA98 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5042122129B58DAD00D2EA98 /* main.swift */; };
 		5042122829B58DAD00D2EA98 /* lexer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5042121F29B58DAD00D2EA98 /* lexer.swift */; };
 		5042122929B58DAD00D2EA98 /* repl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5042122429B58DAD00D2EA98 /* repl.swift */; };
@@ -84,6 +85,7 @@
 		501240E32C2587B800CC2F7C /* VMTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VMTests.swift; sourceTree = "<group>"; };
 		501240E52C2590C300CC2F7C /* vm.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = vm.swift; sourceTree = "<group>"; };
 		50175F9A2C8C426200DD0F4A /* predicateCompilable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = predicateCompilable.swift; sourceTree = "<group>"; };
+		503E27832CE87D7600300B1B /* Benchmark.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Benchmark.swift; sourceTree = "<group>"; };
 		5042121329B58CA700D2EA98 /* JPForce */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = JPForce; sourceTree = BUILT_PRODUCTS_DIR; };
 		5042121E29B58DAD00D2EA98 /* token.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = token.swift; sourceTree = "<group>"; };
 		5042121F29B58DAD00D2EA98 /* lexer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = lexer.swift; sourceTree = "<group>"; };
@@ -190,6 +192,7 @@
 				5042123B29B58E5900D2EA98 /* AstTests.swift */,
 				501240E32C2587B800CC2F7C /* VMTests.swift */,
 				5042124C29B58F0D00D2EA98 /* TokenTests.swift */,
+				503E27832CE87D7600300B1B /* Benchmark.swift */,
 				5042124A29B58F0000D2EA98 /* ParserTests.swift */,
 				5042124829B58EF300D2EA98 /* LexerTests.swift */,
 				5042124629B58EE100D2EA98 /* EvaluatorTests.swift */,
@@ -245,7 +248,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1540;
-				LastUpgradeCheck = 1540;
+				LastUpgradeCheck = 1610;
 				TargetAttributes = {
 					5042121229B58CA700D2EA98 = {
 						CreatedOnToolsVersion = 14.2;
@@ -333,6 +336,7 @@
 				5042125029B5903F00D2EA98 /* evaluatable.swift in Sources */,
 				5042124729B58EE100D2EA98 /* EvaluatorTests.swift in Sources */,
 				5042124129B58EAE00D2EA98 /* object.swift in Sources */,
+				503E27842CE87D7600300B1B /* Benchmark.swift in Sources */,
 				5042124429B58EBC00D2EA98 /* repl.swift in Sources */,
 				5042123C29B58E5900D2EA98 /* AstTests.swift in Sources */,
 				5006B6EC2C2957E700D34FDD /* accessible.swift in Sources */,
@@ -486,7 +490,7 @@
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = ZW73X7LZ8T;
 				ENABLE_HARDENED_RUNTIME = YES;
-				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MACOSX_DEPLOYMENT_TARGET = 13.5;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
 			};
@@ -499,7 +503,7 @@
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = ZW73X7LZ8T;
 				ENABLE_HARDENED_RUNTIME = YES;
-				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MACOSX_DEPLOYMENT_TARGET = 13.5;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
 			};

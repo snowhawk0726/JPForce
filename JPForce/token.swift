@@ -204,6 +204,9 @@ enum Token : Equatable {
         case .wrapped(_, let literal):  return literal
         }
     }
+    var keyword: Keyword? {
+        if case .keyword(let k) = self {return k} else {return nil}
+    }
     var unwrappedType: TokenType {
         if case .wrapped(let type,_) = self {return type}
         return self.type
@@ -211,6 +214,14 @@ enum Token : Equatable {
     var unwrappedLiteral: String {
         guard case .wrapped(_,let word) = self else {return literal}
         return ContinuativeForm(word).plainForm ?? literal
+    }
+    var unwrappedKeyword: Keyword? {
+        switch self {
+        case .keyword(let k): return k
+        case .wrapped(.keyword(let k),_):return k
+        default:
+            return nil
+        }
     }
     var coloredLiteral: String {literal.color(color)}
     var number: Int? {if case .INT(let int) = self {return int} else {return nil}}
@@ -250,11 +261,15 @@ enum Token : Equatable {
     var isEol: Bool     {self == .symbol(.EOL)}
     var isPeriod: Bool  {self == .symbol(.PERIOD)}
     var isComma: Bool   {self == .symbol(.COMMA)}
-    func isKeyword(_ k: Token.Keyword) -> Bool {self.type == .keyword(k)}
-    func isParticle(_ p: Token.Particle) -> Bool {self.type == .particle(p)}
+    func isKeyword(_ k: Token.Keyword) -> Bool {
+        if case .keyword(k) = self {return true} else {return false}}
+    
+    func isParticle(_ p: Token.Particle) -> Bool {
+        if case .particle(p) = self {return true} else {return false}
+    }
     //
     // MARK: - 再定義可能な予約語(述語)(redefinable predicate keywords)
-    static var redefinables: [Token.Keyword] = [    //
+    static var redefinables: Set<Token.Keyword> = [    //
         .ADD, .MULTIPLY, .SUBSTRACT, .DIVIDE, .NEGATE, .NULL,
         .EQUAL, .BE, .NOT, .LT, .GT,
         .RETURN, .GOBACK, .BREAK, .CONTINUE,
@@ -263,7 +278,7 @@ enum Token : Equatable {
         .APPEND, .REMOVE, .CONTAINS, .FOREACH, .MAP, .FILTER, .REDUCE, .SORT, .REVERSE,
         .PRINT, .ASK, .NEWLINE, .READ, .FILES, .IDENTIFIERS,
         .ASSIGN, .SET, .SWAP,
-        .EXECUTE, .SURU, .CREATE, .INITIALIZATION, .AVAILABLE,
+        .EXECUTE, .CREATE, .INITIALIZATION, .AVAILABLE,
     ]
     // MARK: - 全角半角対応の記号辞書(symbol dictionary for half/fullwidth)
     static var symbols = {

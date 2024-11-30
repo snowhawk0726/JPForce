@@ -65,16 +65,17 @@ class Stack {
         return object
     }
     /// スタックに指定のオブジェクトがあったら、それを取り出す。(無ければ nil)
+    /// (オブジェクトは、スタックの末尾から探す)
     func pull(where condition: (JpfObject) -> Bool) -> JpfObject? {
-        for i in stride(from: sp - 1, through: 0, by: -1) {  // スタックの末尾から検索
-            if condition(stack[i]) {
-                let object = stack[i]
-                stack[i] = stack[sp - 1]  // 最後の要素と置き換え
-                sp -= 1  // スタックポインタをデクリメント
-                return object
-            }
+        guard let index = (0..<sp).last(where: {condition(stack[$0])}) else {
+            return nil
         }
-        return nil
+        let object = stack[index]
+        if index != sp - 1 {
+            stack[index] = stack[sp - 1]            // 最後の要素と置き換え
+        }
+        sp -= 1                                     // スタックポインタをデクリメント
+        return object
     }
     func pullAll() -> [JpfObject] {
         defer {sp = 0}
@@ -144,17 +145,17 @@ class VM {
     private var frames: [Frame] = []
     private var framesIndex: Int = 0
     // エラー
-    private let codeNotSupported = JpfError("は、未実装。")
+    private let invalidOpcode = JpfError("不正なオペコード:")
     /// Fetch instructions
     func run() -> JpfError? {
         while currentFrame.isIpInRange {
-            let ip = currentFrame.advancedIp()
+            var ip = currentFrame.advancedIp()
             let instructions = currentFrame.insturctions!
-            let opcode = Opcode(rawValue: instructions[ip])!
-            let bytes = instructions[(ip+1)..<min(ip+1+opcode.operandWidth, instructions.count)].bytes
-            guard let executer = CodeExecutableFactory.create(from: opcode, operandBytes: bytes, with: self) else {
-                return "命令語(\(opcode.name))" + codeNotSupported
-            }
+            let op = instructions[ip]
+            guard let opcode = Opcode(rawValue: op) else {return invalidOpcode + "\(op)"}
+            ip += 1
+            let bytes = instructions[ip..<ip+opcode.operandWidth].bytes
+            let executer = CodeExecutableFactory.create(from: opcode, operandBytes: bytes, with: self)
             if let error = executer.execute() {return error}
         }
         return nil
