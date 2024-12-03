@@ -158,11 +158,20 @@ final class EvaluatorTests: XCTestCase {
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            if let evaluated = testEvaluator(test.input) {
+            let lexer = Lexer(test.input)
+            let parser = Parser(lexer)
+            guard let program = parser.parseProgram() else {
+                XCTAssertEqual(test.exptected as? String, parser.errors.first!)
+                print("テスト(\(parser.errors.first!))終了")
+                return
+            }
+            let environment = Environment()
+            let eval = Evaluator(from: program, with: environment)
+            if let evaluated = eval.object ?? environment.peek {
                 try testObject(evaluated, with: test.exptected)
                 print("テスト(\(evaluated))終了")
             } else {
-                XCTAssertNil(test.exptected, "構文解析、または評価失敗")
+                XCTAssertNil(test.exptected, "評価失敗")
                 print("テスト(nil)終了")
             }
         }

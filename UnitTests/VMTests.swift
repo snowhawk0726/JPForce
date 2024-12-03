@@ -109,7 +109,7 @@ final class VMTests: XCTestCase {
         let error = "「〜の場合」に続く、「それ以外は」が定義されていない。"
         let testPattern: [VmTestCase] = [
             // キャッシュ
-            ("1が1の場合【10】。", 10),
+            ("1が1の場合【10】。", error),
             ("1が1の場合【10】、それ以外は【20】。", 10),
             ("1が2の場合【10】、それ以外は【20】。", 20),
             ("2が1の場合【10】、2の場合【20】、それ以外は【30】。", 20),
@@ -287,17 +287,7 @@ final class VMTests: XCTestCase {
             ("関数【入力がa。a】を実行。", "入力の数が足りていない。必要数：1"),
             ("１で関数【入力がaとb。aとbを足す】を実行。", "入力の数が足りていない。必要数：2"),
         ]
-        for test in testPattern {
-            let program = parseProgram(with: test.input)
-            let compiler = Compiler(from: program)
-            XCTAssertNil(compiler.compile())
-            let vm = VM(with: compiler.bytecode)
-            if let error = vm.run() {
-                XCTAssertEqual(error.message, test.expected as? String)
-            } else {
-                XCTAssertEqual(vm.stackTop?.number, test.expected as? Int)
-            }
-        }
+        try runVmTests(with: testPattern)
     }
     func testBuiltinFunctions() throws {
         let testPattern: [VmTestCase] = [
@@ -373,7 +363,13 @@ final class VMTests: XCTestCase {
         for t in tests {
             var result: JpfObject?
             print("テスト開始：「\(t.input)」")
-            let program = parseProgram(with: t.input)
+            let lexer = Lexer(t.input)
+            let parser = Parser(lexer)
+            guard let program = parser.parseProgram() else {
+                XCTAssertEqual(t.expected as? String, parser.errors.first!)
+                print("テスト結果：\(parser.errors.first!)")
+                continue
+            }
             let compiler = Compiler(from: program)
             if let error = compiler.compile() {
                 result = error          // コンパイルエラー

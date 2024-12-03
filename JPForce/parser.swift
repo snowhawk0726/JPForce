@@ -22,9 +22,11 @@ class Parser {
     var errors: [String] = []
     var nestedBlockCounter = NestCounter(.RBBRACKET, .EOL)
     var nestedElementsCounter = NestCounter(.RBBRACKET, .PERIOD)
+    var switchCase = SwitchCase()           // Switch-case監視
     // MARK: - プログラムの解析
     func parseProgram() -> Program? {
         var program = Program()
+        switchCase.enter()
         while !currentToken.isEof {
             skipEols()
             guard let statement = StatementParserFactory.create(from: self).parse() else {return nil}
@@ -32,6 +34,11 @@ class Parser {
             while getNext(whenNextIs: Token.symbol(.EOL)) {}
             getNext()
         }
+        if switchCase.isActive {
+            errors.append(switchCase.defaultError)
+            return nil
+        }
+        switchCase.leave()
         return program
     }
     // MARK: - ヘルパー
@@ -83,10 +90,10 @@ class Parser {
     }
 }
 // MARK: - Helpers for Unit Test
-func parseProgram(with input: String) -> Program {
+func parseProgram(with input: String) -> Program? {
     let lexer = Lexer(input)
     let parser = Parser(lexer)
-    let program = parser.parseProgram()!
+    let program = parser.parseProgram()
     check(parser.errors)
     return program
 }

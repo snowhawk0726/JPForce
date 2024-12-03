@@ -56,11 +56,11 @@ class SwitchCase {
         }
     }
     // opJumpのip管理
-    func append(_ position: Int) {
-        positions[currentId]?.append(position)
-    }
+    func append(_ position: Int) {positions[currentId]?.append(position)}
     var jumpPositions: [Int]? {positions[currentId]}
     var hasJumpPositions: Bool {positions[currentId]?.isEmpty == false}
+    // エラー
+    let defaultError = "「〜の場合」に続く、「それ以外は」が定義されていない。"
 }
 /// 翻訳器
 class Compiler {

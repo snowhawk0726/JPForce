@@ -559,6 +559,7 @@ struct BlockStatementParser : StatementParsable {
     let parser: Parser, endBlockSymbol: Token.Symbol
     func parse() -> Statement? {blockStatement}
     var blockStatement: BlockStatement? {
+        parser.switchCase.enter()
         var blockStatements: [Statement] = []
         blockCount.up(to: endBlockSymbol)
         getNext()
@@ -577,6 +578,11 @@ struct BlockStatementParser : StatementParsable {
             skipEolInBlock()
         }
         blockCount.down(to: endBlockSymbol)
+        if parser.switchCase.isActive {
+            parser.errors.append(parser.switchCase.defaultError)
+            return nil
+        }
+        parser.switchCase.leave()
         return BlockStatement(token: token, statements: blockStatements)
     }
     private var isEndOfBlock: Bool {
@@ -1209,6 +1215,9 @@ struct GenitiveExpressionParser : ExpressionParsable {
         guard let right = ExpressionParser(parser, precedence: precedence).parse() else {
             error(message: "属格で、右式の解析に失敗した。")
             return nil
+        }
+        if let exp = right as? CaseExpression { // 場合文の「それ以外は」のチェック
+            parser.switchCase.isActive = (exp.alternative == nil)
         }
         var value: ExpressionStatement? = nil
         if let phrase = right as? PhraseExpression, phrase.token.isParticle(.WA) {

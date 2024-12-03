@@ -29,7 +29,7 @@ extension Program : Compilable {
         for statement in statements {
             if let object = statement.compiled(with: c), object.isError {return object}
         }
-        if c.switchCase.hasJumpPositions {return switchCaseError}
+        if c.switchCase.hasJumpPositions {return JpfError(c.switchCase.defaultError)}
         c.switchCase.leave()
         return nil
     }
@@ -53,7 +53,7 @@ extension BlockStatement : Compilable {
             result = statement.compiled(with: c)
             if let object = result, object.isBreakFactor {break}
         }
-        if c.switchCase.hasJumpPositions {return switchCaseError}
+        if c.switchCase.hasJumpPositions {return JpfError(c.switchCase.defaultError)}
         c.switchCase.leave()
         return result
     }

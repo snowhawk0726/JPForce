@@ -19,17 +19,6 @@ extension Node {
     func evaluated(with environment: Environment) -> JpfObject? {
         return (self.string + "(\(type(of: self)))" + notImplementedError)
     }
-    /// ASTを走査し、「それ以外は」があるかチェックする。
-    func hasAlternativeBlock(in statements: [Statement]) -> Bool {
-        for case let es as ExpressionStatement in statements {
-            for case let ge as GenitiveExpression in es.expressions {
-                if let ce = ge.right as? CaseExpression, ce.alternative != nil {
-                    return true
-                }
-            }
-        }
-        return false
-    }
     // 評価エラー
     var notImplementedError: JpfError       {JpfError("の評価を未実装")}
     var phaseValueNotFound: JpfError        {JpfError("句の値が無かった。(例：関数の返り値が無い。)")}
@@ -54,7 +43,6 @@ extension Node {
     var cannotExtend: JpfError              {JpfError("拡張することはできない。")}
     var enumuratorError: JpfError           {JpfError("「列挙」の列挙子(識別子)が正しくない。：")}
     var cannotUseAsKeyword: JpfError        {JpfError("は、ラベルの値として使用できない。")}
-    var switchCaseError: JpfError           {JpfError("「〜の場合」に続く、「それ以外は」が定義されていない。")}
     var notSupportedCall: JpfError          {JpfError("呼び出し式は未対応。対象：")}
     // 仕様表示
     var strideLoopUsage: JpfError           {JpfError("仕様：<数値>から<数値>まで（<数値>ずつ）反復【入力が<識別子(カウント値)>、<処理>】。")}
@@ -67,18 +55,11 @@ extension Node {
 // MARK: Program/Statement/Block evaluators
 extension Program : Evaluatable {
     func evaluated(with environment: Environment) -> JpfObject? {
-        environment.switchCase.enter()
         var lastResult: JpfObject?
         for statement in statements {
             lastResult = statement.evaluated(with: environment)
             if let result = lastResult, result.isBreakFactor {return result.value}
         }
-        // 「〜の場合」に続く「それ以外は」の有無チェック
-        if environment.switchCase.isActive {
-            guard hasAlternativeBlock(in: statements) else {return switchCaseError}
-            environment.switchCase.isActive = false
-        }
-        environment.switchCase.leave()
         return lastResult
     }
 }
@@ -98,18 +79,11 @@ extension ExpressionStatement : Evaluatable {
 }
 extension BlockStatement : Evaluatable {
     func evaluated(with environment: Environment) -> JpfObject? {
-        environment.switchCase.enter()
         var lastResult: JpfObject?
         for statement in statements {
             lastResult = statement.evaluated(with: environment)
             if let result = lastResult, result.isBreakFactor {break}
         }
-        // 「〜の場合」に続く「それ以外は」の有無チェック
-        if environment.switchCase.isActive {
-            guard hasAlternativeBlock(in: statements) else {return switchCaseError}
-            environment.switchCase.isActive = false
-        }
-        environment.switchCase.leave()
         return lastResult
     }
 }
@@ -428,7 +402,6 @@ extension CaseExpression : Evaluatable {
     /// 形式２：   (〜が、〜の)場合、【処理】(、(〜の)場合、【処理】...)(、それ以外は、【処理】)
     /// - Returns: ReturnValueまたはnil、エラー
     func evaluated(with environment: Environment) -> JpfObject? {
-        if alternative != nil {environment.switchCase.isActive = false}
         if let condition = getCondition(from: environment) {
             guard !condition.isError else {return condition}
             let result =  condition.isTrue ?
@@ -919,10 +892,7 @@ extension GenitiveExpression : Evaluatable {
         case let expression as PhraseExpression:
             let object = evaluated(object, expression.left, with: environment)
             return JpfPhrase(name: "", value: object, particle: expression.token)
-        case is CaseExpression:
-            environment.switchCase.isActive = true
-            fallthrough
-        case is PredicateExpression, is Label:
+        case is PredicateExpression, is Label, is CaseExpression:
             if let err = environment.push(phrase) {return err}
             return right.evaluated(with: environment)
         default:
