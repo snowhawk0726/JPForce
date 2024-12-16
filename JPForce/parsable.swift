@@ -516,6 +516,7 @@ struct DefStatementParser : StatementParsable {
         }
         if var function = parsed.expressions.first as? FunctionLiteral {
             function.name = identifier.value// 関数の名前を記録
+            function.function.isOverloaded = isExtended
             parsed.expressions[0] = function// DefineStatement.valueに反映する。
         }
         return DefineStatement(token: token, name: identifier, value: parsed, isExtended: isExtended)
@@ -759,7 +760,7 @@ struct FunctionLiteralParser : ExpressionParsable {
         let token = parseHeader()
         switch parseFunctionBlock(in: token.literal) {
         case .success(let function):
-            return FunctionLiteral(token: token, functions: FunctionBlocks(function))
+            return FunctionLiteral(token: token, function: function)
         case .failure(_):
             return nil
         }
@@ -854,11 +855,9 @@ struct ProtocolLiteralParser : ExpressionParsable {
                     error(message: "規約で、関数の「入力が〜」の解析に失敗した。")
                     return nil
                 }
-                if !parsed.functions.isEmpty {
-                    functionParams = ParameterClauseLiteral(
-                        parameters: parsed.functions.array.first?.parameters ?? [],
-                        signature:  parsed.functions.array.first?.signature)
-                }
+                functionParams = ParameterClauseLiteral(
+                        parameters: parsed.function.parameters,
+                        signature:  parsed.function.signature)
             case .keyword(.COMPUTATION):    // 算出(引数チェック)
                 guard let parsed = ComputationLiteralParser(parser).parse() as? ComputationLiteral else {return nil}
                 if !parsed.getters.isEmpty {

@@ -307,7 +307,7 @@ class Environment {
     /// - Parameter function: 対象の関数ブロック
     /// - Returns: エラー、無しはnil
     private func apply(_ function: FunctionBlock) -> JpfError? {
-        let difference = Set(function.parameters.map {$0.value}).subtracting(Set(arguments.keys))
+        let difference = Set(function.parameters.map {$0.value}).subtracting(arguments.keys)
         for name in difference {
             let i = function.index(of: name)!   // parametersに属するので、nilにはならない。
             self[name] = getDefaultValue(with: function.signature, at: i)

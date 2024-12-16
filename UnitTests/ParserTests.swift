@@ -260,7 +260,7 @@ final class ParserTests: XCTestCase {
             let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
             XCTAssertEqual(statement.expressions.count, 1, "statement.expressions.count")
             let function = try XCTUnwrap(statement.expressions.first as? FunctionLiteral)   // 関数であって、
-            let functionBlock = try XCTUnwrap(function.functions.array.first)
+            let functionBlock = function.function
             XCTAssertEqual(functionBlock.parameters.count, 2, "function.parameters.count")
             try testLiteralExpression(functionBlock.parameters[0], with: "x")
             try testLiteralExpression(functionBlock.parameters[1], with: "y")
@@ -287,7 +287,7 @@ final class ParserTests: XCTestCase {
             let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
             XCTAssertEqual(statement.expressions.count, 1, "statement.expressions.count")
             let function = try XCTUnwrap(statement.expressions.first as? FunctionLiteral)   // 関数であって、
-            let functionBlock = try XCTUnwrap(function.functions.array.first)
+            let functionBlock = function.function
             XCTAssertEqual(functionBlock.parameters.count, test.expectedParameters.count, "関数のパラメータ数が間違っている。")
             try zip(functionBlock.parameters, test.expectedParameters).forEach {
                 try testLiteralExpression($0, with: $1)
@@ -312,7 +312,7 @@ final class ParserTests: XCTestCase {
             let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
             XCTAssertEqual(statement.expressions.count, 1, "statement.expressions.count")
             let function = try XCTUnwrap(statement.expressions.first as? FunctionLiteral)
-            let functionBlock = try XCTUnwrap(function.functions.array.first)
+            let functionBlock = function.function
             XCTAssertEqual(functionBlock.parameters.count, test.expectedParameters.count, "関数のパラメータ数が間違っている。")
             try zip(functionBlock.parameters, test.expectedParameters).forEach {
                 try testLiteralExpression($0, with: $1)
@@ -766,7 +766,7 @@ final class ParserTests: XCTestCase {
             let program = try XCTUnwrap(parseProgram(with: test.input))
             let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
             let function = try XCTUnwrap(statement.expressions.first as? FunctionLiteral)
-            let functionBlock = try XCTUnwrap(function.functions.array.first)
+            let functionBlock = function.function
             XCTAssertEqual(functionBlock.signature.numberOfInputs, test.number)
             XCTAssertEqual(functionBlock.signature.formats.first?.type, test.type)
             XCTAssertEqual(functionBlock.signature.formats.first?.particle, test.particle)

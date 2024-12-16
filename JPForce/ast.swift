@@ -47,7 +47,7 @@ struct DefineStatement : Statement {
     static let towa = "とは"
     static let further = "さらに"
     static let koto = "こと"          //　省略可
-    static let dearu = "である"        //　省略可
+    static let dearu = "である"        // 省略可
     static let desu = "です"          // 代替可
 }
 struct ExpressionStatement : Statement {
@@ -232,12 +232,10 @@ struct LoopExpression : Expression {
 struct FunctionLiteral : Expression {
     var token: Token                // 関数トークン
     var name = ""                   // 名前
-    var functions: FunctionBlocks   // 関数部
+    var function: FunctionBlock     // 関数部
     //
     var tokenLiteral: String {token.literal}
-    var string: String {
-        functions.array.reduce("") {$0 + ($1.isOverloaded ? "さらに、" : "") + "\(token.coloredLiteral)であって、【\($1.string)】"}
-    }
+    var string: String {"\(token.coloredLiteral)であって、【\(function.string)】"}
 }
 struct ComputationLiteral : Expression {
     static let settei = "設定"

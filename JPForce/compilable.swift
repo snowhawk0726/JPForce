@@ -224,15 +224,14 @@ extension DictionaryLiteral : Compilable {
 extension FunctionLiteral : Compilable {
     func compiled(with c: Compiler) -> JpfObject? {
         c.pullAll().forEach {$0.emit(with: c)}      // キャッシュをバイトコードに出力
-        // TODO: 関数をキャッシュとして維持できないか？
         c.enterScope()
         if !name.isEmpty {
             _ = c.symbolTable.define(functionName: name)
         }
-        functions.array[0].parameters.forEach {
+        function.parameters.forEach {
             _ = c.symbolTable.define($0.value)
         }
-        if let body = functions.array[0].body,
+        if let body = function.body,
            let result = body.compiled(with: c) {
            if result.isError {return result}
         }
@@ -246,7 +245,7 @@ extension FunctionLiteral : Compilable {
         let compiledFunction = JpfCompiledFunction(
                                     instructions: instructions,
                                     numberOfLocals: numberOfLocals,
-                                    numberOfParameters: functions.array[0].parameters.count)
+                                    numberOfParameters: function.parameters.count)
         let functionIndex = c.addConstant(compiledFunction)
         _ = c.emit(op: .opClosure, operand: functionIndex, freeSymbols.count)
         return nil

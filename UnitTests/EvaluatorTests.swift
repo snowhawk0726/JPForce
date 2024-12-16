@@ -431,7 +431,7 @@ final class EvaluatorTests: XCTestCase {
         XCTAssertEqual(functionBlock.parameters[0].string, "a")
         XCTAssertEqual(functionBlock.parameters[1].string, "b")
         XCTAssertEqual(functionBlock.body?.string, "aにbを足す。")
-        XCTAssertFalse(functionBlock.isOverloaded)
+        XCTAssertTrue(functionBlock.isOverloaded)
         print("テスト(\(function.string))終了")
     }
     func testOverloadedComputation() throws {

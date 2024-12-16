@@ -704,7 +704,7 @@ extension DictionaryLiteral : Evaluatable {
 }
 extension FunctionLiteral : Evaluatable {
     func evaluated(with environment: Environment) -> JpfObject? {
-        JpfFunction(functions: functions, environment: environment)
+        JpfFunction(functions: FunctionBlocks(function), environment: environment)
     }
 }
 extension ComputationLiteral : Evaluatable {
