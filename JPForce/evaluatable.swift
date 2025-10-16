@@ -856,8 +856,10 @@ extension GenitiveExpression : Evaluatable {
     func evaluated(with environment: Environment) -> (any JpfObject)? {
         guard let object = left.evaluated(with: environment) else {return nil}
         guard !object.isError else {return object}
-        if let phrase = right as? PhraseExpression, phrase.token.isParticle(.WA),
-           let value = value?.evaluated(with: environment) {
+        if let phrase = right as? PhraseExpression, phrase.token.isParticle(.WA) {
+            // 代入文の処理
+            if let result = value?.evaluated(with: environment), result.isError {return result}
+            guard let value = environment.pull() else {return nil}      // 値をスタックから取得
             let element = getElement(from: phrase.left, with: environment)
             let result = object.assign(value, to: element)              // 値を要素に代入
             guard !result.isError else {return result}
