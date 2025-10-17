@@ -835,6 +835,10 @@ final class ParserTests: XCTestCase {
             
                 】
             """,1,1),   // 15. EOL EOL
+            ("""
+                甲は、配列であって、要素が、１、２、３。
+
+            """,1,1),    // 16. 。 EOL EOL
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")

@@ -452,6 +452,7 @@ extension Parsable {
         return .success(functionBlocks)
     }
     func parseEndOfElementsLiteral(with endSymbol: Token.Symbol) -> Bool {
+        if endSymbol == .PERIOD && currentToken.isPeriod {return true}
         skipNextEols()
         if currentToken != .symbol(endSymbol) {
             if endSymbol == .RBBRACKET {_ = getNext(whenNextIs: .PERIOD)}   // 】の前の「。」は読み飛ばす
