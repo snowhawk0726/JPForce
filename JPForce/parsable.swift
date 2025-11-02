@@ -93,6 +93,10 @@ extension Parsable {
                             currentToken.literal : ""           // 入力形式
             var value: ExpressionStatement? = nil
             if getNext(whenNextIs: .WA) {                       // 既定値あり
+                if format.hasThreeDots {
+                    error(message: "可変長識別子(\(identifier.value))に既定値を指定することはできません。")
+                    return nil
+                }
                 _ = getNext(whenNextIs: .COMMA)
                 getNext()
                 let token = currentToken

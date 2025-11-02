@@ -355,6 +355,7 @@ struct InputFormat {
 extension String {
     var threeDots: String {"…"}
     var isThreeDots: Bool {self == threeDots}
+    var hasThreeDots: Bool {self.hasSuffix(threeDots)}
     func getThreeDots() -> Self {self.hasSuffix(threeDots) ? threeDots : ""}
     var removedThreeDots: Self {self.hasSuffix(threeDots) ? String(self.dropLast()) : self}
 }
