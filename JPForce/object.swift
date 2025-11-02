@@ -215,10 +215,10 @@ struct JpfLoopControl : JpfObject {
 struct JpfFunction : JpfObject {
     static let type = "関数"
     var name: String = ""
-    var functions: FunctionBlocks   // 関数ブロック
+    var overload: FunctionBlocks    // 関数ブロック
     var environment: Environment
     var string: String {
-        let s = functions.array.reduce("") {$0 +
+        let s = overload.array.reduce("") {$0 +
             "\($1.isOverloaded ? "さらに、" : "")\(type.color(.magenta))であって、【\($1.string)】"
         }
         return s.replacingOccurrences(of: "。】", with: "】")
@@ -416,7 +416,7 @@ extension JpfFunction {
         let local = Environment(outer: self.environment)    // 関数の環境を拡張
         let stackEnv = environment.isEmpty ? self.environment : environment
         defer {_ = environment.push(stackEnv.pullAll())}    // スタックを戻す
-        if let returnValue = stackEnv.execute(functions, with: local) {
+        if let returnValue = stackEnv.execute(overload, with: local) {
             return returnValue
         }
         return nil
@@ -460,8 +460,8 @@ extension JpfType {
             }
         }
         if let body = body,                                 // 定義ブロック
-           let result = Evaluator(from: body, with: local).object, result.isError {return result}       // メンバ登録
-        if let result = local.conform(to: protocols), result.isError {return result}             // 規約チェック
+           let result = Evaluator(from: body, with: local).object, result.isError {return result}   // メンバ登録
+        if let result = local.conform(to: protocols), result.isError {return result}                // 規約チェック
         var members = (local.peek as? JpfArray).map {$0.elements.compactMap {$0 as? JpfString}.map {$0.value}} ?? []  // 利用可能なメンバーリスト
         local.drop()
         for p in protocols {    // 規約条項のメンバーリストを利用可能なメンバーリストに追加
