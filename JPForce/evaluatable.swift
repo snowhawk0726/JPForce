@@ -121,7 +121,7 @@ extension DefineStatement : Evaluatable {
             guard let function = object as? JpfFunction else {return functionOverloadError}
             return JpfFunction(
                 name: original.name,
-                functions: overload(original.functions, with: function.functions.overloaded),
+                overload: overload(original.overload, with: function.overload.overloaded),
                 environment: environment
             )
         case let original as JpfComputation:    // 算出の多重定義
@@ -170,7 +170,7 @@ extension DefineStatement : Evaluatable {
         }
         // 規約の統合
         for p in definition.protocols {
-            guard !original.protocols.contains(p) else {return ConformityError.duplicated(protocol: p).message}
+            guard !original.protocols.contains(p) else {return ConformanceError.duplicated(protocol: p).error}
             extended.protocols.append(p)
         }
         // インスタンスの定義を統合
@@ -189,7 +189,7 @@ extension DefineStatement : Evaluatable {
         case let f as JpfFunction:
             return JpfFunction(
                 name: f.name,
-                functions: f.functions.overloaded(by: keyword),
+                overload: f.overload.overloaded(by: keyword),
                 environment: f.environment
             )
         case let c as JpfComputation:
@@ -704,7 +704,7 @@ extension DictionaryLiteral : Evaluatable {
 }
 extension FunctionLiteral : Evaluatable {
     func evaluated(with environment: Environment) -> JpfObject? {
-        JpfFunction(functions: FunctionBlocks(function), environment: environment)
+        JpfFunction(overload: FunctionBlocks(function), environment: environment)
     }
 }
 extension ComputationLiteral : Evaluatable {
@@ -722,7 +722,7 @@ extension TypeLiteral : Evaluatable {
             if let result = local.conform(to: all, isTypeMember: true), result.isError {return result}
             return JpfType(initializers: initializers, environment: local, protocols: all, body: body)
         case .failure(let error):
-            return error.message
+            return error.error
         }
     }
 }
@@ -732,11 +732,11 @@ extension ProtocolLiteral : Evaluatable {
         case .success(let all):
             return JpfProtocol(protocols: all, clauses: clauses)
         case .failure(let error):
-            return error.message
+            return error.error
         }
     }
 }
-private func derivedProtocols(from protocols: [String], with environment: Environment) -> Result<[String], ConformityError> {
+private func derivedProtocols(from protocols: [String], with environment: Environment) -> Result<[String], ConformanceError> {
     var results: [String] = protocols
     for s in protocols {
         guard let p = environment[s] as? JpfProtocol else {return .failure(.notFound(protocol: s))}
@@ -746,16 +746,6 @@ private func derivedProtocols(from protocols: [String], with environment: Enviro
         }
     }
     return .success(results)
-}
-enum ConformityError : Error {
-    case notFound(protocol: String)
-    case duplicated(protocol: String)
-    var message: JpfError {
-        switch self {
-        case .notFound(let s):      return JpfError("準拠する規約の識別子が見つからない。：" + s)
-        case .duplicated(let s):    return JpfError("準拠する規約の識別子が重複している。：" + s)
-        }
-    }
 }
 extension EnumLiteral : Evaluatable {
     func evaluated(with environment: Environment) -> JpfObject? {
@@ -820,7 +810,7 @@ extension CallExpression : Evaluatable {
             let local = Environment(outer: f.environment)
             arguments.forEach {_ = $0.evaluated(with: local)}
             local.storeArguments(with: local)
-            if let result = environment.call(f.functions, with: local) {
+            if let result = environment.call(f.overload, with: local) {
                 return result
             }
         case let c as JpfComputation:

@@ -271,21 +271,21 @@ struct ClauseLiteral {
     static let joukouwa = "条項は、"
     var identifier: Identifier      // 識別子
     var type: String                // 型の文字列
-    var functionParams: ParameterClauseLiteral?
-    var getterParams: ParameterClauseLiteral?
-    var setterParams: ParameterClauseLiteral?
+    var funcSignature: SignatureClauseLiteral?
+    var getterSignature: SignatureClauseLiteral?
+    var setterSignature: SignatureClauseLiteral?
     var isTypeMember: Bool = false  // 型の要素
     //
     var string: String {identifier.string + DefineStatement.wa + "、" + typeString(type) + "。"}
     private func typeString(_ type: String) -> String {
         switch type {
         case JpfFunction.type:
-            if let string = functionParams?.string {
+            if let string = funcSignature?.string {
                 return type + ExpressionStatement.deatte + "【\(string)】"
             }
         case JpfComputation.type:
-            let setter = setterParams?.string
-            let getter = getterParams?.string
+            let setter = setterSignature?.string
+            let getter = getterSignature?.string
             if setter != nil || getter != nil {
                 let string = 
                     (setter.map {"設定は、【\($0)】。"} ?? "") +
@@ -298,11 +298,13 @@ struct ClauseLiteral {
         return "「\(type)」"
     }
 }
-struct ParameterClauseLiteral {
+struct SignatureClauseLiteral {     // 関数シグネチャ条項
     var parameters: [Identifier]    // 引数
-    var signature: InputFormat?     // シグネチャ
+    var paramForm: InputFormat      // 引数形式
+    var returnTypes: [String]       // 返り値の型
     var string: String {
-        signature.map {"入力が、\(zip(parameters, $0.strings).map {$0.string + $1}.joined(separator: "と、"))"} ?? ""
+        (parameters.isEmpty ? "" : "入力が\(zip(parameters, paramForm.strings).map {$0.string + $1}.joined(separator: "と"))。") +
+        (returnTypes.isEmpty ? "" : "出力が「\(returnTypes.joined(separator: "」と「"))」。")
     }
 }
 struct TypeLiteral : Expression {
@@ -358,21 +360,26 @@ extension String {
 }
 struct FunctionBlock {
     static let input = "入力"
+    static let output = "出力"
     static let ari = "あり"
     var parameters: [Identifier]    // 入力パラメータ
-    var signature: InputFormat      // 入力形式
+    var paramForm: InputFormat      // 入力形式
+    var returnTypes: [String]       // 出力型
     var body: BlockStatement?       // 処理本体
     var isOverloaded: Bool = false  // 多重識別
     var string: String {
-        (parameters.isEmpty ? "" : "入力が、\(zip(parameters, signature.strings).map {$0.string + $1}.joined(separator: "と、"))であり、") +
+        let s =
+        (parameters.isEmpty ? "" : "入力が、\(zip(parameters, paramForm.strings).map {$0.string + $1}.joined(separator: "と"))であり、") +
+        (returnTypes.isEmpty ? "" : "出力が、「\(returnTypes.joined(separator: "」と「"))」であり、") +
         (body.map {"本体が、\($0.string)"} ?? "")
+        return s.hasSuffix("であり、") ? String(s.dropLast("であり、".count)) : s
     }
     var overloaded: Self {
-        FunctionBlock(parameters: self.parameters, signature: self.signature, body: self.body, isOverloaded: true)
+        FunctionBlock(parameters: self.parameters, paramForm: self.paramForm, returnTypes: self.returnTypes, body: self.body, isOverloaded: true)
     }
     var rangeOfInputs: ClosedRange<Int> {   // 入力数の範囲
-        guard let max = signature.numberOfInputs else {return (-1)...(-1)}
-        let min = max - signature.numberOfDefaultValues
+        guard let max = paramForm.numberOfInputs else {return (-1)...(-1)}
+        let min = max - paramForm.numberOfDefaultValues
         return min...max
     }
     func index(of name: String) -> Int? {
@@ -383,18 +390,19 @@ struct FunctionBlock {
     ///   - name: 入力パラメータの名前
     ///   - type: 指定の型
     /// - Returns: 一致(true), 不一致もしくは名前が見つからない(false)
-    func isSameType(of name: String, as type: String) -> Bool {
+    func hasParameter(named name: String,  ofType type: String) -> Bool {
         guard let i = index(of: name) else {
             return false                    // 入力の名前が一致しない
         }
-        let t = signature.formats[i].type
+        let t = paramForm.formats[i].type
         return t.isEmpty || t == type       // チェック不要、もしくは型が一致
     }
-    func isVariable(parmeter name: String) -> Bool {
+    /// 指定の名前の可変超識別子があるか
+    func hasVariableParameter(named name: String) -> Bool {
         guard let i = index(of: name) else {
             return false                    // 入力の名前が一致しない
         }
-        return signature.formats[i].hasThreeDots
+        return paramForm.formats[i].hasThreeDots
     }
 }
 /// 必要入力数ごとの関数ブロック配列(多重定義)
@@ -461,27 +469,27 @@ struct FunctionBlocks : Collection {
     }
     /// 再定義している(多重定義でない関数ブロックが含まれる)
     var hasRedefine: Bool {self.array.contains {$0.isOverloaded == false}}
-    /// 規約の条項の引数部と同じ形式の定義有無
-    /// - Parameter params: 条項の引数部
-    /// - Returns: true: 有る
-    func hasParamaeter(to params: ParameterClauseLiteral) -> Bool {
+    
+    /// 多重定義に、指定のシグネチャと一致する関数ブロックがあるか？
+    /// - Parameter signature: 関数シグネチャ
+    /// - Returns: シグネチャが一致ならば、true
+    func hasSameSignature(as signature: SignatureClauseLiteral) -> Bool {
         for definition in array.reversed() {
-            guard params.parameters.count == definition.parameters.count else {continue}  // 引数の数
-            for pairs in zip(params.parameters, definition.parameters) {                  // 全識別子名
-                guard pairs.0.value == pairs.1.value else {continue}
+            guard signature.parameters.count == definition.parameters.count else {continue} // 引数の数
+            guard zip(signature.parameters, definition.parameters).allSatisfy({$0.value == $1.value}) else {
+                continue                                                                    // 引数の識別子名が不一致
             }
-            if let signature = params.signature {                                       // シグネチャ
-                guard signature.numberOfInputs == definition.signature.numberOfInputs else {continue}
-                for pairs in zip(signature.formats, definition.signature.formats) {
-                    guard pairs.0.type == pairs.1.type &&
-                            pairs.0.particle == pairs.1.particle else {continue}
-                }
-            }
-            return true
+            let paramForm = signature.paramForm                                             // 引数の形式
+            guard paramForm.numberOfInputs == definition.paramForm.numberOfInputs else {continue}
+            guard zip(paramForm.formats, definition.paramForm.formats).allSatisfy({
+                $0.type == $1.type &&  $0.particle == $1.particle}) else {
+                continue
+            }                                                                               // 形式(型と格)が一致
+            return signature.returnTypes == definition.returnTypes                          // 返り値の型が一致
         }
         return false
     }
-    /// 入力と引数の形式が一致する関数ブロックを得る。
+    /// 入力と引数の形式が一致する関数ブロックを得る。(call expression用)
     /// - Parameter env: 引数をもつ環境
     /// - Returns: 関数ブロック(無ければnil)
     func function(with env: Environment) -> FunctionBlock? {
@@ -506,15 +514,15 @@ struct FunctionBlocks : Collection {
     private func function(in functions: [FunctionBlock], with pairs: [(String, JpfObject)]) -> FunctionBlock? {
         functions: for f in functions.reversed() {
             arguments: for (k, v) in pairs {
-                if f.isVariable(parmeter: k) {  // 可変長識別子の値の型は配列
+                if f.hasVariableParameter(named: k) {// 可変長識別子の値の型は配列
                     guard v.type == JpfArray.type else {continue functions}
-                } else {                        // 固定長識別子の値の型は引数の型
-                    guard f.isSameType(of: k, as: v.type) else {continue functions}
+                } else {                            // 固定長識別子の値の型は引数の型
+                    guard f.hasParameter(named: k,  ofType: v.type) else {continue functions}
                 }
             }
-            return f                            // 引数名と型が全て一致
+            return f                                // 引数名と型が全て一致
         }
-        return nil                              // 一致する関数が無い
+        return nil                                  // 一致する関数が無い
     }
 }
 struct CallExpression : Expression {

@@ -261,7 +261,7 @@ final class EvaluatorTests: XCTestCase {
         let input = "関数であって、【入力がxであり、本体が、xに2を足す】。"
         print("テストパターン: \(input)")
         let function = try XCTUnwrap(testEvaluator(input) as? JpfFunction)
-        let functionBlock = try XCTUnwrap(function.functions.array.first)
+        let functionBlock = try XCTUnwrap(function.overload.array.first)
         XCTAssertEqual(functionBlock.parameters.count, 1)
         XCTAssertEqual(functionBlock.parameters.first?.string, "x")
         XCTAssertEqual(functionBlock.body?.string, "xに2を足す。")
@@ -343,6 +343,34 @@ final class EvaluatorTests: XCTestCase {
             print("テスト(\(result))終了")
         }
         print("テスト終了")
+    }
+    func testReturnTypesChecking() throws {
+        let testPatterns: [(input: String, expected: Any?)] = [
+            ("関数【出力は「数値」。1】を実行", 1),
+            ("甲は算出【出力は「文字列」。「い」を返す】。甲", "い"),
+            ("関数【出力は「数値」と「文字列」。1、「い」】を実行", "い"),
+            ("関数【出力は「数値」と「文字列」。1、「い」を返す】を実行", "い"),
+            ("関数【出力は「数値」と「文字列」。1、「い」、返る】を実行", "い"),
+            ("関数【出力は「」】を実行", nil),
+            ("関数【出力は「数値か無」。無】を実行", nil),
+            ("関数【出力は「数値かエラー」。1】を実行", 1),
+            ("関数【出力は「数値かエラー」。１を０で割る】を実行", "1を0で割ることはできない。"),
+            // エラー
+            ("関数【出力は「数値」。「い」】を実行", "出力の型が異なる。実際の型：文字列"),
+            ("関数【出力は「数値」。１を０で割る】を実行", "出力の型が異なる。実際の型：エラー"),
+            ("関数【出力は「数値」と「文字列」。1】を実行", "出力の数が足りていない。必要数：2"),
+            ("関数【出力は「」。1】を実行", "期待しない出力。型：数値"),
+        ]
+        for test in testPatterns {
+            print("テストパターン: \(test.input)")
+            if let evaluated = testEvaluator(test.input) {
+                try testObject(evaluated, with: test.expected)
+                print("テスト結果(\(evaluated))")
+            } else {
+                XCTAssertNil(test.expected)
+                print("テスト結果(nil)")
+            }
+        }
     }
     func testDefaultParameterValues() throws {
         let input = """
@@ -426,7 +454,7 @@ final class EvaluatorTests: XCTestCase {
         let input = "加算は、さらに、関数【入力がa「数値に」とb「数値を」で、aにbを足す】。加算。"
         print("テストパターン: \(input)")
         let function = try XCTUnwrap(testEvaluator(input) as? JpfFunction)
-        let functionBlock = try XCTUnwrap(function.functions.array.first)
+        let functionBlock = try XCTUnwrap(function.overload.array.first)
         XCTAssertEqual(functionBlock.parameters.count, 2)
         XCTAssertEqual(functionBlock.parameters[0].string, "a")
         XCTAssertEqual(functionBlock.parameters[1].string, "b")
@@ -447,17 +475,17 @@ final class EvaluatorTests: XCTestCase {
         XCTAssertTrue(computation.setters.isEmpty)
         let functionBlocks = computation.getters.array
         XCTAssertEqual(functionBlocks.count, 3)
-        XCTAssertEqual(functionBlocks[0].signature.numberOfInputs, 2)
-        XCTAssertEqual(functionBlocks[0].signature.strings[0], "「数値」")
-        XCTAssertEqual(functionBlocks[0].signature.strings[1], "「数値」")
+        XCTAssertEqual(functionBlocks[0].paramForm.numberOfInputs, 2)
+        XCTAssertEqual(functionBlocks[0].paramForm.strings[0], "「数値」")
+        XCTAssertEqual(functionBlocks[0].paramForm.strings[1], "「数値」")
         XCTAssertFalse(functionBlocks[0].isOverloaded)
-        XCTAssertEqual(functionBlocks[1].signature.numberOfInputs, 2)
-        XCTAssertEqual(functionBlocks[1].signature.strings[0], "「数値に」")
-        XCTAssertEqual(functionBlocks[1].signature.strings[1], "「数値を」")
+        XCTAssertEqual(functionBlocks[1].paramForm.numberOfInputs, 2)
+        XCTAssertEqual(functionBlocks[1].paramForm.strings[0], "「数値に」")
+        XCTAssertEqual(functionBlocks[1].paramForm.strings[1], "「数値を」")
         XCTAssertTrue(functionBlocks[1].isOverloaded)
-        XCTAssertEqual(functionBlocks[2].signature.numberOfInputs, 2)
-        XCTAssertEqual(functionBlocks[2].signature.strings[0], "「文字列」")
-        XCTAssertEqual(functionBlocks[2].signature.strings[1], "「文字列」")
+        XCTAssertEqual(functionBlocks[2].paramForm.numberOfInputs, 2)
+        XCTAssertEqual(functionBlocks[2].paramForm.strings[0], "「文字列」")
+        XCTAssertEqual(functionBlocks[2].paramForm.strings[1], "「文字列」")
         XCTAssertTrue(functionBlocks[2].isOverloaded)
         print("テスト(\(computation.string))終了")
     }
@@ -475,14 +503,14 @@ final class EvaluatorTests: XCTestCase {
         let computation = try XCTUnwrap(testEvaluatorWithLabel(input) as? JpfComputation)
         let functionBlocks = computation.getters.array
         XCTAssertEqual(functionBlocks.count, 2)
-        XCTAssertEqual(functionBlocks[0].signature.numberOfInputs, 2)
-        XCTAssertEqual(functionBlocks[0].signature.strings[0], "「文字列」")
-        XCTAssertEqual(functionBlocks[0].signature.strings[1], "「文字列」")
+        XCTAssertEqual(functionBlocks[0].paramForm.numberOfInputs, 2)
+        XCTAssertEqual(functionBlocks[0].paramForm.strings[0], "「文字列」")
+        XCTAssertEqual(functionBlocks[0].paramForm.strings[1], "「文字列」")
         XCTAssertFalse(functionBlocks[0].isOverloaded)
         XCTAssertEqual(functionBlocks.count, 2)
-        XCTAssertEqual(functionBlocks[1].signature.numberOfInputs, 2)
-        XCTAssertEqual(functionBlocks[1].signature.strings[0], "「文字列に」")
-        XCTAssertEqual(functionBlocks[1].signature.strings[1], "「文字列を」")
+        XCTAssertEqual(functionBlocks[1].paramForm.numberOfInputs, 2)
+        XCTAssertEqual(functionBlocks[1].paramForm.strings[0], "「文字列に」")
+        XCTAssertEqual(functionBlocks[1].paramForm.strings[1], "「文字列を」")
         XCTAssertTrue(functionBlocks[1].isOverloaded)
         print("テスト(\(computation.string))終了")
     }
@@ -566,7 +594,7 @@ final class EvaluatorTests: XCTestCase {
         let type = try XCTUnwrap(testEvaluator(input) as? JpfType)
         let initializer = try XCTUnwrap(type.initializers.array.first)
         XCTAssertEqual(initializer.parameters.count, 0)
-        XCTAssertEqual(initializer.signature.numberOfInputs, 0)
+        XCTAssertEqual(initializer.paramForm.numberOfInputs, 0)
         let initialization = try XCTUnwrap(initializer.body?.statements.first as? DefineStatement)
         XCTAssertEqual(initialization.name.value, "行列")
         XCTAssertEqual(initialization.value.expressions.count, 1)
@@ -774,12 +802,12 @@ final class EvaluatorTests: XCTestCase {
         }
         print("テスト終了")
     }
-    func testProtocolConformities() throws {
+    func testProtocolConformances() throws {
         let input = """
-            甲は、規約であって、己は「数値」。
+            甲は、規約であって、己は「算出」。
             乙は、規約であって、準拠する規約が、甲。
             丙は、規約であって、準拠する規約が、乙。条項が、庚は「文字列」。
-            丁は、型であって、準拠する規約が、丙。本体が、己は１。庚は「い」。
+            丁は、型であって、準拠する規約が、丙。本体が、己は算出【１】。庚は「い」。
             戊は、丁から生成する。
         """
         let testPatterns: [(input: String, expected: Any)] = [
@@ -802,7 +830,7 @@ final class EvaluatorTests: XCTestCase {
         }
         print("テスト終了")
     }
-    func testParameterConformity() throws {
+    func testParameterConformance() throws {
         let input = """
             <規約>は、規約であって、【
                 <関数>は、関数【入力がa「数値」】
@@ -836,9 +864,83 @@ final class EvaluatorTests: XCTestCase {
         """
         print("テストパターン: \(input)")
         let result = try XCTUnwrap(testEvaluator(input))
-        if result.isError {print("テスト失敗：\(result.string)")}
+        XCTAssertFalse(result.isError, "テスト失敗：\(result.string)")
         print("<インスタンス>は、\(result.string)")
         print("テスト終了")
+    }
+    func testReturnTypeConformance() throws {
+        let input = """
+            <規約>は、規約であって、【
+                <関数>は、関数【入力がa「数値」。出力が「数値」】
+                <取得>は、算出【出力が「文字列」】
+                <設定>は、算出【
+                    設定は、【入力がc「配列」。出力が「数値」】
+                】
+                <算出>は、算出【
+                    設定は、【入力がd「と」。出力が「数値」】
+                    取得は、【入力がe「で」。出力が「配列」】
+                】
+            】
+            <型>は、型【
+                準拠する規約が<規約>。
+                本体が、【
+                    <関数>は、関数【入力がa「数値」。出力が「数値」。aを返す。】
+                    <関数>は、さらに、関数【１を返す。】
+                    <取得>は、算出【入力がb「数値」。bを返す。】
+                    <取得>は、さらに、算出【出力が「文字列」。「あ」を返す。】
+                    <設定>は、算出【
+                        設定は、【入力がc「配列」。出力が「数値」。cの最初を返す。】
+                    】
+                    <算出>は、算出【
+                        設定は、【入力がd「と」。出力が「数値」。dを返す。】
+                        取得は、【入力がe「で」。出力が「配列」。eを返す。】
+                    】
+                】
+            】
+            <インスタンス>は、<型>から生成する。
+            <インスタンス>。
+        """
+        print("テストパターン: \(input)")
+        let result = try XCTUnwrap(testEvaluator(input))
+        XCTAssertFalse(result.isError, "テスト失敗：\(result.string)")
+        print("<インスタンス>は、\(result.string)")
+        print("テスト終了")
+    }
+    func testConformanceErrors() throws {
+        let testPatterns: [(input: String, expected: Any?)] = [
+            // 規約の定義
+            ("甲は型【規約は乙。弊は関数【出力は「」】】。甲【】", "準拠する規約「乙」が見つからない。"),
+            // 条項(識別子)の定義
+            ("甲は規約【乙は関数【出力は「数値」】】。弊は型【規約は甲。丁は関数【出力は「」】】。弊【】",               "規約に準拠するためには、識別子「乙(型：関数)」の定義が必要。"),
+            ("甲は規約【乙は関数【出力は「数値」】】。弊は型【規約は甲。乙は算出【出力は「数値」】】。弊【】",             "規約に準拠するためには、識別子「乙」を、型「関数」で定義する必要がある。"),
+            ("甲は規約【乙は関数【入力がa】】。弊は型【規約は甲。乙は関数【】】。弊【】",                        "規約に準拠するためには、識別子「乙」の入力定義に1個の引数が必要。"),
+            ("甲は規約【乙は算出【設定が、【出力は「数値」】】】。弊は型【規約は甲。乙は算出【入力はa「数値」】】。弊【】",  "規約に準拠するためには、識別子「乙」に「設定」の定義が必要。"),
+            ("甲は規約【乙は算出【出力は「数値」】】。弊は型【規約は甲。乙は算出【設定が、【入力はa「数値」】】】。弊【】",  "規約に準拠するためには、識別子「乙」に「取得」の定義が必要。"),
+            ("甲は規約【乙は算出【設定が【入力はa「数値」】。取得が【入力はa「文字列」】】】。弊は型【規約は甲。乙は算出【】】。弊【】",               "規約に準拠するためには、識別子「乙」に「設定と取得」の定義が必要。"),
+            ("甲は規約【乙は算出【設定が【入力はa「数値」】。取得が【入力はa「文字列」】】】。弊は型【規約は甲。乙は算出【入力はa「文字列」】】。弊【】", "規約に準拠するためには、識別子「乙」に「設定」の定義が必要。"),
+            // 入力定義
+            ("甲は規約【乙は関数【出力は「数値」】】。弊は型【規約は甲。乙は関数【入力はa「数値」】】。弊【】",    "識別子「乙」には、入力定義は不要。"),
+            ("甲は規約【乙は算出【出力は「数値」】】。弊は型【規約は甲。乙は算出【入力はa「数値」】】。弊【】",     "識別子「乙」には、入力定義は不要。"),
+            ("甲は規約【乙は関数【入力はaとb】】。弊は型【規約は甲。乙は関数【出力は「」】】。弊【】", "規約に準拠するためには、識別子「乙」の入力定義に2個の引数が必要。"),
+            ("甲は規約【乙は関数【入力はaとb】】。弊は型【規約は甲。乙は関数【入力はaとc】】。弊【】", "規約に準拠するためには、識別子「乙」に引数「b」が必要。"),
+            ("甲は規約【乙は関数【入力はa「数値に」とb「数値を」】】。弊は型【規約は甲。乙は関数【入力はa「数値に」とb「文字列を」】】。弊【】", "規約に準拠するためには、識別子「乙」に入力形式「数値を」が必要。"),
+            ("甲は規約【乙は関数【入力がa「数値と…」とb「数値を」。】】。弊は型【規約は甲。乙は関数【入力はa「数値と」とb「数値を」】】。弊【】", "規約に準拠するためには、識別子「乙」に入力形式「数値と…」が必要。"),
+            // 出力定義
+            ("甲は規約【乙は関数【出力は「数値」】】。弊は型【規約は甲。乙は関数【出力は「文字列」】】。弊【】",            "規約に準拠するためには、識別子「乙」に出力型「数値」が必要。"),
+            ("甲は規約【乙は算出【設定が【出力は「数値」】】】。弊は型【規約は甲。乙は算出【設定が【出力は「文字列」】】】。弊【】",            "規約に準拠するためには、識別子「乙」に出力型「数値」が必要。"),
+            ("甲は規約【乙は関数【出力は「数値」と「文字列」】】。弊は型【規約は甲。乙は関数【出力は「文字列」】】。弊【】",  "規約に準拠するためには、識別子「乙」の出力定義に2個の型が必要。"),
+            ("甲は規約【乙は関数【入力がa】】。弊は型【規約は甲。乙は関数【入力がa。出力が「数値」】】。弊【】",           "識別子「乙」には、出力定義は不要。"),
+        ]
+        for test in testPatterns {
+            print("テストパターン: \(test.input)")
+            if let evaluated = testEvaluator(test.input) {
+                try testObject(evaluated, with: test.expected)
+                print("テスト結果(\(evaluated))")
+            } else {
+                XCTAssertNil(test.expected)
+                print("テスト結果(nil)")
+            }
+        }
     }
     func testBuiltinOperations() throws {
         let testPatterns: [(input: String, exptected: Any?)] = [
@@ -1627,9 +1729,9 @@ final class EvaluatorTests: XCTestCase {
             ("二倍は、関数【入力がxで、xに2を掛ける】。二倍",
              "関数であって、【入力が、xであり、本体が、xに2を掛ける】"),
             ("加えるは、算出【取得が【入力がa「数値」とb「数値」で、aにbを足し、返す】】。識別子「加える」",
-             "算出であって、【取得は、【入力が、a「数値」と、b「数値」であり、本体が、aにbを足し、返す】】"),
+             "算出であって、【取得は、【入力が、a「数値」とb「数値」であり、本体が、aにbを足し、返す】】"),
             ("加えるは、算出【取得が【入力がa「数値」とb「数値」で、aにbを足し、返す】】。「\\『加える\\』は、『加える』」",
-             "『加える』は、算出であって、【取得は、【入力が、a「数値」と、b「数値」であり、本体が、aにbを足し、返す】】"),
+             "『加える』は、算出であって、【取得は、【入力が、a「数値」とb「数値」であり、本体が、aにbを足し、返す】】"),
             ("文字列は、「い\\nろ\\nは」。識別子「文字列」", "い\\nろ\\nは"),
         ]
         for test in testPatterns {

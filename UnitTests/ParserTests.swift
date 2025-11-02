@@ -295,6 +295,28 @@ final class ParserTests: XCTestCase {
             print("テスト(\(statement.string))終了")
         }
     }
+    func testFunctionRturnTypesParsing() throws {
+        let testPatterns: [(input: String, expectedTypes: [String])] = [
+            ("関数【出力が「数値」で、１。】", ["数値"]),
+            ("関数【出力が「文字列か無」で、「い」。】", ["文字列か無"]),
+            ("関数【出力が「」】",[""]),
+            ("関数【出力が「文字列かエラー」と「数値」で、「い」、1】", ["文字列かエラー", "数値"]),
+        ]
+        for test in testPatterns {
+            print("テストパターン: \(test.input)")
+            let program = try XCTUnwrap(parseProgram(with: test.input))
+            XCTAssertEqual(program.statements.count, 1, "program.statements.count")
+            let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
+            XCTAssertEqual(statement.expressions.count, 1, "statement.expressions.count")
+            let function = try XCTUnwrap(statement.expressions.first as? FunctionLiteral)   // 関数であって、
+            let functionBlock = function.function
+            XCTAssertEqual(functionBlock.returnTypes.count, test.expectedTypes.count, "関数の返り値の数が間違っている。")
+            zip(functionBlock.returnTypes, test.expectedTypes).forEach {
+                XCTAssertEqual($0, $1)
+            }
+            print("テスト(\(statement.string))終了")
+        }
+    }
     func testDefaultParameterParsing() throws {
         let testPatterns: [(input: String, expectedParameters: [String])] = [
             ("関数【入力が、xと、yは1と、zは2。xとyとzを足す】。", ["x","y","z"]),
@@ -317,10 +339,10 @@ final class ParserTests: XCTestCase {
             try zip(functionBlock.parameters, test.expectedParameters).forEach {
                 try testLiteralExpression($0, with: $1)
             }
-            XCTAssertNil(functionBlock.signature.values[0]) // x: 既定値無し
-            let valueOfy = try XCTUnwrap(functionBlock.signature.values[1]?.expressions.first as? IntegerLiteral)
+            XCTAssertNil(functionBlock.paramForm.values[0]) // x: 既定値無し
+            let valueOfy = try XCTUnwrap(functionBlock.paramForm.values[1]?.expressions.first as? IntegerLiteral)
             XCTAssertEqual(valueOfy.value, 1)               // y: 既定値1
-            let valueOfz = try XCTUnwrap(functionBlock.signature.values[2]?.expressions.first as? IntegerLiteral)
+            let valueOfz = try XCTUnwrap(functionBlock.paramForm.values[2]?.expressions.first as? IntegerLiteral)
             XCTAssertEqual(valueOfz.value, 2)               // z: 既定値2
             zip(functionBlock.rangeOfInputs, 1...3).forEach {
                 XCTAssertEqual($0, $1)                      // パラメータ数: 1〜3
@@ -352,10 +374,10 @@ final class ParserTests: XCTestCase {
     }
     func testProtocolLiteralParsings() throws {
         let testPatterns = [
-            "規約であって、【数値は「数値」。文字列は「文字列」。数値化は関数で、入力が文字列「文字列を」。】",
-            "規約であり、数値は「数値」。文字列は「文字列」。数値化は関数で、入力が文字列「文字列を」。",
-            "規約【数値は「数値」。文字列は「文字列」。数値化は関数で、入力が文字列「文字列を」】",
-            "規約【数値は「数値」。文字列は「文字列」。数値化は関数【入力が文字列「文字列を」】】",
+            "規約であって、【数値は「数値」。文字列は「文字列」。数値化は関数で、入力が文字列「文字列を」。出力が「数値」】",
+            "規約であり、数値は「数値」。文字列は「文字列」。数値化は関数で、入力が文字列「文字列を」。出力が「数値」。",
+            "規約【数値は「数値」。文字列は「文字列」。数値化は関数で、入力が文字列「文字列を」。出力が「数値」】",
+            "規約【数値は「数値」。文字列は「文字列」。数値化は関数【入力が文字列「文字列を」。出力が「数値」】】",
         ]
         for input in testPatterns {
             print("テストパターン: \(input)")
@@ -367,7 +389,7 @@ final class ParserTests: XCTestCase {
             XCTAssertEqual(protocolLiteral.clauses.count, 3, "protocolLiteral.clauses.count")
             XCTAssertEqual(protocolLiteral.clauses[0].string.withoutPeriod, "数値は、「数値」")
             XCTAssertEqual(protocolLiteral.clauses[1].string.withoutPeriod, "文字列は、「文字列」")
-            XCTAssertEqual(protocolLiteral.clauses[2].string.withoutPeriod, "数値化は、関数であって、【入力が、文字列「文字列を」】")
+            XCTAssertEqual(protocolLiteral.clauses[2].string, "数値化は、関数であって、【入力が文字列「文字列を」。出力が「数値」。】。")
             print("テスト終了: \(statement.string)")
         }
     }
@@ -407,7 +429,7 @@ final class ParserTests: XCTestCase {
         }
     }
     func testProtocolComformingProtocols() throws {
-        let input = "規約であって、準拠する規約は、甲、乙、丙。条項は、丁は、「数値」。"
+        let input = "規約であって、準拠する規約が、甲と、乙と、丙。条項が、丁は「数値」。"
         print("テストパターン: \(input)")
         let program = try XCTUnwrap(parseProgram(with: input))
         XCTAssertEqual(program.statements.count, 1, "program.statements.count")
@@ -750,7 +772,7 @@ final class ParserTests: XCTestCase {
             print("テスト終了: \(statement.string)")
         }
     }
-    func testFunctionSignatures() throws {
+    func testFunctionParamForms() throws {
         let testPatterns: [(input: String, number: Int?, type: String, particle: String, threeDots: String)] = [
             ("関数【入力が、甲。甲を表示する】", 1, "", "", ""),
             ("関数【入力が、甲「の」。甲を表示する】", 1, "", "の", ""),
@@ -767,10 +789,10 @@ final class ParserTests: XCTestCase {
             let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
             let function = try XCTUnwrap(statement.expressions.first as? FunctionLiteral)
             let functionBlock = function.function
-            XCTAssertEqual(functionBlock.signature.numberOfInputs, test.number)
-            XCTAssertEqual(functionBlock.signature.formats.first?.type, test.type)
-            XCTAssertEqual(functionBlock.signature.formats.first?.particle, test.particle)
-            XCTAssertEqual(functionBlock.signature.formats.first?.threeDots, test.threeDots)
+            XCTAssertEqual(functionBlock.paramForm.numberOfInputs, test.number)
+            XCTAssertEqual(functionBlock.paramForm.formats.first?.type, test.type)
+            XCTAssertEqual(functionBlock.paramForm.formats.first?.particle, test.particle)
+            XCTAssertEqual(functionBlock.paramForm.formats.first?.threeDots, test.threeDots)
             print("テスト終了: \(statement.string)")
         }
     }
