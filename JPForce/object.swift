@@ -461,7 +461,7 @@ extension JpfType {
         }
         if let body = body,                                 // 定義ブロック
            let result = Evaluator(from: body, with: local).object, result.isError {return result}   // メンバ登録
-        if let result = local.conform(to: protocols), result.isError {return result}                // 規約チェック
+        if let result = local.conform(to: protocols, with: initializers), result.isError {return result}                // 規約チェック
         var members = (local.peek as? JpfArray).map {$0.elements.compactMap {$0 as? JpfString}.map {$0.value}} ?? []  // 利用可能なメンバーリスト
         local.drop()
         for p in protocols {    // 規約条項のメンバーリストを利用可能なメンバーリストに追加
@@ -471,28 +471,36 @@ extension JpfType {
     }
 }
 extension JpfInstance {
-    /// インスタンスの初期化を行う。
+    /// 生成、初期化から、インスタンスの初期化を行う。
     /// - Parameter outer: スタックによる引数を含む環境
-    /// - Returns: 成功: nil、失敗: エラー
-    func initialize(with outer: Environment) -> JpfError? {
+    /// - Returns: 成功: nil、失敗: 無(JpfNull)、またはエラー(JpfError)
+    func initialize(with outer: Environment) -> JpfObject? {
         guard let type = outer[self.type] as? JpfType else {return JpfError(typeNotFound)}
-        environment[JpfInstance.SELF] = self                // 自身を辞書に登録
-        if !type.initializers.isEmpty,
-           let result = outer.execute(type.initializers, with: environment),
-           result.isError {return result.error}
-        return nil
+        return initialize(type: type, outer: outer) {inits, env in
+            outer.execute(inits, with: env)
+        }
     }
-    /// インスタンスの初期化を行う。
-    /// - Parameters:
-    ///   - arguments: 引数のみの環境
-    ///   - type: 生成元の型
-    /// - Returns: 成功: nil、失敗: エラー
-    func initialize(with arguments: Environment, type: JpfType) -> JpfError? {
-        environment[JpfInstance.SELF] = self                // 自身を辞書に登録
-        if !type.initializers.isEmpty,
-           let outer = environment.outer,
-           let result = outer.call(type.initializers, with: environment),
-           result.isError {return result.error}
+    /// 呼び出し式から、インスタンスの初期化を行う。
+    /// - Parameter type: 生成元の型
+    /// - Returns: 成功: nil、失敗: 無(JpfNull)、またはエラー(JpfError)
+    func initialize(with type: JpfType) -> JpfObject? {
+        guard let outer = environment.outer else {return nil}
+        return initialize(type: type, outer: outer) {inits, env in
+            outer.call(inits, with: env)
+        }
+    }
+    /// 共通処理
+    private func initialize(type: JpfType, outer: Environment, callee: (FunctionBlocks, Environment) -> JpfObject?) -> JpfObject? {
+        environment[JpfInstance.SELF] = self            // 自身を辞書に登録
+        if type.initializers.isEmpty {return nil}       // 定義がない場合は、なにもしない
+        if let result = callee(type.initializers, environment) {
+            if result.isError {return result.error}     // エラーを返す
+            if result.isReturnValue {return result.value}
+            return result
+        }
+        if let result = outer.peek, result.isNull {     // スタックの無を返り値として返す。
+            return outer.pull()
+        }
         return nil
     }
 }

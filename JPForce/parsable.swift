@@ -39,11 +39,19 @@ extension Parsable {
     /// - Returns: matchAll = falseの場合、常にtrueを返す。
     func getNext(whenNextIs expected: String, matchAll: Bool = true) -> Bool {
         let lexer = Lexer(expected)
+        var tokens: [Token] = []
         var token = lexer.getNext()
-        while token != Lexer.EoT {
-            guard getNext(whenNextIs: token) || !matchAll else {return false}
+        while token != Lexer.EoT {  // lexerからtokensを取り出す
+            tokens.append(token)
             token = lexer.getNext()
         }
+        // コピーしたParserで、仮の解析をする。(途中で失敗したらfalse)
+        let tempParser = Parser(from: self.parser)
+        for token in tokens {
+            guard tempParser.getNext(whenNextIs: token) || !matchAll else {return false}
+        }
+        // 一致した場合、実際の解析を進める。
+        tokens.forEach {_ = getNext(whenNextIs: $0)}
         return true
     }
     /// 入力が「<keyword>が、(は、)」に該当すれば解析位置を進め、trueを返す。
@@ -431,11 +439,10 @@ extension Parsable {
         return types
     }
     /// 定義部： <ブロック名>は(が)、【<定義>】
+    /// 定義部から<定義>を取り出し、ブロック文として返す。
     /// - Returns: ブロック文、定義無し(nil)、もしくはエラー
     func parseOptionalBlock(of blockname: String, in typename: String) -> Result<BlockStatement?, FunctionBlockError> {
-        guard getNext(whenNextIs: blockname) else {return .success(nil)}
-        _ = getNext(whenNextIs: ExpressionStatement.ga + ExpressionStatement.wa, matchAll: false)
-        _ = getNext(whenNextIs: .COMMA)
+        guard getNext(whenNextKeywordIs: blockname) else {return .success(nil)}
         let endSymbol: Token.Symbol = getNext(whenNextIs: .LBBRACKET) ? .RBBRACKET : .EOL
         guard let blockStatement = BlockStatementParser(parser, symbol: endSymbol).blockStatement else { 
             error(message: "\(typename)で、「\(blockname)は、〜」の解析に失敗した。")
@@ -475,9 +482,7 @@ extension Parsable {
     }
     func parseFunctionBlocks(of name: String, in typename: String) -> Result<FunctionBlocks, FunctionBlockError> {
         var functionBlocks = FunctionBlocks()
-        while getNext(whenNextIs: name) {
-            _ = getNext(whenNextIs: ExpressionStatement.ga + ExpressionStatement.wa, matchAll: false)
-            _ = getNext(whenNextIs: .COMMA)
+        while getNext(whenNextKeywordIs: name) {
             let isOverloaded = getNext(whenNextIs: DefineStatement.further)
             _ = getNext(whenNextIs: .COMMA)
 
@@ -872,76 +877,148 @@ struct ProtocolLiteralParser : ExpressionParsable {
         if endSymbol == .RBBRACKET {_ = getNext(whenNextIs: endSymbol)}
         return ProtocolLiteral(token: token, protocols: protocols, clauses: clauses)
     }
+    /// 条項群の解析
     private func parseClauses(until symbol: Token.Symbol) -> [ClauseLiteral]? {
         var clauses: [ClauseLiteral] = []
         _ = getNext(whenNextIs: ClauseLiteral.joukouga + ClauseLiteral.joukouwa, matchAll: false)   // 条項が、(条項は、)
         while nextToken != .symbol(symbol) && !nextToken.isEof {
-            var functionSignature: SignatureClauseLiteral?
-            var getterSignature: SignatureClauseLiteral?
-            var setterSignature: SignatureClauseLiteral?
-            //
-            skipNextEols(suppress: symbol == .EOL)
-            let isTyped = getNext(whenNextIs: TypeLiteral.katano)   // 型の要素(メンバー)か
+            guard let clauseGroup = parseClauseGroup(until: symbol) else {return nil}
+            clauses.append(contentsOf: clauseGroup)
+        }
+        return clauses
+    }
+    /// 各条項の解析
+    /// 1. (型の)<識別子>は、<型>
+    /// 2. (型の)<識別子>は、関数【<入力定義>。<出力定義>】
+    /// 3. (型の)<識別子>は、算出【<入力定義>。<出力定義>】
+    /// 4. 初期化は(が)、【<入力定義>。<出力定義>】
+    private func parseClauseGroup(until symbol: Token.Symbol) -> [ClauseLiteral]? {
+        skipNextEols(suppress: symbol == .EOL)
+        //
+        let isStatic = getNext(whenNextIs: TypeLiteral.katano)  // 型の<識別子>
+        var token = nextToken
+        var ident = Identifier(from: token)
+        switch token {
+        case .IDENT:
             getNext()
-            let ident = Identifier(from: currentToken)
-            guard getNext(whenNextIs: DefineStatement.wa) else {
-                error(message: "規約で、条項の解析に失敗した。")
+            ident = Identifier(from: currentToken)              // <識別子>は、
+            if isStatic && ident.value == "要素" {
+                error(message: "規約で、「型の要素は、【〜】」の定義はできない。個別に「型の<識別子>は、〜」の定義が必要。")
+                return nil
+            }
+            guard getNext(whenNextIs: .WA) else {
+                error(message: "規約で、条項「<識別子>は」の解析に失敗した。")
                 return nil
             }
             _ = getNext(whenNextIs: .COMMA)
+            _ = getNext(whenNextIs: DefineStatement.further)    // 「さらに」は読み飛ばす
+            _ = getNext(whenNextIs: .COMMA)
             getNext()
-            let token = currentToken
-            switch token {
-            case .STRING(_):                // 型(文字列)のチェック
-                break
-            case .keyword(.FUNCTION):       // 関数(引数チェック)
-                guard let parsed = FunctionLiteralParser(parser).parse() as? FunctionLiteral else {
-                    error(message: "規約で、関数定義の解析に失敗した。")
-                    return nil
-                }
-                functionSignature = SignatureClauseLiteral(
-                        parameters:  parsed.function.parameters,
-                        paramForm:   parsed.function.paramForm,
-                        returnTypes: parsed.function.returnTypes
-                )
-            case .keyword(.COMPUTATION):    // 算出(引数チェック)
-                guard let parsed = ComputationLiteralParser(parser).parse() as? ComputationLiteral else {return nil}
-                if let getter = parsed.getters.array.first {
-                    getterSignature = SignatureClauseLiteral(
-                        parameters:  getter.parameters,
-                        paramForm:   getter.paramForm,
-                        returnTypes: getter.returnTypes
-                    )
-                }
-                if let setter = parsed.setters.array.first {
-                    setterSignature = SignatureClauseLiteral(
-                        parameters:  setter.parameters,
-                        paramForm:   setter.paramForm,
-                        returnTypes: setter.returnTypes
-                    )
-                }
-            default:
-                error(message: "規約で、条項の解析に失敗した。")
+            token = currentToken
+        case .keyword(.INITIALIZATION):
+            if isStatic {
+                error(message: "型の初期化はできない(「型の」は不要)。")
                 return nil
             }
-            clauses.append(ClauseLiteral(
+        default:
+            error(message: "規約で、条項(トークン：\(token.literal))の解析に失敗した。")
+            return nil
+        }
+        guard let signatureKinds = parseClauseContents(from: token) else {return nil}
+        _ = getNext(whenNextIs: .PERIOD)
+        skipNextEols(suppress: symbol == .EOL)
+        
+        return signatureKinds.map { kind in
+            ClauseLiteral(
+                isTypeMember: isStatic,
                 identifier: ident,
                 type: token.literal,
-                funcSignature: functionSignature,
-                getterSignature: getterSignature,
-                setterSignature: setterSignature,
-                isTypeMember: isTyped))
-            _ = getNext(whenNextIs: .PERIOD)
-            skipNextEols(suppress: symbol == .EOL)
+                kind: kind,
+            )
         }
-        return clauses
+    }
+    /// 条項の型毎の入出力の解析
+    private func parseClauseContents(from token: Token) -> [SignatureKind]? {
+        switch token {
+        case .STRING(_):                // 型(文字列)
+            return [.none]
+        case .keyword(.FUNCTION):       // 関数
+            guard let parsed = FunctionLiteralParser(parser).parse() as? FunctionLiteral else {
+                error(message: "規約で、関数定義の解析に失敗した。")
+                return nil
+            }
+            let sig = FunctionSignature(
+                parameters:  parsed.function.parameters,
+                paramForm:   parsed.function.paramForm,
+                returnTypes: parsed.function.returnTypes
+            )
+            return [.function(sig)]
+        case .keyword(.COMPUTATION):    // 算出
+            guard let parsed = ComputationLiteralParser(parser).parse() as? ComputationLiteral else {
+                error(message: "規約で、算出定義の解析に失敗した。")
+                return nil
+            }
+            return makeComputationSignatures(from: parsed)
+        case .keyword(.INITIALIZATION): // 初期化
+            switch parseFunctionBlocks(of: token.literal, in: token.literal) {
+            case .success(let blocks):
+                return blocks.array.map {
+                    .initializer(FunctionSignature(
+                        parameters: $0.parameters,
+                        paramForm:  $0.paramForm,
+                        returnTypes:$0.returnTypes
+                    ))
+                }
+            case .failure(_):
+                return nil
+            }
+        default:
+            error(message: "規約で、条項の解析に失敗した。(未対応の型: \(token.literal))")
+            return nil
+        }
+    }
+    /// 算出内の多重定義(FunctionBlocks) → [SignatureKind]変換
+    private func makeComputationSignatures(from literal: ComputationLiteral) -> [SignatureKind]? {
+        var getters = literal.getters.array.map {Optional($0)}
+        var setters = literal.setters.array.map {Optional($0)}
+        let n = max(getters.count, setters.count)
+        guard n > 0 else {
+            error(message: "規約の算出には、取得か設定の少なくともいずれかの定義が必要。")
+            return nil
+        }
+        // 足りない分をnilで埋める
+        getters += Array(repeating: nil, count: n - getters.count)
+        setters += Array(repeating: nil, count: n - setters.count)
+        // [FunctionBlock?,FunctionBlock?] → [.computation(FunctionSignature?,FunctionSignature?)]
+        return zip(getters, setters).map { (getter, setter) in
+                .computation(
+                    getter: getter.map {
+                        FunctionSignature(
+                            parameters: $0.parameters,
+                            paramForm: $0.paramForm,
+                            returnTypes: $0.returnTypes)
+                    },
+                    setter: setter.map {
+                        FunctionSignature(
+                            parameters: $0.parameters,
+                            paramForm: $0.paramForm,
+                            returnTypes: $0.returnTypes)
+                    })
+        }
     }
 }
 struct TypeLiteralParser : ExpressionParsable {
     init(_ parser: Parser) {self.parser = parser}
     let parser: Parser
     func parse() -> Expression? {
-        if previousToken == .particle(.NO) {return Identifier(from: currentToken)}  // 〜の型：識別子として振る舞う
+        // exception proc
+        if previousToken.isParticle(.NO) {
+            return Identifier(from: currentToken)                       // 〜の型：識別子として振る舞う
+        }
+        if nextToken.isParticle(.NO) {
+            getNext(); return StringLiteral(from: TypeLiteral.katano)   // 型の：文字列として振る舞う
+        }
+        // Header proc
         let token = parseHeader()
         let endOfType: Token.Symbol = getNext(whenNextIs: .LBBRACKET) ? .RBBRACKET : .EOL
         skipNextEols(suppress: endOfType == .EOL)
@@ -950,11 +1027,14 @@ struct TypeLiteralParser : ExpressionParsable {
         skipNextEols(suppress: endOfType == .EOL)
         // Type member block
         var members: BlockStatement?
-        switch parseOptionalBlock(of: TypeLiteral.typemembers, in: token.literal) {
+        switch parseOptionalBlock(of: TypeLiteral.typemembers, in: token.literal) { // 「型の要素は、【<要素定義>】
         case .success(let block):
             members = block
             skipNextEols(suppress: endOfType == .EOL)
         case .failure(_):
+            return nil
+        }
+        guard parseTypeMembers(with: &members) else {                               // 型の<識別子>を取り込む
             return nil
         }
         // Initializers block
@@ -980,6 +1060,24 @@ struct TypeLiteralParser : ExpressionParsable {
             }
         }
         return TypeLiteral(token: token, protocols: protocols, typeMembers: members, initializers: initializers, body: body)
+    }
+    /// 型の<識別子>は、<定義>を型の要素に取り込む
+    private func parseTypeMembers(with typeMembers: inout BlockStatement?) -> Bool {
+        var definitions = [DefineStatement]()
+        while getNext(whenNextIs: TypeLiteral.katano) {
+            getNext()   // DefStatemntParserは、currentTokenで処理をするため、1つ進める
+            guard let definition = DefStatementParser(parser).parse() as? DefineStatement else {
+                error(message: "型で、「型の<識別子>は、〜」の解析に失敗した。")
+                return false
+            }
+            definitions.append(definition)
+        }
+        if !definitions.isEmpty {
+            typeMembers = BlockStatement(
+                token: typeMembers?.token ?? definitions.first!.token,
+                statements: (typeMembers?.statements ?? []) + definitions)
+        }
+        return true
     }
 }
 struct EnumLiteralParser : ExpressionParsable {
@@ -1171,9 +1269,7 @@ struct LoopExpressionParser : ExpressionParsable {
         return LoopExpression(token: token, parameters: identifiers, condition: condition, body: body)
     }
     private func parseCondition(endSymbol: Token.Symbol) -> [Expression]? {
-        guard getNext(whenNextIs: LoopExpression.condition) else {return []}    // 空のパラメータ
-        _ = getNext(whenNextIs: ExpressionStatement.ga + ExpressionStatement.wa, matchAll: false)   // 条件が、(条件は、)
-        _ = getNext(whenNextIs: .COMMA)
+        guard getNext(whenNextKeywordIs: LoopExpression.condition) else {return []}    // 空のパラメータ
         getNext()
         var expressions: [Expression] = []
         while true {

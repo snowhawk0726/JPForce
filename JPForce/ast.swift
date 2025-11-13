@@ -266,42 +266,60 @@ struct ProtocolLiteral : Expression {
         "条項が、\(clauses.map {$0.string}.joined(separator: ""))】"
     }
 }
+enum SignatureKind {
+    case function(FunctionSignature)
+    case computation(getter: FunctionSignature?, setter: FunctionSignature?)
+    case initializer(FunctionSignature)
+    case none
+}
 struct ClauseLiteral {
     static let joukouga = "条項が、"
     static let joukouwa = "条項は、"
+    //
+    var isTypeMember: Bool = false  // 型の要素
     var identifier: Identifier      // 識別子
     var type: String                // 型の文字列
-    var funcSignature: SignatureClauseLiteral?
-    var getterSignature: SignatureClauseLiteral?
-    var setterSignature: SignatureClauseLiteral?
-    var isTypeMember: Bool = false  // 型の要素
+    var kind: SignatureKind         // シグネチャ種別(無しの場合、.none)
     //
-    var string: String {identifier.string + DefineStatement.wa + "、" + typeString(type) + "。"}
-    private func typeString(_ type: String) -> String {
-        switch type {
-        case JpfFunction.type:
-            if let string = funcSignature?.string {
-                return type + ExpressionStatement.deatte + "【\(string)】"
-            }
-        case JpfComputation.type:
-            let setter = setterSignature?.string
-            let getter = getterSignature?.string
-            if setter != nil || getter != nil {
-                let string = 
-                    (setter.map {"設定は、【\($0)】。"} ?? "") +
-                    (getter.map {"取得は、【\($0)】。"} ?? "")
-                return type + ExpressionStatement.deatte + "【\(string)】"
-            }
+    var signature: FunctionSignature? {
+        switch kind {
+        case .function(let sig): return sig
+        case .initializer(let sig): return sig
         default:
-            break
+            return nil
         }
-        return "「\(type)」"
+    }
+    var getterSignature : FunctionSignature? {
+        guard case .computation(let gsig, _) = kind else { return nil }
+        return gsig
+    }
+    var setterSignature : FunctionSignature? {
+        guard case .computation(_, let ssig) = kind else { return nil }
+        return ssig
+    }
+    var string: String {
+        switch kind {
+        case .function(let sig):
+            return subject + type + ExpressionStatement.deatte + "【\(sig.string)】。"
+        case .computation(getter: let gsig, setter: let ssig):
+            let setter = ssig.map {"設定は、【\($0.string)】。"} ?? ""
+            let getter = gsig.map {"取得は、【\($0.string)】。"} ?? ""
+            return subject + type + ExpressionStatement.deatte + "【" + setter + getter + "】。"
+        case .initializer(let sig):
+            return "初期化は、【\(sig.string)】。"
+        case .none:
+            return subject + "「\(type)」。"
+        }
+    }
+    private var subject: String {   // (型の)<識別子>は、
+        isTypeMember ? TypeLiteral.katano : "" + identifier.value + DefineStatement.wa + "、"
     }
 }
-struct SignatureClauseLiteral {     // 関数シグネチャ条項
+struct FunctionSignature {          // 関数シグネチャ
     var parameters: [Identifier]    // 引数
     var paramForm: InputFormat      // 引数形式
     var returnTypes: [String]       // 返り値の型
+    //
     var string: String {
         (parameters.isEmpty ? "" : "入力が\(zip(parameters, paramForm.strings).map {$0.string + $1}.joined(separator: "と"))。") +
         (returnTypes.isEmpty ? "" : "出力が「\(returnTypes.joined(separator: "」と「"))」。")
@@ -341,6 +359,7 @@ struct InputFormat {
     var numberOfInputs: Int?                        // 期待するパラメータ数(可変の場合はnil)
     var formats: [Format]                           // 期待するパラメータ毎の型と格(無い場合は"")
     var values: [ExpressionStatement?]              // 既定値
+    //
     var strings: [String] {
         zip(formats, values).map { format, value in
             let s = format.string + (value != nil ? ExpressionStatement.wa : "") + (value?.string ?? "")
@@ -367,6 +386,7 @@ struct FunctionBlock {
     var paramForm: InputFormat      // 入力形式
     var returnTypes: [String]       // 出力型
     var body: BlockStatement?       // 処理本体
+    //
     var isOverloaded: Bool = false  // 多重識別
     var string: String {
         let s =
@@ -474,7 +494,7 @@ struct FunctionBlocks : Collection {
     /// 多重定義に、指定のシグネチャと一致する関数ブロックがあるか？
     /// - Parameter signature: 関数シグネチャ
     /// - Returns: シグネチャが一致ならば、true
-    func hasSameSignature(as signature: SignatureClauseLiteral) -> Bool {
+    func hasSameSignature(as signature: FunctionSignature) -> Bool {
         for definition in array.reversed() {
             guard signature.parameters.count == definition.parameters.count else {continue} // 引数の数
             guard zip(signature.parameters, definition.parameters).allSatisfy({$0.value == $1.value}) else {

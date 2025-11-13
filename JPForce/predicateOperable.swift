@@ -651,8 +651,7 @@ struct CreateOperator : PredicateOperable {
             switch type.create(with: environment) {
             case let instance as JpfInstance:
                 let ident = getIdentifier() // 識別子を抽出
-                if let result = instance.initialize(with: environment),
-                   result.isError {return result}
+                if let result = instance.initialize(with: environment) {return result}
                 if let i = ident {          // 識別子あり？
                     environment[i.value] = instance // 生成したインスタンスを代入
                     return nil

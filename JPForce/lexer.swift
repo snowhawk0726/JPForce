@@ -17,7 +17,16 @@ import NaturalLanguage
 // MARK: - 字句解析器(Lexer)
 /// input文字列を解析し、トークンに分解する。
 class Lexer {
+    //
     init(_ input: String) {self.input = input; tagging(input)}
+    init(from other: Lexer) {
+        self.input = other.input
+        self.position = other.position
+        self.positionTobeRead = other.positionTobeRead
+        self.taggedWords = other.taggedWords
+        self.identifiers = other.identifiers
+    }
+    //
     private let input: String           // 解析する文字列
     static let EoT = Token()            // End of Tokens
     static let ESC = Token.Symbol.ESC.rawValue
@@ -26,6 +35,7 @@ class Lexer {
     private var taggedWords: [(word: String, type: TagType)] = [] // 解析(分類)結果文字列
     enum TagType : String {case word, symbol, none}
     private var identifiers = Identifiers()  // 定義された識別子
+    //
     func insert(_ identifier: String) {identifiers.insert(identifier)}
     // トークン解析
     func getNext() -> Token {

@@ -826,7 +826,7 @@ extension CallExpression : Evaluatable {
                 let args = Environment()            // 引数のみの環境
                 arguments.forEach {_ = $0.evaluated(with: args)}
                 instance.environment.storeArguments(with: args, shouldMerge: true)
-                if let result = instance.initialize(with: environment, type: t) {return result}
+                if let result = instance.initialize(with: t) {return result}
                 return instance
             case let error as JpfError:
                 return error

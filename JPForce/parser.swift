@@ -15,6 +15,18 @@ class Parser {
         currentToken = lexer.getNext()      // カレントトークン
         nextToken =    lexer.getNext()      // 次のトークン
     }
+    /// コピーコンストラクタ
+    init(from other: Parser) {
+        self.lexer = Lexer(from: other.lexer)
+        self.currentToken = other.currentToken
+        self.nextToken = other.nextToken
+        self.previousToken = other.previousToken
+        self.errors = other.errors
+        self.nestedBlockCounter = other.nestedBlockCounter
+        self.nestedElementsCounter = other.nestedElementsCounter
+        self.switchCase = other.switchCase
+    }
+    //
     let lexer: Lexer
     var currentToken: Token
     var nextToken: Token
