@@ -267,6 +267,9 @@ enum Token : Equatable {
     func isParticle(_ p: Token.Particle) -> Bool {
         if case .particle(p) = self {return true} else {return false}
     }
+    func isSymbol(_ s: Token.Symbol) -> Bool {
+        if case .symbol(s) = self {return true} else {return false}
+    }
     //
     // MARK: - 再定義可能な予約語(述語)(redefinable predicate keywords)
     static var redefinables: Set<Token.Keyword> = [    //

@@ -176,7 +176,7 @@ final class VMTests: XCTestCase {
             ("iは１。iの負数", -1),                 // opGetGlobal, opPredicate
             ("１。負数の文字列", "-1"),             // opPredicate, opGetProperty
             ("「１」。数値の負数", -1),             // opGetProperty, opPredicate
-            ("aは配列【１、２、配列【3】。aの最後の0の負数", -3),
+            ("aは配列【１、２、配列【3】】。aの最後の0の負数", -3),
             ("iは1。配列【１、２、３】のi", 2),
             ("iは、０と2を足す。配列【１、２、３】のi", 3),
             ("iは０。jは０。配列【配列【１、１、１】】のiのj", 1),

@@ -97,8 +97,8 @@ extension Parsable {
         repeat {
             getNext()
             let identifier = Identifier(from: currentToken)     // 識別子
-            let format = getNext(whenNextIs: .string) ? 
-                            currentToken.literal : ""           // 入力形式
+            let format = getNext(whenNextIs: .string) ?
+            currentToken.literal : ""           // 入力形式
             var value: ExpressionStatement? = nil
             if getNext(whenNextIs: .WA) {                       // 既定値あり
                 if format.hasThreeDots {
@@ -277,26 +277,63 @@ extension Parsable {
     }
     /// 配列・辞書・列挙の要素を解析する（要素の終わりまで）
     /// 形式： 要素が(は)、〜。、要素が(は)、【〜】
-    /// - Parameters: token: 配列・辞書・列挙のトークン
-    /// - Returns: 解析した要素の配列
-    func parseElements<T>(of token: Token, with endSymbol: Token.Symbol) -> [T]? {
+    /// - Parameters:
+    ///     - token:  要素群の種別を表すトークン
+    ///     - endSymbol: 期待する終端
+    /// - Returns: 解析した要素の配列(もしくは、nil : エラー)
+    func parseElements<T>(in token: Token, with endSymbol: Token.Symbol) -> [T]? {
+        if getNext(whenNextIs: endSymbol) {
+            return []                                           // 空の要素
+        }
+        if endSymbol == .PERIOD && nextToken.isEol {            // 型直後の開業
+            error(message: "\(token.literal)の要素が空である場合は、句点「。」が必要。")
+            return nil
+        }
         skipNextEols()
         _ = getNext(whenNextIs: ExpressionStatement.yousoga + ExpressionStatement.yousowa, matchAll: false) // 要素が、(要素は、)
-        skipNextEol()
+        skipNextEols()
+        var commaNotFound: Bool = false                         // ブロック内で、要素の後に「、」が見つからない
         var elements: [T] = []
-        if isEndOfElements {return elements}    // 空の配列
-        repeat {
+        while true {
+            if isTerminator(nextToken, expected: endSymbol) {   // 次が終端ならば解析終了
+                break
+            }
             getNext()
             skipEols()
-            if currentToken == .symbol(endSymbol) || isEndOfBlock {break}   // 要素の終わりが「、」
+            if currentToken.isSymbol(.RBBRACKET) {              // ブロック終了なら即時リターン
+                return elements
+            }
             guard let parsed: T = parseElement(of: token) else {
                 error(message: "\(token.literal)で、要素の解釈に失敗した。")
                 return nil
             }
             elements.append(parsed)
-        } while !nextToken.isEof && getNext(whenNextIs: .COMMA)
-        if !isEndOfBlock {_ = getNext(whenNextIs: endSymbol)}
+            //
+            if !getNext(whenNextIs: .COMMA) {                   // 次が「、」以外ならば解析終了
+                if nextToken.isEol && endSymbol == .RBBRACKET {
+                    commaNotFound = true
+                }
+                break
+            }
+        }
+        // 後処理(endSymbolをcurrentにする。)
+        while nextToken.isEol || nextToken.isSymbol(.PERIOD) {
+            getNext()
+        }
+        let endSymbolFound = getNext(whenNextIs: endSymbol)
+        
+        if commaNotFound && !endSymbolFound {   // ブロック内で、要素の後に区切り「、」が見つからず、終端でない
+            error(message: "要素の区切りには、「、」が必要。")
+            return nil
+        }
+        
         return elements
+    }
+    private func isTerminator(_ token: Token, expected: Token.Symbol) -> Bool {
+        token.isSymbol(expected) ||             // 期待する終端
+        token.isSymbol(.RBBRACKET) ||           // 「】」は終端
+        (expected == .PERIOD && token.isEol) || // 終端「。」待ちならば、EOLは終端
+        token.isEof
     }
     private func parseElement<T>(of token: Token) -> T? {
         switch token {
@@ -498,17 +535,39 @@ extension Parsable {
         }
         return .success(functionBlocks)
     }
-    func parseEndOfElementsLiteral(with endSymbol: Token.Symbol) -> Bool {
-        if endSymbol == .PERIOD && currentToken.isPeriod {return true}
-        skipNextEols()
-        if currentToken != .symbol(endSymbol) {
-            if endSymbol == .RBBRACKET {_ = getNext(whenNextIs: .PERIOD)}   // 】の前の「。」は読み飛ばす
-            skipNextEols()
-            guard getNext(whenNextIs: endSymbol, withError: true) else {return false}
-        } else {                                                            // 】の時は、進めない
-            if elementsCount.value(of: .RBBRACKET) < 1 {_ = getNext(whenNextIs: .RBBRACKET)}    // ただし、】】の時は、１つ進める。
+    /// 要素群の終端解析
+    /// ＊：呼び元の要素解析で、終端まで解析を進めること！
+    /// - Parameter endSymbol: 期待する終端
+    /// - Returns: 解析結果
+    func parseEndOfElements(with endSymbol: Token.Symbol) -> Bool {
+        switch endSymbol {
+        case .PERIOD:
+            if currentToken.isPeriod || currentToken.isEof {return true}
+            if currentToken.isEol {
+                if !nextToken.isEof {
+                    print("警告：要素の終りの句点「。」が見つかりません。要素が複数行にまたがる場合は、ブロック「【】」で囲ってください。")
+                }
+                return true
+            }
+            error(message: "要素の解析で、終端「。」が見つからない。")
+        case .RBBRACKET:
+            if currentToken.isSymbol(.RBBRACKET) {
+                // 余分な「】」が続く場合は読み進める
+                skipNextRBBrackets()
+                return true
+            }
+            error(message: "要素の解析で、終端「】」が見つからない。")
+        default:
+            error(message: "要素の解析で、期待しない終端「\(endSymbol.rawValue)」が見つかった。")
         }
-        return true
+        return false
+    }
+    private func skipNextRBBrackets() {
+        while elementsCount.value(of: .RBBRACKET) < 1 &&    // 要素の解析が終了している
+                blockCount.value(of: .RBBRACKET) < 1 &&     // ブロックの終端ではない
+                nextToken.isSymbol(.RBBRACKET) {
+            getNext()
+        }
     }
 }
 enum FunctionBlockError : Error {
@@ -1088,12 +1147,12 @@ struct EnumLiteralParser : ExpressionParsable {
         let endSymbol: Token.Symbol = getNext(whenNextIs: .LBBRACKET) ? .RBBRACKET : .PERIOD
         elementsCount.up(to: endSymbol)
         // 要素の解析
-        guard let elements: [Statement] = parseElements(of: token, with: endSymbol) else {
+        guard let elements: [Statement] = parseElements(in: token, with: endSymbol) else {
             error(message: "列挙で、「要素が、〜」の解析に失敗した。")
             return nil
         }
         elementsCount.down(to: endSymbol)
-        guard parseEndOfElementsLiteral(with: endSymbol) else {return nil}
+        guard parseEndOfElements(with: endSymbol) else {return nil}
         return EnumLiteral(token: token, elements: elements)
     }
 }
@@ -1105,12 +1164,12 @@ struct ArrayLiteralParser : ExpressionParsable {
         let endSymbol: Token.Symbol = getNext(whenNextIs: .LBBRACKET) ? .RBBRACKET : .PERIOD
         elementsCount.up(to: endSymbol)
         // 要素の解析
-        guard let elements: [ExpressionStatement] = parseElements(of: token, with: endSymbol) else {
+        guard let elements: [ExpressionStatement] = parseElements(in: token, with: endSymbol) else {
             error(message: "配列で、「要素が、〜」の解析に失敗した。")
             return nil
         }
         elementsCount.down(to: endSymbol)
-        guard parseEndOfElementsLiteral(with: endSymbol) else {return nil}
+        guard parseEndOfElements(with: endSymbol) else {return nil}
         return ArrayLiteral(token: token, elements: elements)
     }
 }
@@ -1122,12 +1181,12 @@ struct DictionaryLiteralParser : ExpressionParsable {
         let endSymbol: Token.Symbol = getNext(whenNextIs: .LBBRACKET) ? .RBBRACKET : .PERIOD
         elementsCount.up(to: endSymbol)
         // 要素の解析
-        guard let pairs: [PairExpression] = parseElements(of: token, with: endSymbol) else {
+        guard let pairs: [PairExpression] = parseElements(in: token, with: endSymbol) else {
             error(message: "辞書で、「要素が、〜」の解析に失敗した。")
             return nil
         }
         elementsCount.down(to: endSymbol)
-        guard parseEndOfElementsLiteral(with: endSymbol) else {return nil}
+        guard parseEndOfElements(with: endSymbol) else {return nil}
         return DictionaryLiteral(token: token, pairs: pairs)
     }
 }
