@@ -310,14 +310,15 @@ extension Parsable {
             elements.append(parsed)
             //
             if !getNext(whenNextIs: .COMMA) {                   // 次が「、」以外ならば解析終了
-                if nextToken.isEol && endSymbol == .RBBRACKET {
+                if (nextToken.isEol || nextToken.isPeriod) && endSymbol == .RBBRACKET  {
                     commaNotFound = true
                 }
                 break
             }
         }
         // 後処理(endSymbolをcurrentにする。)
-        while nextToken.isEol || nextToken.isSymbol(.PERIOD) {
+        while nextToken.isEol ||
+              (nextToken.isPeriod && endSymbol != .PERIOD) {
             getNext()
         }
         let endSymbolFound = getNext(whenNextIs: endSymbol)
@@ -603,7 +604,7 @@ struct DefStatementParser : StatementParsable {
     let syntax1 = "定義文「<識別子>とは、<式(値)>ことである。」"
     let syntax2 = "定義文「<識別子>は、<式(値)>。」"
     func parse() -> Statement? {
-        let identifier = Identifier(from: currentToken)
+        let identifier = Identifier(from: currentToken.literal)
         parser.insert(identifier.value)     // 識別子をLexerに登録
         getNext()
         let token = currentToken            // 「は」「とは」
@@ -1071,7 +1072,7 @@ struct TypeLiteralParser : ExpressionParsable {
     let parser: Parser
     func parse() -> Expression? {
         // exception proc
-        if previousToken.isParticle(.NO) {
+        if previousToken.isParticle(.NO) || previousToken.isKeyword(.ITS) {
             return Identifier(from: currentToken)                       // 〜の型：識別子として振る舞う
         }
         if nextToken.isParticle(.NO) {
@@ -1193,7 +1194,13 @@ struct DictionaryLiteralParser : ExpressionParsable {
 struct PredicateExpressionParser : ExpressionParsable {
     init(_ parser: Parser) {self.parser = parser}
     let parser: Parser
-    func parse() -> Expression? {PredicateExpression(token: currentToken)}
+    func parse() -> Expression? {
+        if currentToken.isKeyword(.ITS) && !(nextToken.isIdent || nextToken.isKeyword(.TYPE)) {
+            error(message: "「\(nextToken.literal)」は属性名ではない。")
+            return nil
+        }
+        return PredicateExpression(token: currentToken)
+    }
 }
 /// 「場合」で始まる式を解析し、「場合、」に続くブロックをCaseExpression.consequenceとし、
 /// 続いて「それ以外は、」があれば、それに続くブロックをCaseExpression.alternativeとする。
@@ -1413,6 +1420,9 @@ struct GenitiveExpressionParser : ExpressionParsable {
         guard let left = left else {
             error(message: "属格で、左式の解析に失敗した。")
             return nil
+        }
+        if nextToken.isPeriod || nextToken.isEol || nextToken.isEof {
+            return PhraseExpression(token: currentToken, left: left)
         }
         let precedence = Precedence[currentToken.type]
         getNext()

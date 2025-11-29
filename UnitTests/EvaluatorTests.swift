@@ -236,6 +236,8 @@ final class EvaluatorTests: XCTestCase {
             ("『キー』は、関数【入力がx,x】。辞書【「名前」が「ふぉーす」】の『キー』の値。",
              "エラー：「関数」は、「辞書」の要素の索引(ハッシュキー)として使用できない。"),
             ("甲は１。甲を削除し、甲を表示する。", "エラー：『甲』(識別子)が定義されていない。"),
+            ("それに1を足す。", "エラー：「足す」には、２つ以上の数値、文字列、配列の入力が必要。仕様：(〜と…)〜を足す。"),
+            ("その型。", "エラー：「その」が指すオブジェクトが無い。(スタックが空)"),
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
@@ -1075,16 +1077,16 @@ final class EvaluatorTests: XCTestCase {
         let testPatterns: [(input: String, exptected: Any?)] = [
             ("「こんにちは」の型","文字列"),
             ("cは、型【aは1】。iはcから生成する。iの型", "c"),
-            ("１を積む。得たものの格", nil),
+            ("１を積む。その格", nil),
             ("aは１。aの格", nil),
-            ("「い」を積む。得たものの値", "い"),
+            ("「い」を積む。その値", "い"),
             ("aは「い」。aの値", "い"),
             ("aは１。aの数値", 1),
             ("aは「い」。aの数値", nil),
             ("aは１。aの文字列", "1"),
             ("aは「い」。aの文字列", "い"),
             ("aは１。aの識別子名", "a"),
-            ("aは１。aを積む。得たものの値の識別子名", "a"),
+            ("aは１。aを積む。その値の識別子名", "a"),
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
@@ -1486,6 +1488,14 @@ final class EvaluatorTests: XCTestCase {
             ("22と「a」を積む。捨てる。甲は「値」を1個得たもの。甲の格。", nil),
             ("23と24を積む。「甲」と「乙」に得る。甲に乙を足す。", 47),
             ("25と26を積む。「甲」と「乙」に写す。甲から乙を引く。", -1),
+            ("27と28を積む。それから１を引く。", 27),
+            ("得たものが無である。", true),
+            ("それが無である。", false),
+            ("29を積む。その型。", "数値"),
+            ("配列【1,2,3】。その数。", 3),
+            ("「30」と「31」を足す。その数値。", 3031),
+            ("配列【1,2,3】。それの１番目。", 2),
+            ("１。それの負数。", -1),
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
@@ -1548,8 +1558,8 @@ final class EvaluatorTests: XCTestCase {
             ("甲は、配列【１、２、３】。関数【甲の２は、5。】を実行する。甲の最後", 5),      // 上書き
             ("甲は、配列【１、２、３】。乙は２。関数【甲の乙は、5。】を実行する。甲の最後", 5),// 上書き
             // <辞書>の<キー>は、<値>
-            ("辞書【1が「一」、2が「二」、3が「三」】の2は「弍」。得たものの2の値","弍"),
-            ("辞書【1が「一」、2が「二」、3が「三」】の4は「四」。得たものの4の値","四"),
+            ("辞書【1が「一」、2が「二」、3が「三」】の2は「弍」。それの2の値","弍"),
+            ("辞書【1が「一」、2が「二」、3が「三」】の4は「四」。それの4の値","四"),
             ("甲は、辞書【「い」が「一」、「ろ」が「二」、「は」が「三」】。甲の「は」は「参」。甲の「は」の値", "参"),
             ("甲は、辞書【真が1、偽が0】。甲の偽は、2。甲の偽の値",2),
             ("甲は、辞書【1が「一」、2が「二」、3が「三」】。乙は２。関数【甲の乙は「弍」。】を実行する。甲の2の値", "弍"),  // 上書き
@@ -1648,6 +1658,34 @@ final class EvaluatorTests: XCTestCase {
             ("「月曜」で曜日から「月曜日」を生成する。月曜日の列挙子。", "月"),
             ("「Monday」を月曜日の値で曜日から生成する。Mondayの列挙子。", "月"),
             ("木曜日は、「Thursday」を・木に代入したもの。木曜日の値。", "Thursday"),
+        ]
+        print("テストパターン: \(input)")
+        let environment = Environment()
+        let parser = Parser(Lexer(input))
+        let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+        let result = eval.object ?? environment.pull()
+        XCTAssertFalse(result?.isError ?? false, result?.error?.message ?? "")
+        for test in testPatterns {
+            print("テストパターン: \(test.input)")
+            let parser = Parser(Lexer(test.input))
+            let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+            let expected = eval.object ?? environment.pull()!
+            try testObject(expected, with: test.expected)
+            print("テスト(\(expected))終了")
+        }
+        print("テスト終了")
+    }
+    func testEnumProperties() throws {
+        let input = """
+            果物は、列挙【りんごと、みかん】。
+            ・りんごに列挙【値段は100円と、色は「赤」】を代入。それを「🍎」に代入。
+            ・みかんに列挙【値段は50円と、色は「橙」】を代入。それを「🍊」に代入。
+        """
+        let testPatterns: [(input: String, expected: Any)] = [
+            ("🍎の値の値段の値。", 100),
+            ("🍊の値の色の値。", "橙"),
+            ("🍎の値段。", 100),
+            ("🍊の色。", "橙"),
         ]
         print("テストパターン: \(input)")
         let environment = Environment()
@@ -1888,7 +1926,7 @@ final class EvaluatorTests: XCTestCase {
             ("辞書【】が空",true),
             ("""
              列挙。
-             得たものが空
+             それが空
             """,true),
 //            ("""
 //             甲は、列挙
@@ -1897,7 +1935,7 @@ final class EvaluatorTests: XCTestCase {
 //            """,false), // 列挙の要素が空である場合は、句点「。」が必要。(解析位置: 列挙)
             ("""
              配列【】
-             得たものが空
+             それが空
             """,true),
             // 改行無し
             ("甲は配列であって、要素が、１、２、３。甲の数",3),
@@ -1909,13 +1947,13 @@ final class EvaluatorTests: XCTestCase {
             ("配列【1,2,配列【3,4】】の数",3),
             ("配列【1,2,関数【3】】の数",3),
             ("配列【1,2,関数【3】【】】の数",3),
-            ("算出【配列【1、2、3】】【】。得たものの数",3),
+            ("算出【配列【1、2、3】】【】。その数",3),
             ("甲は型【初期化が【入力がa】。「a」は利用可能】。甲【aは配列【1,2,3】】のaの数",3),
             ("関数【列挙【a、b、c】】【】の数",3),
             // EOL
             ("""
              配列【1、2、3。】
-             得たものの数
+             その数
             """,3),
             ("""
              列挙【
@@ -1923,27 +1961,27 @@ final class EvaluatorTests: XCTestCase {
                 bは2、
                 cは3、
              】
-             得たものの数
+             その数
             """,3),
             //
             ("""
              配列【1、2、3、
             
              】
-             得たものの数
+             その数
             """,3),
             ("""
              配列【1、2、3
              。
              】
-             得たものの数
+             その数
             """,3),
             ("""
              配列であり、【要素が、
             
                 1、2、3。
              】
-             得たものの数
+             その数
             """,3),
             ("""
                 配列【
@@ -1959,16 +1997,16 @@ final class EvaluatorTests: XCTestCase {
             // 終端がEOL (警告)
             ("""
              辞書で、「a」が1、「b」が2、「c」が3
-             得たものの数
+             その数
             """,3),
             ("""
              列挙であり、aは1、bは2、cは3、
-             得たものの数
+             その数
             """,3),
             ("""
              列挙であり、要素が、aは１と、bは３と、
              cは5。
-             得たものの数
+             その数
             """,2),
         ]
         for test in testPatterns {

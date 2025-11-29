@@ -40,7 +40,7 @@ struct ObjectProperties {
         ("後尾", {($0.value!)["後尾", $0.particle]}),
         ("残り", {($0.value!)["残り", $0.particle]}),
         ("列挙子", {($0.value!)["列挙子", $0.particle]}),              // 15 (JpfEnum, JpfEnumerator)
-        ("値", {($0.value!)["値", $0.particle]}),
+        ("値", {($0)["値", $0.value is JpfPhrase ? $0.particle : Token(.NO)]}),
     ]
     // アクセサ
     subscript(index: Int) -> NamedAccessor? {
@@ -572,6 +572,9 @@ extension JpfDictionary {
         }
         return error
     }
+    func contains(name: String) -> Bool {
+        pairs.values.contains(where: {($0.key as? JpfString)?.value == name})
+    }
     func contains(where function: JpfFunction, with environment: Environment) -> JpfObject {
         for element in pairs.values {
             if let err = environment.push(element.key) {return err}
@@ -635,6 +638,7 @@ extension JpfPhrase {
     }
 }
 extension JpfType {
+    func contains(name: String) -> Bool {environment.contains(name)}
     subscript(name: String, particle: Token?) -> JpfObject? {
         // nameかその連用形が辞書にあるかであれば、オブジェクトを返す。
         let canditate = environment[name] != nil ? name : ContinuativeForm(name).plainForm ?? ""
@@ -643,12 +647,13 @@ extension JpfType {
         return getProperty(by: name, with: particle)
     }
     func assign(_ value: JpfObject, to target: JpfObject?) -> JpfObject {
-        return assign(value, to: target, with: environment)
+        assign(value, to: target, with: environment)
     }
 }
 extension JpfInstance {
     var count: JpfObject {JpfInteger(value: available.count)}   // 利用可能要素(メンバー)数
     func contains(type: String) -> Bool {return type == self.type || protocols.contains(type)}
+    func contains(name: String) -> Bool {environment.contains(name)}
     subscript(name: String, particle: Token?) -> JpfObject? {
         // nameが利用可能なメンバー名であれば、オブジェクトを返す。
         let canditate = environment[name] != nil ? name : ContinuativeForm(name).plainForm ?? ""
@@ -665,7 +670,7 @@ extension JpfInstance {
         return getProperty(by: name, with: particle)
     }
     func assign(_ value: JpfObject, to target: JpfObject?) -> JpfObject {
-        return assign(value, to: target, with: environment)
+        assign(value, to: target, with: environment)
     }
     private func pushParameters(_ objects: [JpfObject]) {
         if environment.push(objects) != nil {return}
@@ -678,6 +683,7 @@ extension JpfInstance {
 extension JpfEnum {
     var count: JpfObject {JpfInteger(value: elements.count)}
     var isEmpty: JpfObject {JpfBoolean(value: elements.isEmpty)}
+    func contains(name: String) -> Bool {environment.contains(name)}
     subscript(name: String, particle: Token?) -> JpfObject? {
         if particle == .particle(.NO), elements.contains(name) {
             return JpfEnumerator(type: self.name, identifier: name, rawValue: environment[name])
@@ -695,6 +701,10 @@ extension JpfEnumerator {
             case "列挙子": return JpfString(value: identifier)
             case "値":   return rawValue
             default:
+                // <列挙子>の<要素名> → rawValueが、列挙・型・辞書であれば、名前から属性(値)を引く
+                if let rawValue, rawValue.contains(name: name) {
+                    return rawValue[name, particle]?["値", particle]
+                }
                 break
             }
         }

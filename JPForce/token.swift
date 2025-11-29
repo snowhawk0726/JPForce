@@ -90,6 +90,8 @@ enum Token : Equatable {
         case SURU       = "する"  // irregular verb
         case KOTO       = "こと"  // end of definition
         case MONO       = "もの"  // unwrap a phrase and return a value in the phrase
+        case IT         = "それ"
+        case ITS        = "その"
         case TRUE       = "真"
         case FALSE      = "偽"
         case NULL       = "無"   // object is nil
@@ -204,24 +206,26 @@ enum Token : Equatable {
         case .wrapped(_, let literal):  return literal
         }
     }
-    var keyword: Keyword? {
-        if case .keyword(let k) = self {return k} else {return nil}
-    }
     var unwrappedType: TokenType {
         if case .wrapped(let type,_) = self {return type}
         return self.type
     }
     var unwrappedLiteral: String {
-        guard case .wrapped(_,let word) = self else {return literal}
-        return ContinuativeForm(word).plainForm ?? literal
+        guard case .wrapped(let type,let word) = self else {return literal}
+        switch type {
+        case .keyword(let k): return k.rawValue
+        case .particle(let p): return p.rawValue
+        default:
+            return word
+        }
     }
     var unwrappedKeyword: Keyword? {
-        switch self {
-        case .keyword(let k): return k
-        case .wrapped(.keyword(let k),_):return k
-        default:
-            return nil
-        }
+        if case .keyword(let k) = unwrappedType {return k}
+        return nil
+    }
+    var unwrappedParticle: Particle? {
+        if case .particle(let p) = unwrappedType {return p}
+        return nil
     }
     var coloredLiteral: String {literal.color(color)}
     var number: Int? {if case .INT(let int) = self {return int} else {return nil}}
@@ -249,8 +253,8 @@ enum Token : Equatable {
         default:                            return false
         }
     }
-    var isKeyword: Bool {if case .keyword(_) = self {return true} else {return false}}
-    var isParticle: Bool {if case .particle(_) = self {return true} else {return false}}
+    var isKeyword: Bool {if case .keyword(_) = unwrappedType {return true} else {return false}}
+    var isParticle: Bool {if case .particle(_) = unwrappedType {return true} else {return false}}
     var isWrapped: Bool {if case .wrapped(_,_) = self {return true} else {return false}}
     var isIdent: Bool   {type == .ident}
     var isString: Bool  {type == .string}
@@ -262,13 +266,13 @@ enum Token : Equatable {
     var isPeriod: Bool  {self == .symbol(.PERIOD)}
     var isComma: Bool   {self == .symbol(.COMMA)}
     func isKeyword(_ k: Token.Keyword) -> Bool {
-        if case .keyword(k) = self {return true} else {return false}}
-    
+        unwrappedType == .keyword(k) ? true : false
+    }
     func isParticle(_ p: Token.Particle) -> Bool {
-        if case .particle(p) = self {return true} else {return false}
+        unwrappedType == .particle(p) ? true : false
     }
     func isSymbol(_ s: Token.Symbol) -> Bool {
-        if case .symbol(s) = self {return true} else {return false}
+        unwrappedType == .symbol(s) ? true : false
     }
     //
     // MARK: - 再定義可能な予約語(述語)(redefinable predicate keywords)
@@ -276,7 +280,7 @@ enum Token : Equatable {
         .ADD, .MULTIPLY, .SUBSTRACT, .DIVIDE, .NEGATE, .NULL,
         .EQUAL, .BE, .NOT, .LT, .GT,
         .RETURN, .GOBACK, .BREAK, .CONTINUE,
-        .MONO, .INPUT, .KOTO,
+        .MONO, .INPUT, .KOTO, .IT, .ITS,
         .DROP, /*.EMPTY,*/ .DUPLICATE, .PULL, .PUSH,
         .APPEND, .REMOVE, .CONTAINS, .FOREACH, .MAP, .FILTER, .REDUCE, .SORT, .REVERSE,
         .PRINT, .ASK, .NEWLINE, .READ, .FILES, .IDENTIFIERS,

@@ -15,7 +15,7 @@ class Environment {
     private var store: [String: JpfObject] = [:]
     private var stack: Stack
     var redefineds: Set<Token.Keyword> = []         // 再定義された予約語
-    private var arguments: [String: JpfObject] = [:]// 引数
+    private var parameters: [(key: String, value: JpfObject)] = []  // 引数
     // MARK: - 辞書操作
     subscript(_ name: String) -> JpfObject? {
         get {store[name] ?? outer?[name]}           // 外部環境の取得は可
@@ -76,48 +76,61 @@ class Environment {
             self[name] = nil
         }
     }
+    /// 識別子名を使って、<識別子>に<値>を代入
     func assign(_ value: JpfObject, with name: String) -> JpfObject? {
         guard !name.isEmpty else {return value}
-        if contains(Self.OUTER) {           // 外部識別子
+        if contains(Self.OUTER) {           // 外部指定されている場合
             guard let outer = outer, outer.contains(name) else {
                 return JpfError("「外部」の辞書が無い、または、『\(name)』(識別子)が定義されていない。")
             }
             outer[name] = value             // 外部に代入
             remove(name: Self.OUTER)        // 外部ラベルを削除
-        } else
-        if contains(name) {                 // ローカルにある
-            self[name] = value              // 代入
-        } else
-        if let outer = outer,
-           outer.contains(name) {           // 外部にある
-            outer[name] = value             // 外部に代入
-        } else {
-            return JpfError("『\(name)』(識別子)が定義されていない。")
+            return nil
         }
-        return nil
+        if contains(name) {                 // ローカルにある場合
+            self[name] = value              // ローカル代入
+            return nil
+        }
+        if let outer = outer, outer.contains(name) {// 外部にある場合
+            outer[name] = value             // 外部に代入
+            return nil
+        }
+        return JpfError("『\(name)』(識別子)が定義されていない。")
     }
+    /// オブジェクトを使って、<識別子>に<値>を代入
     func assign(_ value: JpfObject, with object: JpfObject?) -> JpfObject? {
-        guard let object = object else {return JpfError("代入先の値が存在しない。")}
+        guard let object else {
+            return JpfError("代入先のオブジェクトが存在しない。")
+        }
         let name = object.name
         if !name.isEmpty {                  // 既存識別子への代入
             return assign(value, with: name)
-        } else {                            // 定義
-            if contains(Self.OUTER) {
-                return JpfError("外部『\(name)』(識別子)が定義されていない。")
-            }
-            self[getName(from: object)] = value // 識別子に値を登録
         }
+        if contains(Self.OUTER) {           // 新規定義
+            return JpfError("外部『\(name)』(識別子)が定義されていない。")
+        }
+        self[getName(from: object)] = value // 識別子に値を登録
         return nil
     }
+    /// 単一の辞書の値(オブジェクト)
+    var hasSingleValue: Bool {store.count == 1}
+    var singleValue: JpfObject? {
+        hasSingleValue ? store.first?.value : nil
+    }
+    // パラメータ操作
     func storeArguments(with args: Environment, shouldMerge: Bool = false) {
         args.enumerated.forEach {
-            arguments[$0] = $1
+            parameters.append((key: $0, value: $1))
             if shouldMerge {self[$0] = $1}
         }
     }
-    var argumentPairs: [(String, JpfObject)] {
-        arguments.map {($0, $1)}
+    func storeArgument(key: String, value: JpfObject) {
+        parameters.append((key: key, value: value))
     }
+    var parameterPairs: [(String, JpfObject)] {
+        parameters
+    }
+    // 再定義
     func contains(_ keyword: Token.Keyword) -> Bool {
         if redefineds.contains(keyword) {return true}
         guard let instance = peek?.value as? JpfInstance else {return false}
@@ -312,7 +325,7 @@ class Environment {
     /// - Parameter function: 対象の関数ブロック
     /// - Returns: エラー、無しはnil
     private func apply(_ function: FunctionBlock) -> JpfError? {
-        let difference = Set(function.parameters.map {$0.value}).subtracting(arguments.keys)
+        let difference = Set(function.parameters.map {$0.value}).subtracting(parameters.map {$0.key})
         for name in difference {
             let i = function.index(of: name)!   // parametersに属するので、nilにはならない。
             self[name] = getDefaultValue(with: function.paramForm, at: i)
@@ -357,7 +370,7 @@ class Environment {
     }
     /// 対象のオブジェクトの格をチェック
     private func isSameParticle(of object: JpfObject, as particle: String) -> Bool {
-        return particle.isEmpty || object.particle == Token(word: particle)
+        return particle.isEmpty || object.particle?.literal == particle
     }
     private func isSameParticle(of object: JpfObject, as particle: Token.Particle?) -> Bool {
         if let p = particle {

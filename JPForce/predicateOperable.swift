@@ -64,6 +64,8 @@ struct PredicateOperableFactory {
         (.SURU,         {PerformOperator($0)}),                         // 〜にする、〜をする
         (.AVAILABLE,    {AvailableOperator($0)}),
         (.KOTO,         {NopOperator($0)}),                             // 45
+        (.IT,           {ItOperator($0)}),
+        (.ITS,          {ItsOperator($0)}),
     ]
     static let dictionary: [Token.Keyword : (Environment) -> PredicateOperable] = {
         Dictionary(uniqueKeysWithValues: predicates.map {($0.keyword, $0.operator)})
@@ -248,39 +250,7 @@ extension PredicateOperable {
     var cannotCreateFromProtocol:  JpfError {JpfError("規約からインスタンスは生成できない。")}
     var cannotInitialize: JpfError      {JpfError("オブジェクトの初期化ができない。")}
     var detectParserError: JpfError     {JpfError("構文解析器がエラーを検出した。")}
-    // メッセージ(使い方)
-    var printUsage: JpfError            {JpfError("仕様：(〜と…)〜を表示する。")}
-    var askUsage: JpfError              {JpfError("仕様：(〜と…)〜と尋ねる。")}
-    var readUsage: JpfError             {JpfError("仕様：(〜と…)〜を音読する。")}
-    var additionUsage: JpfError         {JpfError("仕様：(〜と…)〜を足す。")}
-    var multiplicationUsage: JpfError   {JpfError("仕様：(〜と…)〜を掛ける。")}
-    var substractionUsage: JpfError     {JpfError("仕様：(〜から)〜を引く。または、(〜を)〜から引く。")}
-    var divisionUsage: JpfError         {JpfError("仕様：(〜を)〜で割る。または、(〜で)〜を割る。")}
-    var negateUsage: JpfError           {JpfError("仕様：〜の負数。または、〜を負数にする。")}
-    var equalUsage: JpfError            {JpfError("仕様：〜(と)〜(が)等しい。")}
-    var beUsage: JpfError               {JpfError("仕様：(〜が)〜である。または、(〜は)〜である。")}
-    var notUsage: JpfError              {JpfError("仕様：(〜が)〜で(は)ない。または、(〜は)〜で(は)ない。")}
-    var returnValueUsage: JpfError      {JpfError("仕様：(〜を)返す。")}
-    var appendUsage: JpfError           {JpfError("仕様：〜(を)〜に追加する。または、〜(に)〜を追加する。")}
-    var appendDictionaryUsage: JpfError {JpfError("仕様：〜が〜(を)〜に追加する。または、〜(に)〜が〜を追加する。")}
-    var removeUsage: JpfError           {JpfError("仕様：(〜から)〜を削除する。")}
-    var rangeCheckUsage: JpfError       {JpfError("仕様：<数値>が範囲【<範囲式>】に")}
-    var determineUsage: JpfError        {JpfError("仕様：〜が<配列、範囲>に")}
-    var containsUsage: JpfError         {JpfError("仕様：<配列、辞書、範囲>が<値/要素>を含む。")}
-    var foreachUsage: JpfError          {JpfError("仕様：<配列、辞書、範囲>で<関数>を繰り返す。")}
-    var mapUsage: JpfError              {JpfError("仕様：<配列、辞書、範囲>を<関数>で写像する。または、<範囲>を写像する。")}
-    var filterUsage: JpfError           {JpfError("仕様：<配列、辞書>を<関数>で絞り込む。")}
-    var reduceUsage: JpfError           {JpfError("仕様：<配列、辞書、範囲>を<初期値>と<関数>でまとめる。")}
-    var sortUsage: JpfError             {JpfError("仕様：<配列>を<関数>で並べ替える。または、<配列>を(「昇順」/「降順」に）並べ替える。")}
-    var reverseUsage: JpfError          {JpfError("仕様：<配列、文字列>を逆順にする。")}
-    var pullDupUsage: JpfError          {JpfError("仕様：(識別子「<識別子>」と…)(識別子「<識別子>」に）(「数値」または「値」を)(<数値>個)")}
-    var assignUsage: JpfError           {JpfError("仕様：〜(を)「<識別子>」に代入する。または、「<識別子>」に〜を代入する。")}
-    var compoundAssignUsage: JpfError   {JpfError("仕様：<識別子>(を)<計算し>て代入する。")}
-    var assignArrayUsage: JpfError      {JpfError("仕様：〜(を)<配列>の位置<数値>に代入する。または、<配列>の位置<数値>に〜を代入する。")}
-    var swapUsage: JpfError             {JpfError("仕様：<識別子１>と<識別子２>を入れ替える。または、<識別子１>を<識別子２>と入れ替える。")}
-    var createUsage: JpfError           {JpfError("仕様：(「<識別子>」を)(<引数>で)<型>から生成する。または、<型>から(<引数>で)「<識別子>」を生成する。")}
-    var createEnumeratorUsage: JpfError {JpfError("仕様：(「<識別子>」を)<値>で<列挙型>から生成する。または、<列挙型>から<値>で「<識別子>」を生成する。")}
-    var setUsage: JpfError              {JpfError("仕様：<値>(を)<オブジェクト>の要素「<識別子>」に設定する。または、<オブジェクト>の要素「<識別子>」に<値>を設定する。")}
+    var stackIsEmpty: JpfError          {JpfError("「その」が指すオブジェクトが無い。(スタックが空)")}
 }
 // MARK: - 表示/音声
 struct PrintOperator : PredicateOperable {
@@ -785,7 +755,7 @@ struct AssignOperator : PredicateOperable {
         if let param = environment.peek {           // 計算して代入
             guard param.value?.name != "" else {return JpfError("代入先の識別子が空(「」)。") + compoundAssignUsage}
             if let value = param.value,
-               param.particle?.unwrappedLiteral == Token(.TA).literal {     // 助詞「て」
+               param.particle?.unwrappedParticle == .TA {   // 助詞「て」
                 environment.drop()
                 return environment.assign(value, with: value.name)  // 識別子に計算した値を代入
             } else {
@@ -1088,11 +1058,15 @@ struct PullOperator : PredicateOperable {
         }
         if identifiers.count == 1 && number > 1 {   // 「<識別子>」にn個
             environment[identifiers.first!] = getObjects(from: environment, numberOf: number, by: method)
+            environment.storeArguments(with: environment)   // 代入した値を出力(VM用)
             return nil
         }
         if !identifiers.isEmpty {                   // (「<識別子>」と…)「<識別子>」に (n個は無視)
             guard let array = getObjects(from: environment, numberOf: identifiers.count, by: method) as? JpfArray else {return JpfNull.object}
-            zip(identifiers, array.elements).forEach {environment[$0] = $1}
+            zip(identifiers, array.elements).forEach {
+                environment[$0] = $1
+                environment.storeArgument(key: $0, value: $1)// 代入した値を出力(VM用)
+            }
             return nil
         }
         if number > 1 {                             // n個 → 配列
@@ -1123,6 +1097,23 @@ struct PullOperator : PredicateOperable {
     }
     private func isMethod(_ s: String?) -> Bool {
         return s == "値" || s == "数値"
+    }
+}
+/// 「それ」
+struct ItOperator : PredicateOperable {
+    init(_ environment: Environment) {self.environment = environment}
+    let environment: Environment
+    func operated() -> JpfObject? {
+        environment.pull()                          // 得る(空の場合→nil)
+    }
+}
+/// 「その」
+struct ItsOperator : PredicateOperable {
+    init(_ environment: Environment) {self.environment = environment}
+    let environment: Environment
+    func operated() -> JpfObject? {
+        guard let value = environment.pull() else {return stackIsEmpty}
+        return JpfPhrase(value: value, particle: Token(.NO))
     }
 }
 struct DropOperator : PredicateOperable {

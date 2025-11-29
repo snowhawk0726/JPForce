@@ -187,8 +187,9 @@ extension GenitiveExpression : Compilable {
             _ = c.emit(op: .opGenitive)                 // 索引をアクセス
         } else {
             guard let symbol = c.symbolTable.resolve(right.tokenLiteral) else {
+                assertionFailure("未定義シンボルはコンパイルエラー → 来ない")
                 return "『\(right.tokenLiteral)』" + identifierNotFound
-            }   /* 未定義シンボルはコンパイルエラー → 来ない */
+            }
             if symbol.isVariable {                      // rightが変数
                 _ = c.emit(op: .opGenitive)             // 索引をアクセス
             }

@@ -94,7 +94,7 @@ struct Identifier : Expression {
     init(from token: Token) {self.init(token: token, value: token.literal)}
     //
     var tokenLiteral: String {token.literal}
-    var string: String {value.color(token.color)}
+    var string: String {token.coloredLiteral}
     //
     static let directoryPath = "ディレクトリパス"
 }
@@ -514,7 +514,7 @@ struct FunctionBlocks : Collection {
     /// - Parameter env: 引数をもつ環境
     /// - Returns: 関数ブロック(無ければnil)
     func function(with env: Environment) -> FunctionBlock? {
-        let pairs = env.argumentPairs           // 引数の名前(k)と値(v)の組
+        let pairs = env.parameterPairs          // 引数の名前(k)と値(v)の組
         let vFunctions = dictionary[-1]         // 可変長の定義
         let fFunctions = dictionary[pairs.count]// 固定長の定義
         switch (vFunctions, fFunctions) {

@@ -9,6 +9,8 @@
 /* Begin PBXBuildFile section */
 		5006B6EB2C2957E700D34FDD /* accessible.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5006B6EA2C2957E700D34FDD /* accessible.swift */; };
 		5006B6EC2C2957E700D34FDD /* accessible.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5006B6EA2C2957E700D34FDD /* accessible.swift */; };
+		500E66B82ED40C270062F5D9 /* errors.swift in Sources */ = {isa = PBXBuildFile; fileRef = 500E66B72ED40C200062F5D9 /* errors.swift */; };
+		500E66B92ED40C270062F5D9 /* errors.swift in Sources */ = {isa = PBXBuildFile; fileRef = 500E66B72ED40C200062F5D9 /* errors.swift */; };
 		501240E12C23FCBC00CC2F7C /* compilable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 501240E02C23FCBC00CC2F7C /* compilable.swift */; };
 		501240E22C23FCBC00CC2F7C /* compilable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 501240E02C23FCBC00CC2F7C /* compilable.swift */; };
 		501240E42C2587B800CC2F7C /* VMTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 501240E32C2587B800CC2F7C /* VMTests.swift */; };
@@ -81,6 +83,7 @@
 /* Begin PBXFileReference section */
 		50050A0A2BE5E0ED00989700 /* test.txt */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = test.txt; path = ../../../../../Documents/test.txt; sourceTree = "<group>"; };
 		5006B6EA2C2957E700D34FDD /* accessible.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = accessible.swift; sourceTree = "<group>"; };
+		500E66B72ED40C200062F5D9 /* errors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = errors.swift; sourceTree = "<group>"; };
 		501240E02C23FCBC00CC2F7C /* compilable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = compilable.swift; sourceTree = "<group>"; };
 		501240E32C2587B800CC2F7C /* VMTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VMTests.swift; sourceTree = "<group>"; };
 		501240E52C2590C300CC2F7C /* vm.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = vm.swift; sourceTree = "<group>"; };
@@ -165,6 +168,7 @@
 				5006B6EA2C2957E700D34FDD /* accessible.swift */,
 				5070B1A729B61DDA00808FDE /* predicateOperable.swift */,
 				50175F9A2C8C426200DD0F4A /* predicateCompilable.swift */,
+				500E66B72ED40C200062F5D9 /* errors.swift */,
 				50552F3C29B5B87D0061CDBE /* environment.swift */,
 				5042121F29B58DAD00D2EA98 /* lexer.swift */,
 				5042122129B58DAD00D2EA98 /* main.swift */,
@@ -313,6 +317,7 @@
 				5042122829B58DAD00D2EA98 /* lexer.swift in Sources */,
 				5042122A29B58DAD00D2EA98 /* parser.swift in Sources */,
 				5042122C29B58DAD00D2EA98 /* parsable.swift in Sources */,
+				500E66B92ED40C270062F5D9 /* errors.swift in Sources */,
 				5042122D29B58DAD00D2EA98 /* token.swift in Sources */,
 				5042124F29B5903F00D2EA98 /* evaluatable.swift in Sources */,
 				501240E12C23FCBC00CC2F7C /* compilable.swift in Sources */,
@@ -330,6 +335,7 @@
 				506B442C2CBA11D900C9F929 /* frame.swift in Sources */,
 				50552F3E29B5B87D0061CDBE /* environment.swift in Sources */,
 				5070B1AA29BC977500808FDE /* main.swift in Sources */,
+				500E66B82ED40C270062F5D9 /* errors.swift in Sources */,
 				509D11FF2C228AFF00FC0C89 /* CompilerTests.swift in Sources */,
 				509D910429CD85C200C22283 /* builtin.swift in Sources */,
 				501240E42C2587B800CC2F7C /* VMTests.swift in Sources */,

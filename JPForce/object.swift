@@ -29,8 +29,10 @@ protocol JpfObject : Accessible {
     var isBreak: Bool {get}
     var isContinue: Bool {get}
     var isError: Bool {get}
+    var hasName: Bool {get}
     func isParticle(_ particle: Token.Particle) -> Bool
     func isEqual(to object: JpfObject) -> Bool
+    func contains(name: String) -> Bool
     func contains(type: String) -> Bool
     // 演算
     func add(_ object: JpfObject) -> JpfObject
@@ -70,8 +72,10 @@ extension JpfObject {
     var isContinue: Bool {false}
     var isError: Bool {false}
     var isBreakFactor: Bool {isReturnValue || isBreak || isContinue || isError}
+    var hasName: Bool {!name.isEmpty}
     func isParticle(_ particle: Token.Particle) -> Bool {false}
-    func isEqual(to object: JpfObject) -> Bool {isTrue == object.isTrue}
+    func isEqual(to object: JpfObject) -> Bool {type == object.type && isTrue == object.isTrue}
+    func contains(name: String) -> Bool {false}
     func contains(type: String) -> Bool {type == self.type}
     var hasValue: Bool {value != nil}
     func emit(with c: Compiler) {assertionFailure("翻訳出力方法：未実装")}

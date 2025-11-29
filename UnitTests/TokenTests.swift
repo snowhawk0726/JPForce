@@ -20,7 +20,8 @@ final class TokenTests: XCTestCase {
             ("て", .wrapped(type: .particle(.TA), literal: "て"), "た"),
             ("-9", .INT(-9), "-9"),
             ("識別", .IDENT("識別"), "識別"),
-            ("余り", .wrapped(type: .ident, literal: "余り"), "余る"),
+            ("余り", .wrapped(type: .ident, literal: "余り"), "余り"),
+            ("加え", .wrapped(type: .ident, literal: "加え"), "加え"),        // 識別子の語尾変換はしない
             ("し", .wrapped(type: .keyword(.SURU), literal: "し"), "する"),
             ("あっ", .wrapped(type: .keyword(.BE), literal: "あっ"), "ある"),
         ]

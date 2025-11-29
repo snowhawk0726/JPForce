@@ -82,7 +82,7 @@ class SymbolTable : Equatable {
     func define(functionName: String) -> Symbol {
         define(name: functionName, index: 0, scope: .FUNCTION)
     }
-    // シンボル解決
+    // シンボルの名前解決
     func resolve(_ name: String) -> Symbol? {
         if let symbol = store[name] {return symbol}
         // 外側で解決

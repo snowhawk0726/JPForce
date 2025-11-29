@@ -58,6 +58,7 @@ final class ParserTests: XCTestCase {
     }
     func testIdentifierExpressions() throws {
         let testPatterns: [(input: String, value: String, literal: String)] = [
+            // 入力, 識別子名, リテラル
             ("識別。", "識別", "識別"),
             ("加え、", "加え", "加え"),
             ("二倍し、", "二倍", "二倍"),
@@ -366,7 +367,7 @@ final class ParserTests: XCTestCase {
             let callExpression = try XCTUnwrap(statement.expressions.first as? CallExpression)
             XCTAssertEqual(callExpression.target.tokenLiteral, "加える")
             let args = callExpression.arguments
-            XCTAssertEqual(args.count, 2, "arguments.count")
+            XCTAssertEqual(args.count, 2, "parameters.count")
             XCTAssertEqual(args[0].string, "xは、1。")
             XCTAssertEqual(args[1].string, "yは、2。")
             print("テスト終了: \(statement.string)")
@@ -571,6 +572,12 @@ final class ParserTests: XCTestCase {
             ("甲の乙の「一」の１", "甲の乙の「一」の1。"),
             ("甲の乙は、１", "甲の乙は、1。"),
             ("甲の１番目は、１と２を足す", "甲の1は、1と2を足す。"),
+            ("甲の。", "甲の。"),
+            ("""
+             甲の
+             1。
+             """, "甲の。"),
+            ("甲の", "甲の。"),
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
@@ -875,6 +882,34 @@ final class ParserTests: XCTestCase {
             print("テスト終了: \(program.string)")
         }
 
+    }
+    /// 「その」に続く属性チェック
+    func testItsParsings() throws {
+        let testPatterns: [(input: String, expected: String, type: Token.TokenType)] = [
+            ("その数", "数", Token.TokenType.ident),
+            ("その型", "型", Token.TokenType.keyword(.TYPE)),
+            ("その位置", "エラー", Token.TokenType.keyword(.POSITION)),
+            ("そのもの", "エラー", Token.TokenType.keyword(.MONO)),
+            ("その「数」", "エラー", Token.TokenType.string),
+            ("そのから", "エラー", Token.TokenType.particle(.KARA)),
+            ("その１", "エラー", Token.TokenType.int),
+            ("その。", "エラー", Token.TokenType.symbol(.PERIOD))
+        ]
+        for test in testPatterns {
+            print("テストパターン: \(test.input)")
+            let parser = Parser(Lexer(test.input))
+            if let program = parser.parseProgram(),
+                  parser.errors.isEmpty {
+                let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
+                let literal = try XCTUnwrap(statement.expressions[1].tokenLiteral)
+                XCTAssertEqual(literal, test.expected)
+            } else {
+                XCTAssertEqual("エラー", test.expected)
+            }
+            let token = Parser(Lexer(test.input)).nextToken
+            XCTAssertEqual(token.type, test.type)
+            print("テスト(\(test.expected): \(token.type))終了")
+        }
     }
     // MARK: - ヘルパー
     private func testDefStatement(_ statement: Statement?, name: String, _ string: String, with value: Any, flag: Bool = false) throws {

@@ -23,6 +23,8 @@ extension CodeExecutable {
     var failedToSetGlobal: JpfError         {JpfError("大域変数の定義に失敗した。")}
     var failedToBuildArray: JpfError        {JpfError("配列の定義に失敗した。")}
     var failedToBuildDictionary: JpfError   {JpfError("辞書の定義に失敗した。")}
+    var propertyNotFound: JpfError          {JpfError("指定した属性が見つからない。")}
+    var objectNotFound: JpfError            {JpfError("対象のオブジェクトが見つからない。")}
     var failedToGetProperty: JpfError       {JpfError("属性の取得に失敗した。")}
     var failedToGetFunction: JpfError       {JpfError("翻訳済み関数の取得に失敗した。")}
     var failedToGetClosure: JpfError        {JpfError("クロージャの取得に失敗した。")}
@@ -83,7 +85,9 @@ struct ArrayExecuter : CodeExecutable {
         guard let array = buildArray(with: numberOfElements) else {return failedToBuildArray}
         return vm.push(array)
     }
-    private func buildArray(with n: Int) -> JpfArray? {
+}
+private extension ArrayExecuter {
+    func buildArray(with n: Int) -> JpfArray? {
         guard let objects = vm.peek(n) else {return nil}
         vm.drop(n)
         return JpfArray(elements: objects)
@@ -98,7 +102,9 @@ struct DictionaryExecuter : CodeExecutable {
         guard let dictionary = buildDictionary(with: numberOfElements) else {return failedToBuildDictionary}
         return vm.push(dictionary)
     }
-    private func buildDictionary(with n: Int) -> JpfDictionary? {
+}
+private extension DictionaryExecuter {
+    func buildDictionary(with n: Int) -> JpfDictionary? {
         var pairs: [JpfHashKey: (key: JpfObject, value: JpfObject)] = [:]
         guard let objects = vm.peek(n) else {return nil}
         vm.drop(n)
@@ -256,9 +262,13 @@ struct GetPropertyExecuter : CodeExecutable {
     func execute() -> JpfError? {
         let index = Int(readUInt8(from: bytes))
         vm.currentFrame.advanceIp(by: 1)
-        guard let getPropertyOf = ObjectProperties()[index]?.accessor,
-              let object = vm.pull(),
-              let result = getPropertyOf(object) else {
+        guard let getPropertyOf = ObjectProperties()[index]?.accessor else {
+            return propertyNotFound
+        }
+        guard let object = vm.pull() else {
+            return objectNotFound
+        }
+        guard let result = getPropertyOf(object) else {
             return failedToGetProperty
         }
         if result.isError {return result.error}
@@ -272,10 +282,36 @@ struct PredicateExecuter : CodeExecutable {
         let index = Int(readUInt8(from: bytes))
         vm.currentFrame.advanceIp(by: 1)
         let predicate = PredicateOperableFactory.predicates[index].operator
-        let environment = Environment(with: vm.stack)
-        guard let result = predicate(environment).operated() else {return nil}
-        if result.isError {return result.error}
-        return vm.push(result)
+        let environment = Environment(with: vm.stack)   // スタックを入力として渡す
+        switch predicate(environment).operated() {      // 述語を評価
+        case .some(let result):
+            return !result.isError ?                    // 評価結果をpush
+            vm.push(result) :
+            result.error
+        case .none:
+            return pushOutputValues(from: environment)  // 代入値をスタックに格納
+        }
+    }
+}
+private extension PredicateExecuter {
+    /// 識別子に代入する値を、スタックに格納する。
+    /// - Parameter env: 代入値を含む
+    /// - Returns: nil : 正常、エラー(JpfError)
+    func pushOutputValues(from env: Environment) -> JpfError? {
+        // 代入する値が単一である場合、それをVMのスタックに格納
+        if let value = env.singleValue {
+            return vm.push(value)
+        }
+        // 複数の識別子に代入する値を取り出し、逆順でVMのスタックに格納
+        for (_, value) in env.parameterPairs.reversed() {
+            if value.isError {
+                return value.error
+            }
+            if let error = vm.push(value) {
+                return error
+            }
+        }
+        return nil
     }
 }
 struct ClosureExecuter : CodeExecutable {
@@ -287,7 +323,9 @@ struct ClosureExecuter : CodeExecutable {
         vm.currentFrame.advanceIp(by: 3)
         return pushClosure(with: functionIndex, numberOfFreeVariables)
     }
-    private func pushClosure(with index: Int, _ number: Int) -> JpfError? {
+}
+private extension ClosureExecuter {
+    func pushClosure(with index: Int, _ number: Int) -> JpfError? {
         guard let function = vm.constants[index] as? JpfCompiledFunction else {return failedToGetFunction}
         let freeVariables = (0..<number).compactMap {vm.stack[vm.sp - number + $0]}
         guard freeVariables.count == number else {return "\(number)個の" + failedToGetFreeVariables}
