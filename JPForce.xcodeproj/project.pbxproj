@@ -17,6 +17,11 @@
 		501240E62C2590C300CC2F7C /* vm.swift in Sources */ = {isa = PBXBuildFile; fileRef = 501240E52C2590C300CC2F7C /* vm.swift */; };
 		501240E72C2590C300CC2F7C /* vm.swift in Sources */ = {isa = PBXBuildFile; fileRef = 501240E52C2590C300CC2F7C /* vm.swift */; };
 		50175F9B2C8C426200DD0F4A /* predicateCompilable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50175F9A2C8C426200DD0F4A /* predicateCompilable.swift */; };
+		5023F7A12EE7CD9200C6DB36 /* compilerObjectsExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5023F7A02EE7CD9200C6DB36 /* compilerObjectsExtension.swift */; };
+		5023F7A22EE7CD9200C6DB36 /* compilerObjectsExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5023F7A02EE7CD9200C6DB36 /* compilerObjectsExtension.swift */; };
+		50267B512EEEBBD8007BA132 /* CommonTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50267B502EEEBBD8007BA132 /* CommonTests.swift */; };
+		50267B532EF23D4C007BA132 /* argumentResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50267B522EF23D4C007BA132 /* argumentResolver.swift */; };
+		50267B542EF23D4C007BA132 /* argumentResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50267B522EF23D4C007BA132 /* argumentResolver.swift */; };
 		503E27842CE87D7600300B1B /* Benchmark.swift in Sources */ = {isa = PBXBuildFile; fileRef = 503E27832CE87D7600300B1B /* Benchmark.swift */; };
 		5042122729B58DAD00D2EA98 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5042122129B58DAD00D2EA98 /* main.swift */; };
 		5042122829B58DAD00D2EA98 /* lexer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5042121F29B58DAD00D2EA98 /* lexer.swift */; };
@@ -88,6 +93,9 @@
 		501240E32C2587B800CC2F7C /* VMTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VMTests.swift; sourceTree = "<group>"; };
 		501240E52C2590C300CC2F7C /* vm.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = vm.swift; sourceTree = "<group>"; };
 		50175F9A2C8C426200DD0F4A /* predicateCompilable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = predicateCompilable.swift; sourceTree = "<group>"; };
+		5023F7A02EE7CD9200C6DB36 /* compilerObjectsExtension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "\bcompilerObjectsExtension.swift"; sourceTree = "<group>"; };
+		50267B502EEEBBD8007BA132 /* CommonTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommonTests.swift; sourceTree = "<group>"; };
+		50267B522EF23D4C007BA132 /* argumentResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = argumentResolver.swift; sourceTree = "<group>"; };
 		503E27832CE87D7600300B1B /* Benchmark.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Benchmark.swift; sourceTree = "<group>"; };
 		5042121329B58CA700D2EA98 /* JPForce */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = JPForce; sourceTree = BUILT_PRODUCTS_DIR; };
 		5042121E29B58DAD00D2EA98 /* token.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = token.swift; sourceTree = "<group>"; };
@@ -170,9 +178,11 @@
 				50175F9A2C8C426200DD0F4A /* predicateCompilable.swift */,
 				500E66B72ED40C200062F5D9 /* errors.swift */,
 				50552F3C29B5B87D0061CDBE /* environment.swift */,
+				50267B522EF23D4C007BA132 /* argumentResolver.swift */,
 				5042121F29B58DAD00D2EA98 /* lexer.swift */,
 				5042122129B58DAD00D2EA98 /* main.swift */,
 				5042122029B58DAD00D2EA98 /* object.swift */,
+				5023F7A02EE7CD9200C6DB36 /* compilerObjectsExtension.swift */,
 				509D910229CD85C200C22283 /* builtin.swift */,
 				50A6829C2C2199CC00754E45 /* code.swift */,
 				501240E52C2590C300CC2F7C /* vm.swift */,
@@ -193,6 +203,7 @@
 			isa = PBXGroup;
 			children = (
 				506561E829D937380016923D /* ObjectTests.swift */,
+				50267B502EEEBBD8007BA132 /* CommonTests.swift */,
 				5042123B29B58E5900D2EA98 /* AstTests.swift */,
 				501240E32C2587B800CC2F7C /* VMTests.swift */,
 				5042124C29B58F0D00D2EA98 /* TokenTests.swift */,
@@ -315,8 +326,10 @@
 				50C3CD962C22CBEB006F9957 /* compiler.swift in Sources */,
 				5006B6EB2C2957E700D34FDD /* accessible.swift in Sources */,
 				5042122829B58DAD00D2EA98 /* lexer.swift in Sources */,
+				50267B532EF23D4C007BA132 /* argumentResolver.swift in Sources */,
 				5042122A29B58DAD00D2EA98 /* parser.swift in Sources */,
 				5042122C29B58DAD00D2EA98 /* parsable.swift in Sources */,
+				5023F7A12EE7CD9200C6DB36 /* compilerObjectsExtension.swift in Sources */,
 				500E66B92ED40C270062F5D9 /* errors.swift in Sources */,
 				5042122D29B58DAD00D2EA98 /* token.swift in Sources */,
 				5042124F29B5903F00D2EA98 /* evaluatable.swift in Sources */,
@@ -336,11 +349,10 @@
 				50552F3E29B5B87D0061CDBE /* environment.swift in Sources */,
 				5070B1AA29BC977500808FDE /* main.swift in Sources */,
 				500E66B82ED40C270062F5D9 /* errors.swift in Sources */,
-				509D11FF2C228AFF00FC0C89 /* CompilerTests.swift in Sources */,
 				509D910429CD85C200C22283 /* builtin.swift in Sources */,
-				501240E42C2587B800CC2F7C /* VMTests.swift in Sources */,
 				5042125029B5903F00D2EA98 /* evaluatable.swift in Sources */,
-				5042124729B58EE100D2EA98 /* EvaluatorTests.swift in Sources */,
+				50267B542EF23D4C007BA132 /* argumentResolver.swift in Sources */,
+				50267B512EEEBBD8007BA132 /* CommonTests.swift in Sources */,
 				5042124129B58EAE00D2EA98 /* object.swift in Sources */,
 				503E27842CE87D7600300B1B /* Benchmark.swift in Sources */,
 				5042124429B58EBC00D2EA98 /* repl.swift in Sources */,
@@ -351,15 +363,19 @@
 				50A6829E2C2199CC00754E45 /* code.swift in Sources */,
 				5042124329B58EB600D2EA98 /* parser.swift in Sources */,
 				5042123F29B58EA800D2EA98 /* lexer.swift in Sources */,
-				506561E929D937380016923D /* ObjectTests.swift in Sources */,
 				50C3CD972C22CBEB006F9957 /* compiler.swift in Sources */,
 				5042124229B58EB200D2EA98 /* parsable.swift in Sources */,
 				50D72B532C8D6ECD00A3841C /* codeExecutable.swift in Sources */,
 				5070B1A929B61DDA00808FDE /* predicateOperable.swift in Sources */,
-				5042124929B58EF400D2EA98 /* LexerTests.swift in Sources */,
 				5042123E29B58EA400D2EA98 /* evaluator.swift in Sources */,
-				509D11FA2C21A34B00FC0C89 /* CodeTests.swift in Sources */,
 				501240E22C23FCBC00CC2F7C /* compilable.swift in Sources */,
+				5042124729B58EE100D2EA98 /* EvaluatorTests.swift in Sources */,
+				501240E42C2587B800CC2F7C /* VMTests.swift in Sources */,
+				506561E929D937380016923D /* ObjectTests.swift in Sources */,
+				509D11FF2C228AFF00FC0C89 /* CompilerTests.swift in Sources */,
+				5042124929B58EF400D2EA98 /* LexerTests.swift in Sources */,
+				509D11FA2C21A34B00FC0C89 /* CodeTests.swift in Sources */,
+				5023F7A22EE7CD9200C6DB36 /* compilerObjectsExtension.swift in Sources */,
 				508909CE2CAA752B00032B0A /* symbolTable.swift in Sources */,
 				5042124B29B58F0000D2EA98 /* ParserTests.swift in Sources */,
 				5042124D29B58F0D00D2EA98 /* TokenTests.swift in Sources */,

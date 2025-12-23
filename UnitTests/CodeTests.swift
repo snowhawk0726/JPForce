@@ -62,4 +62,77 @@ final class CodeTests: XCTestCase {
             }
         }
     }
+    func testVmCodes() throws {
+        let testPattern: [(instructions: [Instruction], expected: [Int])] = [
+            ([  // test opArrayConst 2
+                make(op: .opConstant, operand: 1),
+                make(op: .opConstant, operand: 2),
+                make(op: .opArrayConst, operand: 2),
+            ], [1,2]),
+            ([  // test opArray
+                make(op: .opConstant, operand: 1),
+                make(op: .opConstant, operand: 2),
+                make(op: .opConstant, operand: 2),
+                make(op: .opArray),
+            ], [1,2]),
+            ([  // test opPullConst 2
+                make(op: .opConstant, operand: 1),
+                make(op: .opConstant, operand: 2),
+                make(op: .opPullConst, operand: 2),
+                make(op: .opArrayConst, operand: 2),
+            ], [1,2]),
+            ([  // test opPull
+                make(op: .opConstant, operand: 1),
+                make(op: .opConstant, operand: 2),
+                make(op: .opConstant, operand: 2),
+                make(op: .opPull),
+                make(op: .opArrayConst, operand: 2),
+            ], [1,2]),
+            ([  // test opDuplicateConst 2
+                make(op: .opConstant, operand: 1),
+                make(op: .opConstant, operand: 2),
+                make(op: .opDuplicateConst, operand: 2),
+                make(op: .opArrayConst, operand: 4),
+            ], [1,2,1,2]),
+            ([  // test opDuplicate
+                make(op: .opConstant, operand: 1),
+                make(op: .opConstant, operand: 2),
+                make(op: .opConstant, operand: 2),
+                make(op: .opDuplicate),
+                make(op: .opArrayConst, operand: 4),
+            ], [1,2,1,2]),
+            ([  // test opMapProperty 値
+                make(op: .opConstant, operand: 5),      // 1と
+                make(op: .opConstant, operand: 2),      // 2
+                make(op: .opArrayConst, operand: 2),
+                make(op: .opMapProperty, operand: 2),   // 値
+            ], [1,2]),
+            ([  // test opMapProperty 数値
+                make(op: .opConstant, operand: 5),      // 1と
+                make(op: .opConstant, operand: 6),      // "2"
+                make(op: .opArrayConst, operand: 2),
+                make(op: .opMapProperty, operand: 3),   // 数値
+            ], [1,2]),
+        ]
+        let testConstatnts: [JpfObject] = [
+            JpfInteger(value: 0),
+            JpfInteger(value: 1),
+            JpfInteger(value: 2),
+            JpfInteger(value: 3),
+            JpfInteger(value: 4),
+            JpfPhrase(value: JpfInteger(value: 1), particle: Token(.TO)),
+            JpfString(value: "2"),
+        ]
+        for test in testPattern {
+            let instruction = Instructions(test.instructions.flatMap {$0})
+            print("テスト：\n\(instruction.string)")
+            let vm = VM(with: Bytecode(instruction, testConstatnts))
+            XCTAssertNil(vm.run())
+            let array = try XCTUnwrap(vm.pull() as? JpfArray)
+            let integers = try XCTUnwrap(array.elements as? [JpfInteger])
+            let numbers = integers.map(\.value)
+            XCTAssertEqual(numbers, test.expected)
+            print("結果：\(numbers)")
+        }
+    }
 }

@@ -647,6 +647,14 @@ struct ExpressionStatementParser : StatementParsable {
                 return nil
             }
             expressions.append(expression)
+            // 要素代入する対象の属格を２つの句に分割する
+            if isElementAssignPredicate(expression) {
+                splitElementAssignTarget(in: &expressions)
+            }
+            // LHSに代入する述語の場合、LHS対象の識別子に印をつける
+            if isLhsAssignPredicate(expression) {
+                setLhsFlag(into: &expressions)
+            }
             if getNextWhenNextIsEndOfStatement || isBreakFactor {break}    // 文の終わり
             _ = getNext(whenNextIs: .COMMA)     // 読点を読み飛ばし、
             getNext()                           // 次の式解析に
@@ -659,6 +667,82 @@ struct ExpressionStatementParser : StatementParsable {
         getNext(whenNextIs: .PERIOD) ||
         getNext(whenNextIs: .RBBRACKET) ||
         getNext(whenNextIs: .EOL)
+    }
+    /// 式が左辺(代入される対象の識別子)を持つ述語かどうか
+    private func isLhsAssignPredicate(_ exp: Expression) -> Bool {
+        guard let predicate = exp as? PredicateExpression else {
+            return false
+        }
+        return predicate.token.hasLhsIdentifier
+    }
+    /// 式が要素代入をする述語かどうか
+    private func isElementAssignPredicate(_ exp: Expression) -> Bool {
+        guard let predicate = exp as? PredicateExpression else {
+            return false
+        }
+        return predicate.token.isKeyword(.ASSIGN)
+    }
+    /// 左辺を持つ式配列の対象識別子に、左辺フラグを立てる
+    private func setLhsFlag(into exps: inout [Expression]) {
+        var candidates: [Int] = []  // 左辺識別子の候補
+        for i in 0..<exps.count {
+            // 関係の無い述語であれば、候補をキャンセル
+            if let predicate = exps[i] as? PredicateExpression,
+               !predicate.token.hasLhsIdentifier {
+                candidates = []
+                continue
+            }
+            guard let phrase = exps[i] as? PhraseExpression,
+                  phrase.left is Identifier else {
+                continue
+            }
+            switch phrase.token {
+            case .particle(.TO):
+                candidates.append(i)
+                continue
+            case .particle(.NO):
+                candidates = [i]
+                continue
+            case .particle(.NI):
+                if let idx = candidates.first,
+                   let phrase = exps[idx] as? PhraseExpression,
+                       phrase.token == .particle(.NO) { // aのbに → a/
+                        break
+                }
+                candidates.append(i)
+            default:
+                continue
+            }
+            // 確定した候補の識別子を、[Expression]に代入する。
+            for idx in candidates {
+                guard let targetPhrase = exps[idx] as? PhraseExpression,
+                      let targetIdent = targetPhrase.left as? Identifier else {
+                    continue
+                }
+                let newIdent = Identifier(token: targetIdent.token, value: targetIdent.value, isLhs: true)
+                exps[idx] = PhraseExpression(token: targetPhrase.token, left: newIdent)
+            }
+            candidates = []
+        }
+    }
+    /// 要素代入する対象の属格を２つの句に分割する
+    private func splitElementAssignTarget(in exps: inout [Expression]) {
+        for i in 0..<exps.count {
+            // 関係ない述語であれば、候補をキャンセル
+            if let predicate = exps[i] as? PredicateExpression,
+               !predicate.token.isKeyword(.ASSIGN) {
+                continue
+            }
+            guard let genitive = exps[i] as? GenitiveExpression,
+                  let rightPhrase = genitive.right as? PhraseExpression,
+                  rightPhrase.token.isParticle(.NI)  else {
+                continue
+            }
+            // 属格を句に分割
+            exps[i] = PhraseExpression(token: Token(.NO), left: genitive.left)
+            exps.insert(rightPhrase, at: i + 1)
+            break
+        }
     }
 }
 /// ブロック(【】)内で式を解析したstatementを、statementsに格納
@@ -763,7 +847,7 @@ struct PrefixExpressionParserFactory {
         case .keyword(.CASE):       return CaseExpressionParser(parser)
         case .keyword(.LOOP):       return LoopExpressionParser(parser)
         case .keyword(.CONDITIONAL):return ConditionalOperationParser(parser)
-        case .keyword(.IDENTIFIER),.keyword(.FILE),.keyword(.POSITION),.keyword(.KEY),.keyword(.MEMBER),.keyword(.OUTER),.keyword(.RESERVEDWORD):
+        case .keyword(.IDENTIFIER),.keyword(.FILE),.keyword(.MEMBER),.keyword(.OUTER),.keyword(.RESERVEDWORD):
                                     return LabelExpressionParser(parser)
         case .keyword(_):           return PredicateExpressionParser(parser)
         case .illegal:              break
@@ -1430,20 +1514,24 @@ struct GenitiveExpressionParser : ExpressionParsable {
             error(message: "属格で、右式の解析に失敗した。")
             return nil
         }
-        if let exp = right as? CaseExpression { // 場合文の「それ以外は」のチェック
+        if let exp = right as? CaseExpression {         // 場合文の「それ以外は」のチェック
             parser.switchCase.isActive = (exp.alternative == nil)
         }
-        var value: ExpressionStatement? = nil
-        if let phrase = right as? PhraseExpression, phrase.token.isParticle(.WA) {
-            _ = getNext(whenNextIs: .COMMA)
-            getNext()
-            guard let parsed = ExpressionStatementParser(parser).parse() as? ExpressionStatement else {
-                error(message: "属格で、値式の解釈に失敗した。")
-                return nil
+        if let phrase = right as? PhraseExpression {    // 属格の右辺格処理
+            switch phrase.token {
+            case .particle(.WA):
+                _ = getNext(whenNextIs: .COMMA)
+                getNext()
+                guard let parsed = ExpressionStatementParser(parser).parse() as? ExpressionStatement else {
+                    error(message: "属格で、値式の解釈に失敗した。")
+                    return nil
+                }
+                return GenitiveExpression(token: token, left: left, right: right, value: parsed)
+            default:
+                break
             }
-            value = parsed
         }
-        return GenitiveExpression(token: token, left: left, right: right, value: value)
+        return GenitiveExpression(token: token, left: left, right: right)
     }
 }
 // MARK: - postfix expression parsers and those instance factory

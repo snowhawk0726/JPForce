@@ -888,7 +888,6 @@ final class ParserTests: XCTestCase {
         let testPatterns: [(input: String, expected: String, type: Token.TokenType)] = [
             ("その数", "数", Token.TokenType.ident),
             ("その型", "型", Token.TokenType.keyword(.TYPE)),
-            ("その位置", "エラー", Token.TokenType.keyword(.POSITION)),
             ("そのもの", "エラー", Token.TokenType.keyword(.MONO)),
             ("その「数」", "エラー", Token.TokenType.string),
             ("そのから", "エラー", Token.TokenType.particle(.KARA)),

@@ -79,7 +79,7 @@ struct PredicateOperableFactory {
         dictionary[keyword]?(environment) ?? NopOperator(environment)
     }
     static func create(from token: Token, with environment: Environment) -> PredicateOperable {
-        dictionary[token.unwrappedKeyword!]?(environment) ?? NopOperator(environment)
+        dictionary[token.keyword!]?(environment) ?? NopOperator(environment)
     }
 }
 /// stringをsplit()により、[String]に分解する。
@@ -122,7 +122,7 @@ struct Splitter {
             }
             let (ident, rest) = body.divided(without: right)
             guard let object = environment[ident] else {                    // 識別子の内容を切り出す
-                error = JpfError("『\(ident)』(識別子)が定義されていない。")
+                error = undefinedIdentifier(ident)
                 return nil
             }
             guard let rest = split(rest, with: paren) else {return nil}     // 残りを分解し、配列に追加
@@ -179,7 +179,7 @@ extension PredicateOperable {
         switch object.name {                    // ラベルのチェック
         case Token.Keyword.IDENTIFIER.rawValue: // 識別子(定義)を出力
             guard let identifier = object as? JpfString else {break}
-            guard let definition = environment[identifier.value] else {return JpfError("『\(identifier.value)』(識別子)が定義されていない。")}
+            guard let definition = environment[identifier.value] else {return undefinedIdentifier(identifier.value)}
             out(definition.string, nil)
             environment.remove(name: object.name)
             return nil
@@ -251,6 +251,7 @@ extension PredicateOperable {
     var cannotInitialize: JpfError      {JpfError("オブジェクトの初期化ができない。")}
     var detectParserError: JpfError     {JpfError("構文解析器がエラーを検出した。")}
     var stackIsEmpty: JpfError          {JpfError("「その」が指すオブジェクトが無い。(スタックが空)")}
+    func cannotAssignToIdentifier(_ o: JpfObject?) -> JpfError {JpfError("「\(o?.string ?? "??")」には代入できない。")}
 }
 // MARK: - 表示/音声
 struct PrintOperator : PredicateOperable {
@@ -745,7 +746,9 @@ struct AssignOperator : PredicateOperable {
                     return JpfEnumerator(type: enumerator.type, name: enumerator.name, identifier: enumerator.identifier, rawValue: value)  // 列挙子に値を代入し返す。
                 }
                 let name = environment.getName(from: params[1])
-                guard !name.isEmpty else {break}
+                guard !name.isEmpty else {
+                    return cannotAssignToIdentifier(params[1].value)
+                }
                 environment.drop(2)
                 return environment.assign(value, with: params[1].value) // 識別子に値を代入
             default:
@@ -753,7 +756,7 @@ struct AssignOperator : PredicateOperable {
             }
         }
         if let param = environment.peek {           // 計算して代入
-            guard param.value?.name != "" else {return JpfError("代入先の識別子が空(「」)。") + compoundAssignUsage}
+            guard param.value?.name != "" else {return compoundAssignUsage}
             if let value = param.value,
                param.particle?.unwrappedParticle == .TA {   // 助詞「て」
                 environment.drop()
@@ -1039,64 +1042,60 @@ struct PullOperator : PredicateOperable {
     init(_ environment: Environment, by op: Token) {self.environment = environment; self.op = op}
     let environment: Environment, op: Token
     func operated() -> JpfObject? {
-        var method: String?, number = 1, identifiers: [String] = []
-        if isPeekParticle(.KO) && isPeekNumber {    // n個写す(得る)
-            number = leftNumber!
-        }
-        if isPeekParticle(.WO), let string = environment.unwrappedPeek as? JpfString, isMethod(string.value) {
-            // 取得方法(「値」をor「数値」を
-            environment.drop()
-            method = string.value
-        }
-        if isPeekParticle(.NI) {                    // 複写or移動先の識別子
-            repeat {
-                let identifier = environment.getName()
-                guard !identifier.isEmpty else {return pullDupUsage + op.literal + "。"}
-                environment.drop()
-                identifiers.insert(identifier, at: 0)
-            } while environment.isPeekParticle(.TO)
-        }
-        if identifiers.count == 1 && number > 1 {   // 「<識別子>」にn個
-            environment[identifiers.first!] = getObjects(from: environment, numberOf: number, by: method)
-            environment.storeArguments(with: environment)   // 代入した値を出力(VM用)
-            return nil
-        }
-        if !identifiers.isEmpty {                   // (「<識別子>」と…)「<識別子>」に (n個は無視)
-            guard let array = getObjects(from: environment, numberOf: identifiers.count, by: method) as? JpfArray else {return JpfNull.object}
-            zip(identifiers, array.elements).forEach {
-                environment[$0] = $1
-                environment.storeArgument(key: $0, value: $1)// 代入した値を出力(VM用)
+        do {
+            let spec = try resolveSpec()
+            // 複数の識別子に代入
+            if spec.lhs.count > 1 {
+                return assign(to: spec.lhs, with: spec.valueMode)
             }
-            return nil
-        }
-        if number > 1 {                             // n個 → 配列
-            return getObjects(from: environment, numberOf: number, by: method)
-        }
-        defer {if op.isKeyword(.PULL) {environment.drop()}}
-        return environment.peek.map {getObject(from: $0, by: method)} ?? JpfNull.object
-    }
-    private func getObjects(from environment: Environment, numberOf: Int, by method: String?) -> JpfObject {
-        guard let values = environment.peek(numberOf) else {return JpfNull.object}
-        if op.isKeyword(.PULL) {environment.drop(numberOf)}
-        guard check(values, by: method) else {return JpfNull.object}
-        return JpfArray(elements: values.map {getObject(from: $0, by: method)})
-    }
-    private func getObject(from object: JpfObject, by method: String?) -> JpfObject {
-        switch method {
-        case "値":   return object.value ?? JpfNull.object
-        case "数値":  return object.number.map {JpfInteger(value: $0)} ?? JpfNull.object
-        default:    return object
+            // pull/duplicate(複数は配列化)
+            let objects = try pullObjects(using: spec)
+            let output = objects.count == 1 ? objects[0] : JpfArray(elements: objects)
+            // 結果を識別子に代入
+            if let name = spec.lhs.first {
+                environment[name] = output
+                return nil
+            }
+            // 結果を出力
+            return output
+        } catch {
+            return jpfError(from: error)
         }
     }
-    private func check(_ objects: [JpfObject], by method: String?) -> Bool {
-        switch method {
-        case "値":   return !objects.contains(where: {!$0.hasValue})
-        case "数値":  return !objects.contains(where: {!$0.isNumber})
-        default:    return true
-        }
+}
+private extension PullOperator {
+    /// 仕様解決
+    func resolveSpec() throws -> PullArgumentSpec {
+        let args = environment.getAll()
+        let spec = try PullArgumentResolver().resolve(args)
+        environment.drop(spec.resolvedCount)
+        return spec
     }
-    private func isMethod(_ s: String?) -> Bool {
-        return s == "値" || s == "数値"
+    /// オブジェクトを得て、仕様に従い値を変換
+    func pullObjects(using spec: PullArgumentSpec) throws -> [JpfObject] {
+        let count = max(spec.countSpec.count ?? 1, 1)
+        guard let objs = environment.peek(count) else {
+            throw notEnoughStackValues
+        }
+        if op.isKeyword(.PULL) {environment.drop(count)}
+        
+        return applyValueMode(spec.valueMode, to: objs)
+    }
+    /// 値変換をして代入
+    func assign(to names: [String], with mode: ValueMode) -> JpfError? {
+        guard let objs = environment.peek(names.count) else {
+            return notEnoughStackValues
+        }
+        let values = applyValueMode(mode, to: objs)
+        zip(names, values).forEach {environment[$0] = $1}
+        return nil
+    }
+    /// 仕様に従い値変換
+    private func applyValueMode(_ mode: ValueMode, to objs: [JpfObject]) -> [JpfObject] {
+        guard mode != .none else {return objs}
+        return objs.map {
+            $0.getProperty(by: mode.rawValue) ?? JpfNull.object
+        }
     }
 }
 /// 「それ」

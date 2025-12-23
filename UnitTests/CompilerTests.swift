@@ -249,7 +249,7 @@ final class CompilerTests: XCTestCase {
             (input: "配列【】",
              expectedConstants: [],
              expectedInstructions: [
-                make(op: .opArray, operand: 0),
+                make(op: .opArrayConst, operand: 0),
              ]),
             (input: "配列【1、2、3】",
              expectedConstants: [1, 2, 3],
@@ -257,7 +257,7 @@ final class CompilerTests: XCTestCase {
                 make(op: .opConstant, operand: 0),
                 make(op: .opConstant, operand: 1),
                 make(op: .opConstant, operand: 2),
-                make(op: .opArray, operand: 3),
+                make(op: .opArrayConst, operand: 3),
              ]),
             (input: "配列【１と２を足す、３から４を引く、５と６を掛ける】",
              expectedConstants: [3, -1, 30],
@@ -265,7 +265,7 @@ final class CompilerTests: XCTestCase {
                 make(op: .opConstant, operand: 0),  // 1 + 2
                 make(op: .opConstant, operand: 1),  // 3 - 4
                 make(op: .opConstant, operand: 2),  // 5 * 6
-                make(op: .opArray, operand: 3),
+                make(op: .opArrayConst, operand: 3),
              ]),
         ]
         try runCompilerTests(testPatterns)
@@ -275,7 +275,7 @@ final class CompilerTests: XCTestCase {
             (input: "辞書【】",
              expectedConstants: [],
              expectedInstructions: [
-                make(op: .opDictionary, operand: 0),
+                make(op: .opDictionaryConst, operand: 0),
              ]),
             (input: "辞書【１が２、３が４、５が６】",
              expectedConstants: [1,2,3,4,5,6],
@@ -286,7 +286,7 @@ final class CompilerTests: XCTestCase {
                 make(op: .opConstant, operand: 3),
                 make(op: .opConstant, operand: 4),
                 make(op: .opConstant, operand: 5),
-                make(op: .opDictionary, operand: 6),
+                make(op: .opDictionaryConst, operand: 6),
              ]),
             (input: "辞書【１が２と３を足す、４が５と６を掛ける】",
              expectedConstants: [1, 5, 4, 30],
@@ -295,7 +295,7 @@ final class CompilerTests: XCTestCase {
                 make(op: .opConstant, operand: 1),  // 2と3を足す
                 make(op: .opConstant, operand: 2),  // 4が
                 make(op: .opConstant, operand: 3),  // 5と６を掛ける
-                make(op: .opDictionary, operand: 4),
+                make(op: .opDictionaryConst, operand: 4),
              ]),
         ]
         try runCompilerTests(testPatterns)
@@ -310,7 +310,7 @@ final class CompilerTests: XCTestCase {
                 make(op: .opConstant, operand: 1),
                 make(op: .opConstant, operand: 2),
                 make(op: .opConstant, operand: 3),
-                make(op: .opArray, operand: 3),
+                make(op: .opArrayConst, operand: 3),
                 make(op: .opGetGlobal, operand: 0),
                 make(op: .opGenitive),
              ]),
@@ -325,7 +325,7 @@ final class CompilerTests: XCTestCase {
                 make(op: .opConstant, operand: 0),
                 make(op: .opConstant, operand: 1),
                 make(op: .opConstant, operand: 2),
-                make(op: .opArray, operand: 3),
+                make(op: .opArrayConst, operand: 3),
                 make(op: .opSetGlobal, operand: 0),
                 make(op: .opConstant, operand: 3),
                 make(op: .opSetGlobal, operand: 1),
@@ -340,7 +340,7 @@ final class CompilerTests: XCTestCase {
                 make(op: .opSetGlobal, operand: 0),
                 make(op: .opConstant, operand: 1),
                 make(op: .opConstant, operand: 2),
-                make(op: .opDictionary, operand: 2),
+                make(op: .opDictionaryConst, operand: 2),
                 make(op: .opGetGlobal, operand: 0),
                 make(op: .opGenitive),
              ]),
@@ -484,21 +484,21 @@ final class CompilerTests: XCTestCase {
              expectedConstants: [(2,"が"), (1,"で"), 10, (2,"で"), 20, 30, 3333],
              expectedInstructions: [
                 make(op: .opConstant, operand: 0),          // 0000 2が
-                make(predicate: .DUPLICATE),                // 0003 写す
+                make(op: .opDuplicateConst, operand: 1),    // 0003 写す
                 make(op: .opConstant, operand: 1),          // 0005 1で
                 make(predicate: .BE),                       // 0008 ある
                 make(op: .opJumpNotTruthy, operand: 21),    // 0010 場合
-                make(predicate: .DROP),                     // 0013 捨てる
+                make(op: .opDropConst, operand: 1),         // 0013 捨てる
                 make(op: .opConstant, operand: 2),          // 0015 10
                 make(op: .opJump, operand: 44),             // 0018 】
-                make(predicate: .DUPLICATE),                // 0021 写す
+                make(op: .opDuplicateConst, operand: 1),    // 0021 写す
                 make(op: .opConstant, operand: 3),          // 0023 2で
                 make(predicate: .BE),                       // 0026 ある
                 make(op: .opJumpNotTruthy, operand: 39),    // 0028 場合
-                make(predicate: .DROP),                     // 0031 捨てる
+                make(op: .opDropConst, operand: 1),         // 0031 捨てる
                 make(op: .opConstant, operand: 4),          // 0033 20
                 make(op: .opJump, operand: 44),             // 0036 】
-                make(predicate: .DROP),                     // 0039 捨てる
+                make(op: .opDropConst, operand: 1),         // 0039 捨てる
                 make(op: .opConstant, operand: 5),          // 0041 30
                 make(op: .opConstant, operand: 6),          // 0044 3333
              ]),
@@ -784,14 +784,14 @@ final class CompilerTests: XCTestCase {
              expectedInstructions: [
                 make(op: .opConstant, operand: 0),      // 0
                 make(op: .opConstant, operand: 1),      // 1
-                make(op: .opArray, operand: 1),         // 配列【1】
+                make(op: .opArrayConst, operand: 1),    // 配列【1】
              ]),
             (input: "配列【】。数。配列【】。１を追加",
              expectedConstants: [(1, "を")],
              expectedInstructions: [
-                make(op: .opArray, operand: 0),         // 配列【】。
+                make(op: .opArrayConst, operand: 0),    // 配列【】。
                 make(op: .opGetProperty, operand: 6),   // 数
-                make(op: .opArray, operand: 0),         // 配列【】。
+                make(op: .opArrayConst, operand: 0),    // 配列【】。
                 make(op: .opConstant, operand: 0),      // 1を
                 make(predicate: .APPEND),               // 追加
              ]),
@@ -809,7 +809,7 @@ final class CompilerTests: XCTestCase {
             (input: "関数【配列【】。数】",
              expectedConstants: [
                 [
-                    make(op: .opArray, operand: 0),     // 配列【】。
+                    make(op: .opArrayConst, operand: 0),     // 配列【】。
                     make(op: .opGetProperty, operand: 6),// 数
                     make(op: .opReturn),
                 ],

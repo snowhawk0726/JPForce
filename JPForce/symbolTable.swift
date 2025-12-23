@@ -33,7 +33,16 @@ struct Symbol : Equatable {
     var isLocal: Bool {scope == .LOCAL}
     var isFree: Bool {scope == .FREE}
     /// シンボルに応じた命令語を出力する。
-    func emit(with c: Compiler) {_ = c.emit(op: scope.opCode, operand: index)}
+    func emitOpGet(with c: Compiler) {
+        _ = c.emit(
+            op: scope.opCode, operand: index)
+    }
+    func emitOpSet(with c: Compiler) {
+        _ = c.emit(
+            op: self.isGlobal ? .opSetGlobal : .opSetLocal,
+            operand: self.index
+        )
+    }
 }
 class SymbolTable : Equatable {
     init() {

@@ -16,6 +16,7 @@ class Environment {
     private var stack: Stack
     var redefineds: Set<Token.Keyword> = []         // 再定義された予約語
     private var parameters: [(key: String, value: JpfObject)] = []  // 引数
+    private var assignmentIdentifier: String?       // 代入対象識別子
     // MARK: - 辞書操作
     subscript(_ name: String) -> JpfObject? {
         get {store[name] ?? outer?[name]}           // 外部環境の取得は可
@@ -81,7 +82,7 @@ class Environment {
         guard !name.isEmpty else {return value}
         if contains(Self.OUTER) {           // 外部指定されている場合
             guard let outer = outer, outer.contains(name) else {
-                return JpfError("「外部」の辞書が無い、または、『\(name)』(識別子)が定義されていない。")
+                return "「外部」の辞書が無い、または、" + undefinedIdentifier(name)
             }
             outer[name] = value             // 外部に代入
             remove(name: Self.OUTER)        // 外部ラベルを削除
@@ -95,7 +96,7 @@ class Environment {
             outer[name] = value             // 外部に代入
             return nil
         }
-        return JpfError("『\(name)』(識別子)が定義されていない。")
+        return undefinedIdentifier(name)
     }
     /// オブジェクトを使って、<識別子>に<値>を代入
     func assign(_ value: JpfObject, with object: JpfObject?) -> JpfObject? {
@@ -103,11 +104,12 @@ class Environment {
             return JpfError("代入先のオブジェクトが存在しない。")
         }
         let name = object.name
-        if !name.isEmpty {                  // 既存識別子への代入
+        if !name.isEmpty && !(object is JpfIdentifier) {
+            // 既存識別子への代入
             return assign(value, with: name)
         }
         if contains(Self.OUTER) {           // 新規定義
-            return JpfError("外部『\(name)』(識別子)が定義されていない。")
+            return "外部" + undefinedIdentifier(name)
         }
         self[getName(from: object)] = value // 識別子に値を登録
         return nil
@@ -136,6 +138,12 @@ class Environment {
         guard let instance = peek?.value as? JpfInstance else {return false}
         return instance.available.contains(keyword.rawValue)
     }
+    // 代入用識別子キャッシュ
+    var identifier: String? {
+        get {assignmentIdentifier}
+        set {assignmentIdentifier = newValue}
+    }
+    var hasIdentifier: Bool {assignmentIdentifier != nil}
     // MARK: - スタック操作
     func push(_ object: JpfObject) -> JpfError?     {stack.push(object)}
     func push(_ objects: [JpfObject]) -> JpfError?  {stack.push(objects)}
@@ -171,11 +179,13 @@ class Environment {
         return phrase.value
     }
     func getName(from object: JpfObject?) -> String {
-        var name = object?.value?.name ?? ""
-        if name.isEmpty, let string = object?.value as? JpfString {name = string.value}
-        return name
+        if let s = object?.value as? JpfString {
+            if s.name == Token.Keyword.IDENTIFIER.rawValue {
+                return s.value
+            }
+        }
+        return object?.value?.name ?? ""
     }
-    func getName() -> String {return getName(from: peek)}
     /// 多重定義の関数ブロックから、引数形式が一致するものを抽出し、処理を行う。
     /// - Parameters:
     ///   - functions: 処理ブロック(【入力が〜、本体が〜。】)

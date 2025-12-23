@@ -23,7 +23,6 @@ extension Node {
     var notImplementedError: JpfError       {JpfError("の評価を未実装")}
     var phaseValueNotFound: JpfError        {JpfError("句の値が無かった。(例：関数の返り値が無い。)")}
     var predicateNotSupported: JpfError     {JpfError("述語に対応する定義が見つからなかった。")}
-    var identifierNotFound: JpfError        {JpfError("(識別子)が定義されていない。")}
     var caseConditionError: JpfError        {JpfError("「場合」の条件(真偽値)が見つからなかった。")}
     var conditionalOperationError: JpfError {JpfError("「によって」の条件(真偽値)が見つからなかった。")}
     var logicalConditionError: JpfError     {JpfError("の前に条件(真偽値)が見つからなかった。")}
@@ -268,8 +267,11 @@ extension Identifier : Evaluatable {
             } else
             if let o = getProperty(of: value, from: environment) {  // スタックのオブジェクトの属性を取得
                 object = o
+            } else
+            if self.isLhs {
+                return JpfIdentifier(from: self)
             } else {
-                return "『\(value)』" + identifierNotFound
+                return undefinedIdentifier(value)
             }
         }
         if let computation = object as? JpfComputation, environment.isExecutable {
@@ -327,7 +329,7 @@ extension PredicateExpression : Evaluatable {
     /// 述語を実行する。(結果があれば返す。= スタックに積まれる。)
     /// self.tokenは述語(Token.Keywordもしくは Token.IDENT(_))
     func evaluated(with environment: Environment) -> JpfObject? {
-        if let keyword = token.unwrappedKeyword, environment.contains(keyword) {    // 再定義済み？
+        if let keyword = token.keyword, environment.contains(keyword) { // 再定義済み？
             let ident = Identifier(from: token)
             return ident.evaluated(with: environment)
         }
@@ -595,9 +597,7 @@ extension Label : Evaluatable {
             object = JpfInteger(name: tokenLiteral, value: value.number!)
         case .string:
             object = getObject(from: environment, with: value.literal, label: tokenLiteral)
-            if !(token.isKeyword(.POSITION) || token.isKeyword(.KEY)) {
-                environment.append(object, to: tokenLiteral)
-            }
+            environment.append(object, to: tokenLiteral)
         case .keyword(let k):
             if token.isKeyword(.RESERVEDWORD) {
                 let predicate = PredicateOperableFactory.create(from: k, with: environment)
@@ -606,13 +606,10 @@ extension Label : Evaluatable {
             guard k == .TRUE || k == .FALSE else {return "『\(value.literal)』" + cannotUseAsKeyword}
             object = JpfBoolean(name: tokenLiteral, value: k == .TRUE)
         case .ident:
-            if token.isKeyword(.POSITION) || token.isKeyword(.KEY) {
-                object = getValue(from: environment, with: value.literal)
-            } else
             if token.isKeyword(.OUTER) {
                 guard let outer = environment.outer,
                       let value = outer[value.literal] else {
-                    return "『\(value.literal)』" + identifierNotFound
+                    return undefinedIdentifier(value.literal)
                 }
                 object = value
                 environment.append(object, to: tokenLiteral)
@@ -641,7 +638,7 @@ extension Label : Evaluatable {
         let end   = endRange.lowerBound
         let name  = String(s[start..<end])
         guard let outer = e.outer, let object = outer[name] else {
-            return "外部『\(name)』" + identifierNotFound
+            return "外部" + undefinedIdentifier(name)
         }
         return object                               // 外部オブジェクト
     }
@@ -654,15 +651,15 @@ extension Label : Evaluatable {
         guard name.hasPrefix(Environment.OUTER),                // 外部「<識別子>」のチェック
               let startRage = name.range(of: "「"),
               let endRange  = name.range(of: "」", range: startRage.upperBound..<name.endIndex) else {
-            return e[name] ?? "『\(name)』" + identifierNotFound  // ローカルオブジェクト
+            return e[name] ?? undefinedIdentifier(name)         // ローカルオブジェクト
         }
         let start = name.index(after: startRage.lowerBound)
         let end   = endRange.lowerBound
         let name  = String(name[start..<end])
         guard let outer = e.outer, let value = outer[name] else {
-            return "外部『\(name)』" + identifierNotFound
+            return "外部" + undefinedIdentifier(name)
         }
-        return value                                              // 外部オブジェクト
+        return value                                            // 外部オブジェクト
     }
 }
 extension ArrayLiteral : Evaluatable {
@@ -777,7 +774,7 @@ extension EnumLiteral : Evaluatable {
 }
 extension EnumeratorLiteral : Evaluatable {
     func evaluated(with environment: Environment) -> JpfObject? {
-        guard let enumObject = getEnumObject(from: environment) else {return "『\(type)』" + identifierNotFound}
+        guard let enumObject = getEnumObject(from: environment) else {return undefinedIdentifier(type)}
         return JpfEnumerator(type: enumObject.name, identifier: name, rawValue: enumObject.environment[name])
     }
     /// 環境から列挙オブジェクトを取得する。

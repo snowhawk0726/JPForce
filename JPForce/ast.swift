@@ -88,8 +88,9 @@ struct BlockStatement: Statement {
 struct Identifier : Expression {
     var token: Token                // 識別子(.IDENT(value))トークン
     var value: String               // 値(識別子名)
+    var isLhs: Bool = false         // 左辺(代入される側)
     //
-    init(token: Token, value: String) {self.token = token; self.value = value}
+    init(token: Token, value: String, isLhs: Bool = false) {self.token = token; self.value = value; self.isLhs = isLhs}
     init(from string: String) {self.init(token: Token(ident: string), value: string)}
     init(from token: Token) {self.init(token: token, value: token.literal)}
     //

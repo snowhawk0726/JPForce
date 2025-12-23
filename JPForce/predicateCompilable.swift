@@ -40,7 +40,14 @@ struct PredicateCompilableFactory {
 }
 // MARK: - predicate compilable implements
 extension PredicateCompilable {
-    var pullDupUsage: JpfError          {JpfError("仕様：(識別子「<識別子>」と…)(識別子「<識別子>」に）(「数値」または「値」を)(<数値>個)")}
+    // 実行
+    var functionToBeExecutedNotFound: JpfError {JpfError("実行する関数が無い。")}
+    // 代入
+    var assignIdentiferNotFound: JpfError {JpfError("代入する対象の識別子が見つからない。")}
+    var assignCllectionNotFound: JpfError {JpfError("代入するコレクションが見つからない。")}
+    func assignKeyNotFound(of c: String?) -> JpfError {JpfError("代入する「\(c ?? " ??")」のキーが見つからない。")}
+    func assignValueNotFound(to c: String?, key: String?) -> JpfError {JpfError("「\(c ?? "??")」の「\(key ?? "??")」に、代入する値が見つからない。")}
+    func unregisteredProperty(_ name: String) -> JpfError {JpfError("属性名「\(name)」は未登録。")}
 }
 // MARK: - 補助演算
 /// <式>たもの → <式>
@@ -65,6 +72,9 @@ struct ExecuteCompiler : PredicateCompilable {
     init(_ compiler: Compiler) {self.compiler = compiler}
     let compiler: Compiler
     func compiled() -> JpfObject? {
+        if !compiler.isEmpty {
+            do {try emitFunction(with: compiler)} catch {return jpfError(from: error)}
+        }
         if compiler.lastOpcode == .opPhrase {
             compiler.removeLastInstruction()
         }
@@ -72,17 +82,45 @@ struct ExecuteCompiler : PredicateCompilable {
         return nil
     }
 }
+private extension ExecuteCompiler {
+    func emitFunction(with compiler: Compiler) throws {
+        guard let value = compiler.pull()?.value else {
+            throw functionToBeExecutedNotFound
+        }
+        guard value is JpfIdentifier || value is JpfFunction else {
+            throw functionToBeExecutedNotFound
+        }
+        try compiler.emitAllCashe()
+        try value.emit(with: compiler)
+    }
+}
 struct PerformCompiler : PredicateCompilable {
     init(_ compiler: Compiler) {self.compiler = compiler}
     let compiler: Compiler
+    /// 〜をする、〜にする、〜する
     func compiled() -> JpfObject? {
+        // 「する」対象がキャッシュ
         if let unwrapped = compiler.pull()?.value { // キャッシュの値を取り出し、出力
-            unwrapped.emit(with: compiler)
-        } else
-        if compiler.lastOpcode == .opPhrase {       // をする、にする
+            do {
+                try compiler.emitAllCashe()
+                try unwrapped.emit(with: compiler)
+            } catch {
+                return jpfError(from: error)
+            }
+            return emitOpCallIfNeeded()
+        }
+        // 「する」対象がコード
+        if compiler.lastOpcode == .opPhrase {
             compiler.removeLastInstruction()        // 助詞を除く
         }
-        switch compiler.lastOpcode {                // <動名詞>する = 実行
+        return emitOpCallIfNeeded()
+    }
+}
+private extension PerformCompiler {
+    /// <動名詞>する = 実行
+    /// - Returns: nil
+    func emitOpCallIfNeeded() -> JpfObject? {
+        switch compiler.lastOpcode {
         case .opGetGlobal,.opGetLocal,.opGetFree,.opCurrentClosure:
             _ = compiler.emit(op: .opCall)
         default:
@@ -103,7 +141,11 @@ struct ReturnCompiler : PredicateCompilable {
         let op = ReturnOperator(compiler.environment)
         if !compiler.isEmpty, let result = op.operated() {  // キャッシュで計算
             if result.isError {return result}
-            result.value?.emit(with: compiler)              // resultはJpfReturnValue
+            do {
+                try result.value?.emit(with: compiler)      // resultはJpfReturnValue
+            } catch {
+                return jpfError(from: error)
+            }
         } else {                                            // 直前の出力で計算
             guard compiler.lastOpcode != .opPhrase ||
                   compiler.removeLastOpPhrase(particle: .WO) else {
@@ -123,18 +165,12 @@ struct LogicalOperationCompiler : PredicateCompilable {
     init(_ compiler: Compiler, by token: Token) {self.compiler = compiler; self.op = token}
     let compiler: Compiler, op: Token
     func compiled() -> JpfObject? {
-        if compiler.count >= 2 {                            // キャッシュで計算可
+        if compiler.count >= 2 && !compiler.hasIdentInCashe {   // キャッシュで計算可
             let booleanOperator = BooleanOperator(compiler.environment, by: op)
             return booleanOperator.operated()
         }
-        if compiler.count == 1 {                            // キャッシュで計算不可
-            compiler.pull()!.emit(with: compiler)
-        }
-        guard let symbol = compiler.symbolTable.resolve(op) else {
-            fatalError("『\(op.literal)』が未登録。")
-        }
-        symbol.emit(with: compiler)                         // opPredicate
-        return nil
+        do {try compiler.emitAllCashe()} catch {return jpfError(from: error)}
+        return compiler.emit(predicate: op)                     // opPredicate
     }
 }
 /// 識別子名に関する例外
@@ -145,98 +181,133 @@ struct AssignOperationCompiler : PredicateCompilable {
     init(_ compiler: Compiler, by token: Token) {self.compiler = compiler; self.op = token}
     let compiler: Compiler, op: Token
     func compiled() -> JpfObject? {
-        let params = compiler.pullAll()
-        params.forEach {$0.emit(with: compiler)}            // キャッシュを全てemit
-        guard let symbol = compiler.symbolTable.resolve(op) else {  // .ASSIGNを解決し、
-            fatalError("『\(op.literal)』がシンボルテーブルに未登録。")
-        }
-        symbol.emit(with: compiler)                         // opPredicateをemit
+        let (first, second, third) = normalizeParams(from: compiler)
+        let pattern = (first?.particle, second?.particle, third?.particle)
         do {
-            if let name = try getName(from: params) {       // 代入する識別子名を取得
-                emitSetInstruction(with: name)              // opSetXXXをemit
+            try compiler.emitAllCashe()
+            switch pattern {
+                // コレクションに代入
+            case (_, Token(.NO), Token(.NI)):
+                return compileCollectionAssignment(value: first, collection: second, key: third)
+            case (Token(.NO), Token(.NI), Token(.WO)):
+                return compileCollectionAssignment(value: third, collection: first, key: second)
+                // 識別子に代入
+            case (.none, _, Token(.NI)):
+                try emitAssignment(value: second, ident: third)
+            case (.none, Token(.NI), Token(.WO)):
+                try emitAssignment(value: third, ident: second)
+                // 複合代入
+            case (.none, _, Token(word: "て")):
+                try emitCompoundAssignment(value: third?.value, ident: second?.value)
+                // 実行時(コード出力済み)処理
+            default:
+                try emitAssignment()
             }
-        } catch {                                           // 引数エラーを検出
-            return assignUsage
+        } catch {
+            return jpfError(from: error)
         }
         return nil
     }
 }
 private extension AssignOperationCompiler {
-    func getName(from params: [JpfObject]) throws -> String? {
-        // 配列・辞書・列挙子の識別子名
-        if let name = try getNameOfCollection(with: params) {
-            return name
-        }
-        // 代入する識別子名
-        if let name = try getNameForAssignment(with: params) {
-            return name
-        }
-        // 複合代入演算子の識別子名
-        if let name = getNameOfCompoundAssign(with: params) {
-            return name
-        }
-        return nil
-    }
-    func getNameOfCollection(with params: [JpfObject]) throws -> String? {
-        var params = params.suffix(3)
-        guard params.count == 3 else {return nil}
-        let pattern = (params[0].particle, params[1].particle, params[2].particle)
-        switch pattern {
-        // <配列>の位置<数値>に<値>を代入する
-        // <辞書>のキー<キー>に<値>を代入する
-        // <列挙子>の値に<値>を代入する
-        case (Token(.NO), Token(.NI), Token(.WO)):
-            params.swapAt(0, 1)
-            params.swapAt(0, 2)
-            fallthrough
-        // <値>を<配列>の位置<数値>に代入する
-        // <値>を<辞書>のキー<キー>に代入する
-        // <値>を<列挙子>の値に代入する
-        case (Token(.WO), Token(.NO), Token(.NI)):
-            /* TODO: params[1]とparams[2]の組で、引数が静的に正しいかチェックし、エラーを投げる。 */
-            /* TODO: 代入先の名前が見つからない場合、エラーを投げる。 */
-            guard let object = params[1].value else {return nil}
-            return getName(from: object)
-        default:
+    func compileCollectionAssignment(value: JpfObject?, collection: JpfObject?, key: JpfObject?) -> JpfObject? {
+        // 「<値>を」が翻訳済みの場合は、emit
+        if value == nil && compiler.isLastOpPhrase(particle: .WO) {
+            do {try emitCollectionAssignment(value: nil, collection: collection, key: key)}
+            catch {return jpfError(from: error)}
             return nil
         }
-    }
-    func getNameForAssignment(with params: [JpfObject]) throws -> String? {
-        var params = params.suffix(2)
-        guard params.count == 2 else {return nil}
-        let pattern = (params[0].particle, params[1].particle)
-        switch pattern {
-        // <識別子>に<値>を代入
-        case (Token(.NI), Token(.WO)):
-            params.swapAt(0, 1)
-            fallthrough
-        // <値>を<識別子>に代入
-        case (Token(.WO),Token(.NI)):
-            /* TODO: 代入先の名前が見つからない場合、エラーを投げる。 */
-            guard let object = params[1].value else {return nil}
-            return getName(from: object)
-        default:
+        // 引数をチェック
+        guard let v = value?.value else {
+            return assignValueNotFound(to: collection?.value?.string, key: key?.value?.string)
+        }
+        guard let c = collection?.value  else {
+            return assignCllectionNotFound
+        }
+        guard let k = key?.value else {
+            return assignKeyNotFound(of: c.value?.string)
+        }
+        // 引数が識別子を含む場合は、emit
+        if [v, c, k].contains(where: {$0 is JpfIdentifier}) {
+            do {try emitCollectionAssignment(value: value, collection: collection, key: key)} catch {return jpfError(from: error)}
             return nil
         }
+        // 引数が定数の場合は、値を代入したコレクションを返す
+        return c.assign(v, to: k)
     }
-    func getNameOfCompoundAssign(with params: [JpfObject]) -> String? {
-        guard let param = params.last else {return nil}
-        guard param.particle?.unwrappedParticle == .TA else {return nil}
-        if let object = param.value {
-            return getName(from: object)
+    func emitAssignment(value: JpfObject?, ident: JpfObject?) throws {
+        // 「<配列>の」が翻訳済みの場合は、emit
+        if compiler.isLastOpPhrase(particle: .NO) {
+            try emitCollectionAssignment(value: value, collection: nil, key: ident)
+            return
         }
-        return nil
+        // 「<値>を<識別子>に代入」をemit
+        try value?.value?.emit(with: compiler)
+        // 引数から識別子名を取得し、opSetXXをemit
+        let ident = try JpfIdentifier(ensuring: ident, with: compiler)
+        try ident.emitOpSet(with: compiler)
     }
-    func getName(from object: JpfObject) -> String? {
-        if object.hasName {return object.name}              // 識別子名がある
-        return (object as? JpfString)?.value                // 文字列を識別子とする
+    func emitCompoundAssignment(value: JpfObject?, ident: JpfObject?) throws {
+        if let name = compiler.identifier {
+            let ident = JpfIdentifier(ensuring: name, with: compiler)
+            try emitAssignment(value: value, ident: ident)
+            return
+        }
+        try emitAssignment(value: value, ident: ident)
     }
-    func emitSetInstruction(with name: String) {
-        let symbol = compiler.symbolTable.define(name)      // 識別子を取得
-        _ = compiler.emit(                                  // setコードを出力
-            op: symbol.isGlobal ? .opSetGlobal : .opSetLocal,
-            operand: symbol.index
-        )
+    func emitCollectionAssignment(value: JpfObject?, collection: JpfObject?, key: JpfObject?) throws {
+        // 引数を適切な順序で、emit
+        try emitCollectionAssignmentWithOrder(value: value, collection: collection, key: key)
+        // 「代入」をemit
+        _ = compiler.emit(predicate: .ASSIGN)
+        // 代入されるコレクションが識別子であれば、さらに、setをemit
+        if let ident = collection?.value as? JpfIdentifier {
+            try ident.emitOpSet(with: compiler)
+        }
+    }
+    /// .ASSIGNに渡す引数を順番に出力(翻訳済みの引数はnil)
+    private func emitCollectionAssignmentWithOrder(value: JpfObject?, collection: JpfObject?, key: JpfObject?) throws {
+        if key == nil {
+            throw assignKeyNotFound(of: collection?.value?.string)
+        }
+        if collection == nil {
+            try key?.emit(with: compiler)       // <キー>に
+            try value?.emit(with: compiler)     // <値>を
+            return
+        }
+        try value?.emit(with: compiler)         // <値>を
+        try collection?.emit(with: compiler)    // <コレクション>の
+        try key?.emit(with: compiler)           // <キー>に
+    }
+    func emitAssignment() throws {              // 引数が翻訳済みの場合の代入
+        guard let name = compiler.identifier else {
+            throw assignIdentiferNotFound
+        }
+        if compiler.isLastOpPhrase(particle: .TA) {         // 直前の出力「た」でを取り除く
+            _ = compiler.removeLastOpPhrase(particle: .TA)
+            compiler.identifier = nil                       // 複合代入用識別子をクリア
+        } else {
+            _ = compiler.emit(predicate: .ASSIGN)   // 代入する
+        }
+        let ident = JpfIdentifier(ensuring: name, with: compiler)
+        try ident.emitOpSet(with: compiler)
+    }
+    //
+    func normalizeParams(from stack: Compiler) -> (JpfObject?, JpfObject?, JpfObject?) {
+        let params = stack.getAll()
+        switch params.count {
+        case 0:
+            return (nil, nil, nil)
+        case 1:
+            stack.drop(1)
+            return (nil, nil, params[0])
+        case 2:
+            stack.drop(2)
+            return (nil, params[0], params[1])
+        default:
+            stack.drop(3)
+            return (params[params.count-3], params[params.count-2], params[params.count-1])
+        }
     }
 }
 /// 「得る」または「写す」をコンパイル
@@ -244,46 +315,124 @@ struct PullOperationCompiler : PredicateCompilable {
     init(_ compiler: Compiler, by token: Token) {self.compiler = compiler; self.op = token}
     let compiler: Compiler, op: Token
     func compiled() -> JpfObject? {
-        // 「<識別子１>」(と「<識別子２>」…)に
-        let params = compiler.pullAll()
         do {
-            let names = try getNames(from: params)              // 引数から識別子名を取り出す
-            params.forEach {$0.emit(with: compiler)}            // キャッシュを全てemit
-            if let symbol = compiler.symbolTable.resolve(op) {  // opを解決し、
-                symbol.emit(with: compiler)                     // opPredicateをemit
-            } else {
-                fatalError("『\(op.literal)』が未登録。")
-            }
-            emitSetInstructions(with: names)                    // opSetXXXをemit
+            let spec = try resolveSpec()
+            try emitAllCached()
+            //
+            let countKind = try resolveCountKind(from: spec)
+            try emitValues(by: countKind)
+            try emitValueConversion(using: spec.valueMode, for: countKind)
+            try emitAssignment(using: spec)
+            //
+            return nil
         } catch {
-            return pullDupUsage + op.literal + "。"
+            return jpfError(from: error)
         }
-        return nil
     }
 }
 private extension PullOperationCompiler {
-    /// 引数から識別子の名前を取り出す。
-    func getNames(from params: [JpfObject]) throws -> [String] {
-        //
-        let targets = params
-            .compactMap { $0 as? JpfPhrase }
-            .filter { $0.isParticle(.TO) || $0.isParticle(.NI) }
-        
-        return try targets.map { phrase in
-            guard let string = phrase.value as? JpfString, !string.value.isEmpty else {
-                throw NameError.notFound
+    /// 仕様解決
+    func resolveSpec() throws -> PullArgumentSpec {
+        let params = compiler.getAll()
+        let spec = try PullArgumentResolver().resolve(params)
+        compiler.drop(spec.resolvedCount)
+        return spec
+    }
+    func emitAllCached() throws {
+        try compiler.emitAllCashe()
+    }
+    /// 個数指定区分
+    enum CountKind {
+        case symbol(Symbol) // 変数指定
+        case number(Int)    // 数値指定
+        case single(Int)    // 省略(識別子数で指定)
+    }
+    func resolveCountKind(from spec: PullArgumentSpec) throws -> CountKind {
+        if let name = spec.countSpec.name {
+            guard let symbol = compiler.symbolTable.resolve(name) else {
+                throw undefinedIdentifier(name)
             }
-            return string.value
+            return .symbol(symbol)
+        }
+        if let count = spec.countSpec.count, count > 1 {
+            return .number(count)
+        }
+        let count = spec.lhs.count > 1 ? spec.lhs.count : 1
+        return .single(count)
+    }
+    /// 値をemit
+    func emitValues(by kind: CountKind) throws {
+        switch kind {
+        case .symbol(let symbol):
+            emitValuesToArray(by: symbol)
+        case .number(let count):
+            emitValuesToArray(by: count)
+        case .single(let count):
+            op.emitConst(with: compiler, operand: count)
         }
     }
+    /// 個数指定区分に対応した値変換(map)をemit
+    func emitValueConversion(using mode: ValueMode, for kind: CountKind) throws {
+        guard mode != .none else { return }
+        // 配列に対する map
+        if case .symbol = kind {
+            try emitMapProperty(by: mode)
+            return
+        }
+        if case .number(let count) = kind, count > 1 {
+            try emitMapProperty(by: mode)
+        }
+    }
+    /// 代入をemit
+    func emitAssignment(using spec: PullArgumentSpec) throws {
+        try emitSetInstructions(
+            to: spec.lhs,
+            by: spec.valueMode
+        )
+    }
+    /// ヘルパー
+    /// (識別子)指定個数分、配列に出力
+    private func emitValuesToArray(by symbol: Symbol) {
+        symbol.emitOpGet(with: compiler)        // スタックに指定個数を積む(opGetXXX)
+        op.emitStack(with: compiler)            // 指定個数をduplicate/pull
+        symbol.emitOpGet(with: compiler)        // スタックに指定個数を積む(opGetXXX)
+        _ = compiler.emit(op: .opArray)         // 指定個数で配列化
+    }
+    /// (数値)指定個数分、配列に出力
+    private func emitValuesToArray(by count: Int) {
+        op.emitConst(with: compiler, operand: count)
+        if count > 1 {
+            _ = compiler.emit(op: .opArrayConst, operand: count)
+        }
+    }
+    /// 値を変換(map)
+    private func emitMapProperty(by mode: ValueMode) throws {
+        guard let symbol = compiler.symbolTable.resolve(mode.rawValue) else {
+            throw unregisteredProperty(mode.rawValue)
+        }
+        _ = compiler.emit(op: .opMapProperty, operand: symbol.index)
+    }
+    /// 値を変換(stack)
+    private func emitGetProperty(by mode: ValueMode) throws {
+        guard let symbol = compiler.symbolTable.resolve(mode.rawValue) else {
+            throw unregisteredProperty(mode.rawValue)
+        }
+        _ = compiler.emit(op: .opGetProperty, operand: symbol.index)
+    }
     /// 識別子に代入するコードを出力する。
-    func emitSetInstructions(with identifiers: [String]) {
-        identifiers.forEach { name in
+    /// - Parameters:
+    ///   - identifiers: 出力する識別子
+    ///   - mode:        値変換モード
+    func emitSetInstructions(to identifiers: [String], by mode: ValueMode = .none) throws {
+        try identifiers.reversed().forEach { name in
+            if mode != .none && identifiers.count > 1 {
+                try emitGetProperty(by: mode)
+            }
             let symbol = compiler.symbolTable.define(name)
-            _ = compiler.emit(
-                op: symbol.isGlobal ? .opSetGlobal : .opSetLocal,
-                operand: symbol.index
-            )
+            symbol.emitOpSet(with: compiler)
+        }
+        if identifiers.isEmpty, mode != .none {
+            try emitGetProperty(by: mode)
         }
     }
 }

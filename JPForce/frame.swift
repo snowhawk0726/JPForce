@@ -27,7 +27,7 @@ class Frame {
         return ip < i.count - 1
     }
     func advanceIp(by offset: Int) {ip += offset}
-    func advancedIp() -> Int {
+    func advanceIp() -> Int {
         ip += 1
         return ip
     }

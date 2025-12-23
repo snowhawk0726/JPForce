@@ -149,7 +149,7 @@ class VM {
     /// Fetch instructions
     func run() -> JpfError? {
         while currentFrame.isIpInRange {
-            var ip = currentFrame.advancedIp()
+            var ip = currentFrame.advanceIp()
             let instructions = currentFrame.insturctions!
             let op = instructions[ip]
             guard let opcode = Opcode(rawValue: op) else {return invalidOpcode + "\(op)"}
@@ -177,6 +177,7 @@ class VM {
         get {stack.stackPointer}
         set {stack.stackPointer = newValue}
     }
+    var count: Int                                  {stack.count}
     var string: String                              {stack.string}
     func push(_ object: JpfObject) -> JpfError?     {stack.push(object)}
     func push(_ objects: [JpfObject]) -> JpfError?  {stack.push(objects)}

@@ -105,6 +105,19 @@ class Compiler {
     func emit(predicate keyword: Token.Keyword) -> Int {
         emit(op: .opPredicate, operand: PredicateOperableFactory.index(of: keyword)!)
     }
+    func emit(predicate op: Token) -> JpfError? {
+        guard let symbol = symbolTable.resolve(op) else {
+            return JpfError("述語「\(op.literal)」がシンボルテーブルに未登録")
+        }
+        _ = emit(op: .opPredicate, operand: symbol.index)
+        return nil
+    }
+    func emit(particle token: Token) -> Int {
+        emit(op: .opPhrase, operand: token.particleIndex!)
+    }
+    func emit(particle: Token.Particle) -> Int {
+        emit(op: .opPhrase, operand: Token(particle).particleIndex!)
+    }
     /// インストラクションを記録(追加)し、新たなインストラクション位置を返す。
     /// - Parameter ins: 追加するバイト列
     /// - Returns: 新たなip(インストラクション・ポイント)
@@ -193,18 +206,50 @@ class Compiler {
         symbolTable = symbolTable.outer!
         return instructions
     }
-    // 定数の演算を行うための補助(ヘルパー)
+}
+/// 定数の演算を行うための補助(ヘルパー)
+extension Compiler {
     func push(_ o: JpfObject) -> JpfError?
                                     {environment.push(o)}
     func pull() -> JpfObject?       {environment.pull()}
     func pullAll() -> [JpfObject]   {environment.pullAll()}
     var peek: JpfObject?            {environment.peek}
+    func getAll() -> [JpfObject]    {environment.getAll()}
     func peek(_ n: Int) -> [JpfObject]? {environment.peek(n)}
     func drop()                     {environment.drop()}
     func drop(_ n: Int)             {environment.drop(n)}
     var count: Int                  {environment.count}
     var isEmpty: Bool               {environment.isEmpty}
+    func isPeekParticle(_ p: Token.Particle) -> Bool {
+        guard let phrase = peek as? JpfPhrase else { return false }
+        return phrase.isParticle(p)
+    }
     func unwrappedObject() -> JpfObject?
                                     {(pull() as? JpfPhrase)?.value}
     var unwrappedPeek: JpfObject?   {(peek as? JpfPhrase)?.value ?? peek}
+    func emitAllCashe() throws {
+        for obj in pullAll() {
+            if let ident = obj.value as? JpfIdentifier, !ident.hasSymbol {
+                if ident.value == self.identifier {
+                    let _ = self.symbolTable.define(ident.value)
+                    continue
+                }
+                if !ident.isLhs {
+                    throw undefinedIdentifier(ident.value)
+                }
+            }
+            try obj.emit(with: self)
+        }
+    }
+    var hasIdentInCashe: Bool   {
+        getAll().contains(where: {$0.value is JpfIdentifier})
+    }
+}
+/// 複合代入識別子用ヘルパー
+extension Compiler {
+    var identifier: String? {
+        get {environment.identifier}
+        set {environment.identifier = newValue}
+    }
+    func clearIdentifier() {environment.identifier = nil}
 }

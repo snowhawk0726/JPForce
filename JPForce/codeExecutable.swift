@@ -17,6 +17,7 @@ protocol CodeExecutable {
 // MARK: - implementations for CodeExecutable
 extension CodeExecutable {
     // エラー
+    func unknownError(with error: Error) -> JpfError {JpfError("不明なエラーが発生。\(error)")}
     var genitiveParamError: JpfError        {JpfError("属格の左右オブジェクトが足りない。")}
     var callingFunctionNotFound: JpfError   {JpfError("呼び出し先の関数が無い。")}
     var returnValueNotFound: JpfError       {JpfError("返すべき値が無い。")}
@@ -30,6 +31,7 @@ extension CodeExecutable {
     var failedToGetClosure: JpfError        {JpfError("クロージャの取得に失敗した。")}
     var failedToGetFreeVariables: JpfError  {JpfError("自由変数の取得に失敗した。")}
     var cannotFoundPredicate: JpfError      {JpfError("述語が定義されていない。")}
+    var stackValueIsNotNumber: JpfError     {JpfError("スタックの値が数値でない。")}
 }
 // MARK: - instance factory
 struct CodeExecutableFactory {
@@ -37,8 +39,9 @@ struct CodeExecutableFactory {
         switch op {
         case .opTrue,.opFalse:  return BooleanExecuter(vm, by: op)
         case .opNull:           return NullExecuter(vm)
-        case .opArray:          return ArrayExecuter(vm, with: operandBytes)
-        case .opDictionary:     return DictionaryExecuter(vm, with: operandBytes)
+        case .opArrayConst:     return ArrayConstExecuter(vm, with: operandBytes)
+        case .opArray:          return ArrayStackExecuter(vm)
+        case .opDictionaryConst:return DictionaryConstExecuter(vm, with: operandBytes)
         case .opGenitive:       return GenitiveExecuter(vm)
         case .opJump, .opJumpNotTruthy:
                                 return JumpExecuter(vm, by: op, with: operandBytes)
@@ -57,6 +60,13 @@ struct CodeExecutableFactory {
         case .opClosure:        return ClosureExecuter(vm, with: operandBytes)
         case .opGetFree:        return GetFreeExecuter(vm, with: operandBytes)
         case .opCurrentClosure: return CurrentClosureExecuter(vm)
+        case .opPullConst:      return PullConstExecuter(vm, with: operandBytes)
+        case .opPull:           return PullStackExecuter(vm)
+        case .opDuplicateConst: return DuplicateConstExecuter(vm, with: operandBytes)
+        case .opDuplicate:      return DuplicateStackExecuter(vm)
+        case .opDropConst:      return DropConstExecuter(vm, with: operandBytes)
+        case .opDrop:           return DropStackExecuter(vm)
+        case .opMapProperty:    return MapPropertyExecuter(vm, with: operandBytes)
         }
     }
 }
@@ -76,7 +86,7 @@ struct NullExecuter : CodeExecutable {
         return nil
     }
 }
-struct ArrayExecuter : CodeExecutable {
+struct ArrayConstExecuter : CodeExecutable {
     init(_ vm: VM, with bytes: [Byte]) {self.vm = vm; self.bytes = bytes}
     let vm: VM, bytes: [Byte]
     func execute() -> JpfError? {
@@ -86,14 +96,25 @@ struct ArrayExecuter : CodeExecutable {
         return vm.push(array)
     }
 }
-private extension ArrayExecuter {
+struct ArrayStackExecuter : CodeExecutable {
+    init(_ vm: VM) {self.vm = vm}
+    let vm: VM
+    func execute() -> JpfError? {
+        guard let numberOfElements = vm.pull()?.number else {
+            return stackValueIsNotNumber
+        }
+        guard let array = buildArray(with: numberOfElements) else {return failedToBuildArray}
+        return vm.push(array)
+    }
+}
+private extension CodeExecutable {
     func buildArray(with n: Int) -> JpfArray? {
         guard let objects = vm.peek(n) else {return nil}
         vm.drop(n)
         return JpfArray(elements: objects)
     }
 }
-struct DictionaryExecuter : CodeExecutable {
+struct DictionaryConstExecuter : CodeExecutable {
     init(_ vm: VM, with bytes: [Byte]) {self.vm = vm; self.bytes = bytes}
     let vm: VM, bytes: [Byte]
     func execute() -> JpfError? {
@@ -103,7 +124,7 @@ struct DictionaryExecuter : CodeExecutable {
         return vm.push(dictionary)
     }
 }
-private extension DictionaryExecuter {
+private extension DictionaryConstExecuter {
     func buildDictionary(with n: Int) -> JpfDictionary? {
         var pairs: [JpfHashKey: (key: JpfObject, value: JpfObject)] = [:]
         guard let objects = vm.peek(n) else {return nil}
@@ -262,17 +283,18 @@ struct GetPropertyExecuter : CodeExecutable {
     func execute() -> JpfError? {
         let index = Int(readUInt8(from: bytes))
         vm.currentFrame.advanceIp(by: 1)
-        guard let getPropertyOf = ObjectProperties()[index]?.accessor else {
+        guard let accessor = ObjectProperties()[index]?.accessor else {
             return propertyNotFound
         }
         guard let object = vm.pull() else {
             return objectNotFound
         }
-        guard let result = getPropertyOf(object) else {
-            return failedToGetProperty
+        do {
+            let result = try getProperty(of: object, with: accessor)
+            return vm.push(result)
+        } catch let err {
+            return err
         }
-        if result.isError {return result.error}
-        return vm.push(result)
     }
 }
 struct PredicateExecuter : CodeExecutable {
@@ -289,29 +311,8 @@ struct PredicateExecuter : CodeExecutable {
             vm.push(result) :
             result.error
         case .none:
-            return pushOutputValues(from: environment)  // 代入値をスタックに格納
+            return nil
         }
-    }
-}
-private extension PredicateExecuter {
-    /// 識別子に代入する値を、スタックに格納する。
-    /// - Parameter env: 代入値を含む
-    /// - Returns: nil : 正常、エラー(JpfError)
-    func pushOutputValues(from env: Environment) -> JpfError? {
-        // 代入する値が単一である場合、それをVMのスタックに格納
-        if let value = env.singleValue {
-            return vm.push(value)
-        }
-        // 複数の識別子に代入する値を取り出し、逆順でVMのスタックに格納
-        for (_, value) in env.parameterPairs.reversed() {
-            if value.isError {
-                return value.error
-            }
-            if let error = vm.push(value) {
-                return error
-            }
-        }
-        return nil
     }
 }
 struct ClosureExecuter : CodeExecutable {
@@ -350,5 +351,124 @@ struct CurrentClosureExecuter : CodeExecutable {
     func execute() -> JpfError? {
         guard let currentClosure = vm.currentFrame.cl else {return failedToGetClosure}
         return vm.push(currentClosure)
+    }
+}
+struct PullConstExecuter : CodeExecutable {
+    init(_ vm: VM, with bytes: [Byte]) {self.vm = vm; self.bytes = bytes}
+    let vm: VM, bytes: [Byte]
+    func execute() -> JpfError? {
+        let numberOfElements = Int(readUInt8(from: bytes))
+        vm.currentFrame.advanceIp(by: 1)
+        return vm.count >= numberOfElements ? nil : notEnoughStackValues
+    }
+}
+struct PullStackExecuter : CodeExecutable {
+    init(_ vm: VM) {self.vm = vm}
+    let vm: VM
+    func execute() -> JpfError? {
+        guard let numberOfElements = vm.pull()?.number else {
+            return stackValueIsNotNumber
+        }
+        return vm.count >= numberOfElements ? nil : notEnoughStackValues
+    }
+}
+struct DuplicateConstExecuter : CodeExecutable {
+    init(_ vm: VM, with bytes: [Byte]) {self.vm = vm; self.bytes = bytes}
+    let vm: VM, bytes: [Byte]
+    func execute() -> JpfError? {
+        let numberOfElements = Int(readUInt8(from: bytes))
+        vm.currentFrame.advanceIp(by: 1)
+        return duplicateStackValues(with: numberOfElements)
+    }
+}
+struct DuplicateStackExecuter : CodeExecutable {
+    init(_ vm: VM) {self.vm = vm}
+    let vm: VM
+    func execute() -> JpfError? {
+        guard let numberOfElements = vm.pull()?.number else {
+            return stackValueIsNotNumber
+        }
+        return duplicateStackValues(with: numberOfElements)
+    }
+}
+private extension CodeExecutable {
+    func duplicateStackValues(with n: Int) -> JpfError? {
+        guard let objs = vm.peek(n) else {
+            return notEnoughStackValues
+        }
+        return vm.push(objs)
+    }
+}
+struct DropConstExecuter : CodeExecutable {
+    init(_ vm: VM, with bytes: [Byte]) {self.vm = vm; self.bytes = bytes}
+    let vm: VM, bytes: [Byte]
+    func execute() -> JpfError? {
+        let numberOfElements = Int(readUInt8(from: bytes))
+        vm.currentFrame.advanceIp(by: 1)
+        vm.drop(numberOfElements)
+        return nil
+    }
+}
+struct DropStackExecuter : CodeExecutable {
+    init(_ vm: VM) {self.vm = vm}
+    let vm: VM
+    func execute() -> JpfError? {
+        guard let numberOfElements = vm.pull()?.number else {
+            return stackValueIsNotNumber
+        }
+        vm.drop(numberOfElements)
+        return nil
+    }
+}
+struct MapPropertyExecuter : CodeExecutable {
+    init(_ vm: VM, with bytes: [Byte]) {self.vm = vm; self.bytes = bytes}
+    let vm: VM, bytes: [Byte]
+    func execute() -> JpfError? {
+        let index = Int(readUInt8(from: bytes))
+        vm.currentFrame.advanceIp(by: 1)
+        guard let accessor = ObjectProperties()[index]?.accessor else {
+            return propertyNotFound
+        }
+        guard let object = vm.pull() else {
+            return objectNotFound
+        }
+        do {
+            let result = try mapProperty(of: object, using: accessor)
+            return vm.push(result)
+        } catch let err {
+            return err
+        }
+    }
+}
+extension MapPropertyExecuter {
+    func mapProperty(of obj: JpfObject,
+                     using accessor: (JpfObject) -> JpfObject?
+    ) throws(JpfError) -> JpfObject {
+        // 対象がが配列の場合
+        if let array = obj as? JpfArray {
+            var mapped: [JpfObject] = []
+            mapped.reserveCapacity(array.elements.count)
+            // 要素の変換
+            for element in array.elements {
+                mapped.append(
+                    try getProperty(of: element, with: accessor)
+                )
+            }
+            // 変換後の配列を返す
+            return JpfArray(name: array.name, elements: mapped)
+        }
+        // その他は、通常のgetPropertyで返す
+        return try getProperty(of: obj, with: accessor)
+    }
+}
+extension CodeExecutable {
+    func getProperty(of obj: JpfObject,
+                     with getPropertyOf: (JpfObject) -> JpfObject?
+    ) throws(JpfError) -> JpfObject {
+        guard let result = getPropertyOf(obj) else {
+            throw failedToGetProperty
+        }
+        if let err = result.error {throw err}
+        return result
     }
 }

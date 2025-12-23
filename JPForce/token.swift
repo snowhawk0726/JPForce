@@ -129,8 +129,6 @@ enum Token : Equatable {
         case CREATE     = "生成"
         case AVAILABLE  = "利用可能"
         case OUTER      = "外部"
-        case POSITION   = "位置"
-        case KEY        = "キー"
         case MEMBER     = "要素"
         case SET        = "設定"
         case COMPUTATION = "算出"
@@ -229,6 +227,7 @@ enum Token : Equatable {
     }
     var coloredLiteral: String {literal.color(color)}
     var number: Int? {if case .INT(let int) = self {return int} else {return nil}}
+    var keyword: Token.Keyword? {unwrappedKeyword}
     var color: EscapeCode {
         switch type {
         case .ident:        return .cyan
@@ -299,7 +298,10 @@ enum Token : Equatable {
         d["．"] = .PERIOD;   d["."] = .PERIOD
         return d
     }()
-    /// 助詞一覧
+    // MARK: - 左辺識別子を持つ述語
+    static let assignmentPredicates = [.ASSIGN, .SET, .PULL, .DUPLICATE] as [Token.Keyword]
+    var hasLhsIdentifier: Bool {Self.assignmentPredicates.contains {self.isKeyword($0)}}
+    // MARK: - 助詞一覧とそのインデックス
     static let particles = Particle.allCases
     var particleIndex: Int? {Token.particles.firstIndex {self.isParticle($0)}}
 }

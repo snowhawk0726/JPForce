@@ -23,8 +23,8 @@ enum Opcode : Byte {
     case opTrue
     case opFalse
     case opNull
-    case opArray            // 10
-    case opDictionary
+    case opArrayConst       // 10
+    case opDictionaryConst
     case opGenitive
     case opJump
     case opJumpNotTruthy
@@ -36,6 +36,14 @@ enum Opcode : Byte {
     case opClosure          // 20
     case opGetFree
     case opCurrentClosure
+    case opPullConst
+    case opPull
+    case opDuplicateConst   // 25
+    case opDuplicate
+    case opDropConst
+    case opDrop
+    case opArray
+    case opMapProperty      // 30
     //
     var definition: (name: String, operandWidths: [Int]) {
         switch self {
@@ -49,8 +57,9 @@ enum Opcode : Byte {
         case .opTrue:           (name: "OpTrue",          operandWidths: [])
         case .opFalse:          (name: "OpFalse",         operandWidths: [])
         case .opNull:           (name: "OpNull",          operandWidths: [])
-        case .opArray:          (name: "OpArray",         operandWidths: [2])   // 要素数
-        case .opDictionary:     (name: "OpDictionary",    operandWidths: [2])   // 要素数 x ２
+        case .opArrayConst:     (name: "OpArray",         operandWidths: [2])   // 要素数
+        case .opArray:          (name: "OpArray",         operandWidths: [])    // (スタック値)
+        case .opDictionaryConst:(name: "OpDictionary",    operandWidths: [2])   // 要素数 x ２
         case .opGenitive:       (name: "OpGenitive",      operandWidths: [])
         case .opJump:           (name: "OpJump",          operandWidths: [2])   // 飛び先
         case .opJumpNotTruthy:  (name: "OpJumpNotTruthy", operandWidths: [2])   // 飛び先
@@ -62,6 +71,13 @@ enum Opcode : Byte {
         case .opClosure:        (name: "OpClosure",       operandWidths: [2, 1])// 関数インデックス、自由変数数
         case .opGetFree:        (name: "OpGetFree",       operandWidths: [1])   // 自由変数位置
         case .opCurrentClosure: (name: "OpCurrentClosure",operandWidths: [])
+        case .opPullConst:      (name: "opPull",          operandWidths: [1])   // 要素数
+        case .opPull:           (name: "opPull",          operandWidths: [])    // (スタック値)
+        case .opDuplicateConst: (name: "OpDuplicate",     operandWidths: [1])   // 要素数
+        case .opDuplicate:      (name: "OpDuplicate",     operandWidths: [])    // (スタック値)
+        case .opDropConst:      (name: "OpDrop",          operandWidths: [1])   // 要素数
+        case .opDrop:           (name: "OpDrop",          operandWidths: [])    // (スタック値)
+        case .opMapProperty:    (name: "OpMapProperty",   operandWidths: [1])   // 属性インデックス
         }
     }
     var name: String {definition.name}                  // オペコード名
@@ -208,7 +224,7 @@ struct Instructions : ExpressibleByArrayLiteral {
             s = (symbolTable[index] ?? "??") + "(識別子名)"                  // 識別子名
         case .opGetLocal, .opSetLocal, .opGetFree:
             s = "??(識別子名)"                                               // 識別子名
-        case .opGetProperty:
+        case .opGetProperty, .opMapProperty:
             s = ObjectProperties().names[index]                             // 属性名
         case .opPredicate:
             s = PredicateOperableFactory.predicates[index].keyword.rawValue // 述語名
