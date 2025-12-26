@@ -16,7 +16,7 @@ protocol PredicateCompilable {
     ///   翻訳済みの場合、nilを返す。
     ///   エラーを検出した場合、JpfErrorを返す。
     ///   キャッシュによる演算が継続可能な場合、値(JpfObject)を出力する。
-    func compiled() -> JpfObject?
+    func compile() -> JpfObject?
 }
 // MARK: - predicate compilable instance factory
 struct PredicateCompilableFactory {
@@ -57,9 +57,9 @@ extension PredicateCompilable {
 struct UnwrapCompiler : PredicateCompilable {
     init(_ compiler: Compiler, by token: Token) {self.compiler = compiler; self.op = token}
     let compiler: Compiler, op: Token
-    func compiled() -> JpfObject? {
+    func compile() -> JpfObject? {
         guard compiler.isEmpty else {
-            return UnwrapOperator(compiler.environment, by: op).operated()
+            return UnwrapOperator(compiler.environment, by: op).operate()
         }
         if compiler.lastOpcode == .opPhrase {
             compiler.removeLastInstruction()
@@ -71,7 +71,7 @@ struct UnwrapCompiler : PredicateCompilable {
 struct ExecuteCompiler : PredicateCompilable {
     init(_ compiler: Compiler) {self.compiler = compiler}
     let compiler: Compiler
-    func compiled() -> JpfObject? {
+    func compile() -> JpfObject? {
         if !compiler.isEmpty {
             do {try emitFunction(with: compiler)} catch {return jpfError(from: error)}
         }
@@ -98,7 +98,7 @@ struct PerformCompiler : PredicateCompilable {
     init(_ compiler: Compiler) {self.compiler = compiler}
     let compiler: Compiler
     /// 〜をする、〜にする、〜する
-    func compiled() -> JpfObject? {
+    func compile() -> JpfObject? {
         // 「する」対象がキャッシュ
         if let unwrapped = compiler.pull()?.value { // キャッシュの値を取り出し、出力
             do {
@@ -130,16 +130,16 @@ private extension PerformCompiler {
     }
 }
 /// 「(〜を)返す」を翻訳する。
-/// ・キャッシュがあれば計算(operated())し、opReturnValueを出力する。
+/// ・キャッシュがあれば計算(operate())し、opReturnValueを出力する。
 /// ・出力する前に、句をチェックし、
 ///  「〜を」または「無し」であれば、出力を行う。(格が違う(「を」でない)場合はusageを返す)
 ///   opPhraseが出力されていたら、それを取り除く。
 struct ReturnCompiler : PredicateCompilable {
     init(_ compiler: Compiler) {self.compiler = compiler}
     let compiler: Compiler
-    func compiled() -> JpfObject? {
+    func compile() -> JpfObject? {
         let op = ReturnOperator(compiler.environment)
-        if !compiler.isEmpty, let result = op.operated() {  // キャッシュで計算
+        if !compiler.isEmpty, let result = op.operate() {   // キャッシュで計算
             if result.isError {return result}
             do {
                 try result.value?.emit(with: compiler)      // resultはJpfReturnValue
@@ -159,15 +159,15 @@ struct ReturnCompiler : PredicateCompilable {
 struct NullCompiler : PredicateCompilable {
     init(_ compiler: Compiler) {self.compiler = compiler}
     let compiler: Compiler
-    func compiled() -> JpfObject? {JpfNull.object}
+    func compile() -> JpfObject? {JpfNull.object}
 }
 struct LogicalOperationCompiler : PredicateCompilable {
     init(_ compiler: Compiler, by token: Token) {self.compiler = compiler; self.op = token}
     let compiler: Compiler, op: Token
-    func compiled() -> JpfObject? {
+    func compile() -> JpfObject? {
         if compiler.count >= 2 && !compiler.hasIdentInCashe {   // キャッシュで計算可
             let booleanOperator = BooleanOperator(compiler.environment, by: op)
-            return booleanOperator.operated()
+            return booleanOperator.operate()
         }
         do {try compiler.emitAllCashe()} catch {return jpfError(from: error)}
         return compiler.emit(predicate: op)                     // opPredicate
@@ -180,7 +180,7 @@ private enum NameError : Error {case notFound}
 struct AssignOperationCompiler : PredicateCompilable {
     init(_ compiler: Compiler, by token: Token) {self.compiler = compiler; self.op = token}
     let compiler: Compiler, op: Token
-    func compiled() -> JpfObject? {
+    func compile() -> JpfObject? {
         let (first, second, third) = normalizeParams(from: compiler)
         let pattern = (first?.particle, second?.particle, third?.particle)
         do {
@@ -314,7 +314,7 @@ private extension AssignOperationCompiler {
 struct PullOperationCompiler : PredicateCompilable {
     init(_ compiler: Compiler, by token: Token) {self.compiler = compiler; self.op = token}
     let compiler: Compiler, op: Token
-    func compiled() -> JpfObject? {
+    func compile() -> JpfObject? {
         do {
             let spec = try resolveSpec()
             try emitAllCached()
@@ -439,7 +439,7 @@ private extension PullOperationCompiler {
 struct ItCompiler : PredicateCompilable {
     init(_ compiler: Compiler) {self.compiler = compiler}
     let compiler: Compiler
-    func compiled() -> JpfObject? {
+    func compile() -> JpfObject? {
         nil // opPredicateのemitを抑止
     }
 }

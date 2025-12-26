@@ -156,7 +156,11 @@ class VM {
             ip += 1
             let bytes = instructions[ip..<ip+opcode.operandWidth].bytes
             let executer = CodeExecutableFactory.create(from: opcode, operandBytes: bytes, with: self)
-            if let error = executer.execute() {return error}
+            do {
+                try executer.execute()
+            } catch {
+                return jpfError(from: error)
+            }
         }
         return nil
     }
@@ -179,8 +183,12 @@ class VM {
     }
     var count: Int                                  {stack.count}
     var string: String                              {stack.string}
-    func push(_ object: JpfObject) -> JpfError?     {stack.push(object)}
-    func push(_ objects: [JpfObject]) -> JpfError?  {stack.push(objects)}
+    func push(_ object: JpfObject) throws           {
+        if let err = stack.push(object) {throw err}
+    }
+    func push(_ objects: [JpfObject]) throws        {
+        if let err = stack.push(objects) {throw err}
+    }
     func pull() -> JpfObject?                       {stack.pull()}
     func pullAll() -> [JpfObject]                   {stack.pullAll()}
     func peek() -> JpfObject?                       {stack.peek()}

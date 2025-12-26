@@ -88,7 +88,7 @@ class Compiler {
     /// 指定されたASTノードをコンパイルする。
     /// - Returns: エラー(無しは、nil)
     func compile() -> JpfError? {
-        if let error = node.compiled(with: self) as? JpfError {return error}
+        if let error = node.compile(with: self) as? JpfError {return error}
         return nil
     }
     /// インストラクションを出力し、新たなインストラクション位置を返す。

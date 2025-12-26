@@ -226,7 +226,7 @@ struct JpfFunction : JpfObject {
     var environment: Environment
     //
     var string: String {
-        let s = overload.array.reduce("") {$0 +
+        let s = overload.all.reduce("") {$0 +
             "\($1.isOverloaded ? "さらに、" : "")\(type.color(.magenta))であって、【\($1.string)】"
         }
         return s.replacingOccurrences(of: "。】", with: "】")
@@ -241,8 +241,8 @@ struct JpfComputation : JpfObject {
     //
     var string: String {
         let s = type.color(.magenta) + "であって、【" +
-        (setters.array.reduce("") {$0 + "設定は、\($1.isOverloaded ? "さらに、" : "")【\($1.string)】。"}) +
-        (getters.array.reduce("") {$0 + "取得は、\($1.isOverloaded ? "さらに、" : "")【\($1.string)】。"}) +
+        (setters.all.reduce("") {$0 + "設定は、\($1.isOverloaded ? "さらに、" : "")【\($1.string)】。"}) +
+        (getters.all.reduce("") {$0 + "取得は、\($1.isOverloaded ? "さらに、" : "")【\($1.string)】。"}) +
         "】"
         return s.replacingOccurrences(of: "。】", with: "】")
     }
@@ -284,7 +284,7 @@ struct JpfType : JpfObject {
         var s1 = type.color(.magenta) + "であって、【" +
         (protocols.isEmpty ? "" : "準拠する規約は、\(protocols.map {$0}.joined(separator: "と、"))。") +
         (environment.enumerated.isEmpty ? "" : "型の要素が、\(environment.enumerated.map {$0.key}.joined(separator: "と、"))。") +
-        (initializers.array.reduce("") {$0 + "初期化は、さらに、【\($1.string)】。"}) 
+        (initializers.all.reduce("") {$0 + "初期化は、さらに、【\($1.string)】。"}) 
         let s2 = (body.map {"本体が、\($0.string)"} ?? "") +
         "】"
         s1.range(of: "さらに、").map {s1.replaceSubrange($0, with: "")} // 初出の「さらに、」を取り除く
@@ -413,7 +413,7 @@ extension JpfFunction {
     /// 本体は評価実行され、エラーかアンラップされた返り値を返す。
     /// - Parameter environment: 実行中の(通常もしくは関数の)環境
     /// - Returns: エラーかアンラップされた返り値、なければnil
-    func executed(with environment: Environment) -> JpfObject? {
+    func execute(with environment: Environment) -> JpfObject? {
         let local = Environment(outer: self.environment)    // 関数の環境を拡張
         let stackEnv = environment.isEmpty ? self.environment : environment
         defer {_ = environment.push(stackEnv.pullAll())}    // スタックを戻す

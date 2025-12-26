@@ -56,7 +56,7 @@ struct Repl {
         errors.forEach {print("\t\($0)")}
     }
     private func runEvaluator(of program: Program, with environment: Environment) {
-        let evaluated = program.evaluated(with: environment)
+        let evaluated = program.evaluate(with: environment)
         evaluated.map {print("評価結果: \($0.string)")}
         print("入力: (\(environment.string))")
     }

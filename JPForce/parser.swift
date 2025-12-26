@@ -37,7 +37,7 @@ class Parser {
     var switchCase = SwitchCase()           // Switch-case監視
     // MARK: - プログラムの解析
     func parseProgram() -> Program? {
-        var program = Program()
+        let program = Program()
         switchCase.enter()
         while !currentToken.isEof {
             skipEols()

@@ -11,12 +11,12 @@ import Foundation
 protocol Evaluatable {
     /// ASTノードの評価を行い、結果のオブジェクトを返す。
     /// - Returns: 返すオブジェクトが無い場合、nilを返す。エラーの場合は、JpfErrorを返す。
-    func evaluated(with environment: Environment) -> JpfObject?
+    func evaluate(with environment: Environment) -> JpfObject?
 }
 // MARK: - implements (evalutable extentions)
 // MARK: 文と式を評価して、オブジェクト(JpfObject)を生成
 extension Node {
-    func evaluated(with environment: Environment) -> JpfObject? {
+    func evaluate(with environment: Environment) -> JpfObject? {
         return (self.string + "(\(type(of: self)))" + notImplementedError)
     }
     // 評価エラー
@@ -53,20 +53,20 @@ extension Node {
 }
 // MARK: Program/Statement/Block evaluators
 extension Program : Evaluatable {
-    func evaluated(with environment: Environment) -> JpfObject? {
+    func evaluate(with environment: Environment) -> JpfObject? {
         var lastResult: JpfObject?
         for statement in statements {
-            lastResult = statement.evaluated(with: environment)
+            lastResult = statement.evaluate(with: environment)
             if let result = lastResult, result.isBreakFactor {return result.value}
         }
         return lastResult
     }
 }
 extension ExpressionStatement : Evaluatable {
-    func evaluated(with environment: Environment) -> JpfObject? {
+    func evaluate(with environment: Environment) -> JpfObject? {
         var lastResult: JpfObject?
         for expression in expressions {
-            lastResult = expression.evaluated(with: environment)
+            lastResult = expression.evaluate(with: environment)
             if let result = lastResult {
                 if result.isBreakFactor {break}
                 if let err = environment.push(result) {return err}
@@ -77,18 +77,18 @@ extension ExpressionStatement : Evaluatable {
     }
 }
 extension BlockStatement : Evaluatable {
-    func evaluated(with environment: Environment) -> JpfObject? {
+    func evaluate(with environment: Environment) -> JpfObject? {
         var lastResult: JpfObject?
         for statement in statements {
-            lastResult = statement.evaluated(with: environment)
+            lastResult = statement.evaluate(with: environment)
             if let result = lastResult, result.isBreakFactor {break}
         }
         return lastResult
     }
 }
 extension DefineStatement : Evaluatable {
-    func evaluated(with environment: Environment) -> JpfObject? {
-        if let result = value.evaluated(with: environment), result.isError {return result}
+    func evaluate(with environment: Environment) -> JpfObject? {
+        if let result = value.evaluate(with: environment), result.isError {return result}
         guard var definition = environment.pull() else {return nil}
         if let keyword = Token.Keyword(rawValue: name.value),
            Token.redefinables.contains(keyword) {   // 再定義可能な識別子
@@ -120,14 +120,14 @@ extension DefineStatement : Evaluatable {
             guard let function = object as? JpfFunction else {return functionOverloadError}
             return JpfFunction(
                 name: original.name,
-                overload: overload(original.overload, with: function.overload.overloaded),
+                overload: original.overload.append(function.overload.markAsOverloaded()),
                 environment: environment
             )
         case let original as JpfComputation:    // 算出の多重定義
             guard var computation = object as? JpfComputation else {return computationOverloadError}
-            if computation.getters.array.count == 1 && computation.setters.isEmpty {
+            if computation.getters.isSingleDefinition && computation.setters.isEmpty {
                 // 算出定義内に取得が唯一 → <識別子>は、さらに、算出【取得は、さらに、【…】】
-                computation.getters = computation.getters.overloaded
+                computation.getters = computation.getters.markAsOverloaded()
             }
             return JpfComputation(
                 name: original.name,
@@ -188,14 +188,14 @@ extension DefineStatement : Evaluatable {
         case let f as JpfFunction:
             return JpfFunction(
                 name: f.name,
-                overload: f.overload.overloaded(by: keyword),
+                overload: f.overload.redefinePredicate(by: keyword),
                 environment: f.environment
             )
         case let c as JpfComputation:
             return JpfComputation(
                 name: c.name,
-                setters: c.setters.overloaded(by: keyword),
-                getters: c.getters.overloaded(by: keyword),
+                setters: c.setters.redefinePredicate(by: keyword),
+                getters: c.getters.redefinePredicate(by: keyword),
                 environment: c.environment
             )
         default:
@@ -203,43 +203,42 @@ extension DefineStatement : Evaluatable {
         }
     }
     private func overload(_ original: FunctionBlocks, with definition: FunctionBlocks) -> FunctionBlocks {
-        var overloaded = original
-        return overloaded.append(definition)
+        return original.append(definition)
     }
 }
 // MARK: Expression evaluators
 extension IntegerLiteral : Evaluatable {
     /// 数値オブジェクトを返す。
     /// または、数値で配列もしくは辞書の要素を取り出し返す。
-    func evaluated(with environment: Environment) -> JpfObject? {
+    func evaluate(with environment: Environment) -> JpfObject? {
         JpfInteger(value: value)
     }
 }
 extension StringLiteral : Evaluatable {
     /// 文字列オブジェクトを返す。
     /// または、文字列で辞書の要素を取り出し返す。
-    func evaluated(with environment: Environment) -> JpfObject? {
+    func evaluate(with environment: Environment) -> JpfObject? {
         JpfString(value: value)
     }
 }
 extension Boolean : Evaluatable {
     /// 真偽値オブジェクトを返す。
     /// または、真偽値で辞書の要素を取り出し返す。
-    func evaluated(with environment: Environment) -> JpfObject? {
+    func evaluate(with environment: Environment) -> JpfObject? {
         JpfBoolean(value: value)
     }
 }
 extension RangeLiteral : Evaluatable {
-    func evaluated(with environment: Environment) -> JpfObject? {
+    func evaluate(with environment: Environment) -> JpfObject? {
         if let err = environment.push(JpfNull.object) {return err}  // 範囲の上下限が、配列にアクセスしないための回避策
         var lowerBound, upperBound: (JpfInteger, Token)?
-        if let object = self.lowerBound?.evaluated(with: environment) {
+        if let object = self.lowerBound?.evaluate(with: environment) {
             if object.isError {return object}
             guard let value = environment.peek as? JpfInteger else {return rangeTypeError + object.string}
             environment.drop()
             lowerBound = (value, self.lowerBound!.token)
         }
-        if let object = self.upperBound?.evaluated(with: environment) {
+        if let object = self.upperBound?.evaluate(with: environment) {
             if object.isError {return object}
             guard let value = environment.peek as? JpfInteger else {return rangeTypeError + object.string}
             environment.drop()
@@ -254,7 +253,7 @@ extension Identifier : Evaluatable {
     /// 識別子名をキーに、オブジェクトを得る。(あれば入力に積まれる。)
     /// - 「の」による属性、メソッド、値、その他属性、の順にオブジェクト取得
     /// - 返すオブジェクトが算出で実行可であれば、取得(getter)を呼び出す。
-    func evaluated(with environment: Environment) -> JpfObject? {
+    func evaluate(with environment: Environment) -> JpfObject? {
         var object: JpfObject? = nil
         if let o = getProperty(of: value, from: environment, check: true) { // 「ノ格」による属性アクセス
             object = o
@@ -328,21 +327,21 @@ extension Identifier : Evaluatable {
 extension PredicateExpression : Evaluatable {
     /// 述語を実行する。(結果があれば返す。= スタックに積まれる。)
     /// self.tokenは述語(Token.Keywordもしくは Token.IDENT(_))
-    func evaluated(with environment: Environment) -> JpfObject? {
+    func evaluate(with environment: Environment) -> JpfObject? {
         if let keyword = token.keyword, environment.contains(keyword) { // 再定義済み？
             let ident = Identifier(from: token)
-            return ident.evaluated(with: environment)
+            return ident.evaluate(with: environment)
         }
         let predicate = PredicateOperableFactory.create(from: token, with: environment)
-        return predicate.operated()
+        return predicate.operate()
     }
 }
 extension PhraseExpression : Evaluatable {
     /// 句(式+助詞)を返す。
     /// self.tokenは、助詞(Token.Particle)
-    func evaluated(with environment: Environment) -> JpfObject? {
+    func evaluate(with environment: Environment) -> JpfObject? {
         var object: JpfObject
-        if let result = left.evaluated(with: environment) { // leftの評価結果が値を返した場合
+        if let result = left.evaluate(with: environment) {  // leftの評価結果が値を返した場合
             object = result
         } else
         if let value = environment.unwrappedPeek {          // leftがスタックに値を出力した場合
@@ -360,17 +359,17 @@ extension OrExpression : Evaluatable {
     /// <値１>または<値２>…<格> → 配列【<値１>、<値２>…】<格>
     /// - Parameter environment: 環境
     /// - Returns: 配列、または配列を含む句、エラー
-    func evaluated(with environment: Environment) -> JpfObject? {
+    func evaluate(with environment: Environment) -> JpfObject? {
         guard token.isKeyword(.OR) else {
             return "「\(tokenLiteral)」" + keywordNotSupportedInInfixExpression
         }
-        guard let value = left.evaluated(with: environment) else {return nil}
+        guard let value = left.evaluate(with: environment) else {return nil}
         guard !value.isError else {return value}
         guard let la = toArray(from: value) else {
             return "「\(value.string)」" + keywordNotSupportedInInfixExpression
         }
         //
-        guard let value = right.evaluated(with: environment) else {return nil}
+        guard let value = right.evaluate(with: environment) else {return nil}
         guard !value.isError else {return value}
         guard let ra = toArray(from: value) else {
             return "「\(value.string)」" + keywordNotSupportedInInfixExpression
@@ -403,12 +402,12 @@ extension CaseExpression : Evaluatable {
     /// 形式１：　(条件)場合、【処理】(、それ以外は、【処理】)
     /// 形式２：   (〜が、〜の)場合、【処理】(、(〜の)場合、【処理】...)(、それ以外は、【処理】)
     /// - Returns: ReturnValueまたはnil、エラー
-    func evaluated(with environment: Environment) -> JpfObject? {
+    func evaluate(with environment: Environment) -> JpfObject? {
         if let condition = getCondition(from: environment) {
             guard !condition.isError else {return condition}
             let result =  condition.isTrue ?
-            consequence.evaluated(with: environment) :
-            alternative?.evaluated(with: environment)
+            consequence.evaluate(with: environment) :
+            alternative?.evaluate(with: environment)
             if let value = result, value.isBreakFactor {return value}
         }
         return nil
@@ -446,9 +445,9 @@ extension CaseExpression : Evaluatable {
     }
 }
 extension LogicalExpression : Evaluatable {
-    func evaluated(with environment: Environment) -> JpfObject? {
+    func evaluate(with environment: Environment) -> JpfObject? {
         guard let condition = environment.peek else {return "「\(tokenLiteral)」" + logicalConditionError}
-        guard let object = right.evaluated(with: environment) else {return "「\(tokenLiteral)」" + logicalRightEvaluationError}
+        guard let object = right.evaluate(with: environment) else {return "「\(tokenLiteral)」" + logicalRightEvaluationError}
         if object.isError {return object}
         guard let right = environment.pull() else {return "「\(tokenLiteral)」" + logicalRightEvaluationError}
         environment.drop()      // 入力（左辺(条件)）を捨てる
@@ -463,51 +462,51 @@ extension LogicalExpression : Evaluatable {
     }
 }
 extension ConditionalOperation : Evaluatable {
-    func evaluated(with environment: Environment) -> (any JpfObject)? {
+    func evaluate(with environment: Environment) -> (any JpfObject)? {
         guard let condition = environment.unwrappedPeek else {return conditionalOperationError}
         environment.drop()
         return condition.isTrue ?
-            consequence.evaluated(with: environment) :
-            alternative.evaluated(with: environment)
+            consequence.evaluate(with: environment) :
+            alternative.evaluate(with: environment)
     }
 }
 extension LoopExpression : Evaluatable {
-    func evaluated(with environment: Environment) -> JpfObject? {
+    func evaluate(with environment: Environment) -> JpfObject? {
         // 入力（パラメータ）の数と、格・型をチェック
         if let params = environment.peek(3),
            params[0].isParticle(.KARA) && params[1].isParticle(.MADE) {
             environment.drop(3)
-            return evaluatedLoop(from: params[0].number, through: params[1].number, by: params[2].number, with: environment)
+            return evaluateLoop(from: params[0].number, through: params[1].number, by: params[2].number, with: environment)
         } else
         if let params = environment.peek(2) {
             guard params[0].isParticle(.KARA) && params[1].isParticle(.MADE) else {return strideLoopUsage}
             environment.drop(2)
-            return evaluatedLoop(from: params[0].number, through: params[1].number, with: environment)
+            return evaluateLoop(from: params[0].number, through: params[1].number, with: environment)
         } else
         if let param = environment.peek {
             switch param.value {
             case let array as JpfArray:
-                return evaluatedLoop(of: array, with: environment)
+                return evaluateLoop(of: array, with: environment)
             case let dictionary as JpfDictionary:
-                return evaluatedLoop(of: dictionary, with: environment)
+                return evaluateLoop(of: dictionary, with: environment)
             case let range as JpfRange:
-                return evaluatedLoop(of: range, with: environment)
+                return evaluateLoop(of: range, with: environment)
             default:
-                return evaluatedLoop(with: environment)
+                return evaluateLoop(with: environment)
             }
         } else {
-            return evaluatedLoop(with: environment)
+            return evaluateLoop(with: environment)
         }
     }
     // 反復【(条件が<条件式>(の)間、)<処理>】。
     // (条件が無い場合、処理に「中止する」があることが前提→無いと無限ループ)
-    private func evaluatedLoop(with environment: Environment) -> JpfObject? {
+    private func evaluateLoop(with environment: Environment) -> JpfObject? {
         repeat {
-            if let condition = evaluatedCondition(with: environment) {  // 条件式の評価
+            if let condition = evaluateCondition(with: environment) {   // 条件式の評価
                 guard !condition.isError else {return condition}
                 guard condition.isTrue else {break}
             }
-            if let evaluated = body.evaluated(with: environment) {      // 本体の評価
+            if let evaluated = body.evaluate(with: environment) {       // 本体の評価
                 if evaluated.isBreak {break}        // 中止する
                 if evaluated.isContinue {continue}  // 継続する
                 if evaluated.isBreakFactor {return evaluated}
@@ -516,12 +515,12 @@ extension LoopExpression : Evaluatable {
         return nil
     }   // 「返す」で上がってきたReturnValueであれば、そのまま返す。それ以外は処理終了
     // <数値>から<数値>まで（<数値>ずつ）反復【入力が<識別子(カウント値)>、<処理>】。
-    private func evaluatedLoop(from: Int?, through: Int?, by: Int? = 1, with environment: Environment) -> JpfObject? {
+    private func evaluateLoop(from: Int?, through: Int?, by: Int? = 1, with environment: Environment) -> JpfObject? {
         guard let f = from, let t = through, let b = by,
               parameters.count == 1 else {return loopParameterError + strideLoopUsage}
         for counter in stride(from: f, through: t, by: b) {
             environment[parameters[0].value] = JpfInteger(value: counter)   // カウンタの更新
-            if let evaluated = body.evaluated(with: environment) {
+            if let evaluated = body.evaluate(with: environment) {
                 if evaluated.isBreak {break}        // 中止する
                 if evaluated.isContinue {continue}  // 継続する
                 if evaluated.isBreakFactor {return evaluated}
@@ -530,22 +529,22 @@ extension LoopExpression : Evaluatable {
         return nil
     }
     // <範囲>を反復【入力が<識別子(カウント値)>、<処理>】。
-    private func evaluatedLoop(of range: JpfRange, with environment: Environment) -> JpfObject? {
+    private func evaluateLoop(of range: JpfRange, with environment: Environment) -> JpfObject? {
         guard parameters.count == 1 else {return loopParameterError + rangeLoopUsage}
         guard let lowerBound = range.lowerBound?.0.number,
               var upperBound = range.upperBound?.0.number else {return rangeLoopUsage}
         if let formatError = range.error {return formatError}
         environment.drop()
         if range.upperBound?.1 == Token(.UNDER) {upperBound -= 1}       // 未満なので、上限 - 1
-        return evaluatedLoop(from: lowerBound, through: upperBound, with: environment)  // 下限から、上限までループ
+        return evaluateLoop(from: lowerBound, through: upperBound, with: environment)   // 下限から、上限までループ
     }
     // <配列>を反復【入力が<識別子(値)>、<処理>】。
-    private func evaluatedLoop(of array: JpfArray, with environment: Environment) -> JpfObject? {
+    private func evaluateLoop(of array: JpfArray, with environment: Environment) -> JpfObject? {
         guard parameters.count == 1 else {return loopParameterError + arrayLoopUsage}
         environment.drop()
         for element in array.elements {
             environment[parameters[0].value] = element
-            if let evaluated = body.evaluated(with: environment) {
+            if let evaluated = body.evaluate(with: environment) {
                 if evaluated.isBreak {break}        // 中止する
                 if evaluated.isContinue {continue}  // 継続する
                 if evaluated.isBreakFactor {return evaluated}
@@ -554,13 +553,13 @@ extension LoopExpression : Evaluatable {
         return nil
     }
     // <辞書>を反復【入力が<識別子(キー)>と<識別子(値)>、<処理>】。
-    private func evaluatedLoop(of dictionary: JpfDictionary, with environment: Environment) -> JpfObject? {
+    private func evaluateLoop(of dictionary: JpfDictionary, with environment: Environment) -> JpfObject? {
         guard parameters.count == 2 else {return loopParameterError + dictionaryLoopUsage}
         environment.drop()
         for pair in dictionary.pairs {
             environment[parameters[0].value] = pair.value.key
             environment[parameters[1].value] = pair.value.value
-            if let evaluated = body.evaluated(with: environment) {
+            if let evaluated = body.evaluate(with: environment) {
                 if evaluated.isBreak {break}        // 中止する
                 if evaluated.isContinue {continue}  // 継続する
                 if evaluated.isBreakFactor {return evaluated}
@@ -569,11 +568,11 @@ extension LoopExpression : Evaluatable {
         return nil
     }
     // 「反復」の条件を評価する。条件式が無い場合は、真オブジェクトを返す。
-    private func evaluatedCondition(with environment: Environment) -> JpfObject? {
+    private func evaluateCondition(with environment: Environment) -> JpfObject? {
         if condition.isEmpty {return JpfBoolean.TRUE}
         var result: JpfObject?
         for expression in condition {
-            result = expression.evaluated(with: environment)
+            result = expression.evaluate(with: environment)
             if let object = result {
                 if object.isBreakFactor {break}
                 if let err = environment.push(object) {return err}
@@ -590,7 +589,7 @@ extension Label : Evaluatable {
     /// 4. ラベルが「外部」である場合は、outerから値を取り出し、返す。
     /// - Parameter environment: 格納先
     /// - Returns: 識別子名、または位置の数値 (オブジェクトの識別子名は、ラベル名)
-    func evaluated(with environment: Environment) -> JpfObject? {
+    func evaluate(with environment: Environment) -> JpfObject? {
         var object: JpfObject
         switch value.type {
         case .int:
@@ -601,7 +600,7 @@ extension Label : Evaluatable {
         case .keyword(let k):
             if token.isKeyword(.RESERVEDWORD) {
                 let predicate = PredicateOperableFactory.create(from: k, with: environment)
-                return predicate.operated()
+                return predicate.operate()
             }
             guard k == .TRUE || k == .FALSE else {return "『\(value.literal)』" + cannotUseAsKeyword}
             object = JpfBoolean(name: tokenLiteral, value: k == .TRUE)
@@ -663,10 +662,10 @@ extension Label : Evaluatable {
     }
 }
 extension ArrayLiteral : Evaluatable {
-    func evaluated(with environment: Environment) -> JpfObject? {
+    func evaluate(with environment: Environment) -> JpfObject? {
         var results: [JpfObject] = []
         for element in elements {
-            if let result = element.evaluated(with: environment), result.isError {return result}
+            if let result = element.evaluate(with: environment), result.isError {return result}
             if let params = environment.peek(2), let elements = elements(from: params) {
                 environment.drop(2)
                 results = elements
@@ -684,14 +683,14 @@ extension ArrayLiteral : Evaluatable {
     }
 }
 extension DictionaryLiteral : Evaluatable {
-    func evaluated(with environment: Environment) -> JpfObject? {
+    func evaluate(with environment: Environment) -> JpfObject? {
         var results: [JpfHashKey : (key: JpfObject, value: JpfObject)] = [:]
         for expression in pairs {
-            guard let key = expression.pair.key.evaluated(with: environment) else {return nil}
+            guard let key = expression.pair.key.evaluate(with: environment) else {return nil}
             guard !key.isError else {return key}
             let keyObject = environment.pull()!     // スタックに積まれた評価結果を回収
             guard let object = key as? JpfHashable else {return unusableAsHashKey + "「\(key.string)」"}
-            guard let value = expression.pair.value.evaluated(with: environment) else {return nil}
+            guard let value = expression.pair.value.evaluate(with: environment) else {return nil}
             guard !value.isError else {return value}
             let valueObject = environment.pull()!   // スタックに積まれた評価結果を回収
             results[object.hashKey] = (keyObject, valueObject)
@@ -700,17 +699,17 @@ extension DictionaryLiteral : Evaluatable {
     }
 }
 extension FunctionLiteral : Evaluatable {
-    func evaluated(with environment: Environment) -> JpfObject? {
+    func evaluate(with environment: Environment) -> JpfObject? {
         JpfFunction(overload: FunctionBlocks(function), environment: environment)
     }
 }
 extension ComputationLiteral : Evaluatable {
-    func evaluated(with environment: Environment) -> JpfObject? {
+    func evaluate(with environment: Environment) -> JpfObject? {
         JpfComputation(setters: setters, getters: getters, environment: environment)
     }
 }
 extension TypeLiteral : Evaluatable {
-    func evaluated(with environment: Environment) -> JpfObject? {
+    func evaluate(with environment: Environment) -> JpfObject? {
         switch derivedProtocols(from: protocols, with: environment) {
         case .success(let all):
             let local = Environment(outer: environment)
@@ -724,7 +723,7 @@ extension TypeLiteral : Evaluatable {
     }
 }
 extension ProtocolLiteral : Evaluatable {
-    func evaluated(with environment: Environment) -> JpfObject? {
+    func evaluate(with environment: Environment) -> JpfObject? {
         switch derivedProtocols(from: protocols, with: environment) {
         case .success(let all):
             return JpfProtocol(protocols: all, clauses: clauses)
@@ -745,7 +744,7 @@ private func derivedProtocols(from protocols: [String], with environment: Enviro
     return .success(results)
 }
 extension EnumLiteral : Evaluatable {
-    func evaluated(with environment: Environment) -> JpfObject? {
+    func evaluate(with environment: Environment) -> JpfObject? {
         let local = Environment(outer: environment)             // 列挙型の環境を拡張
         var ident: String = ""
         var identifiers: [String] = []
@@ -760,7 +759,7 @@ extension EnumLiteral : Evaluatable {
             } else
             if let statement = element as? DefineStatement {    // 値有り(値をlocalに設定)
                 ident = statement.name.value
-                if let result = element.evaluated(with: local), result.isError {return result}
+                if let result = element.evaluate(with: local), result.isError {return result}
                 if let value = local[ident] as? JpfInteger {    // 設定値が<数値>の場合、
                     number = value.value + 1                    // 値+1を連番に振り直す。
                 }
@@ -773,7 +772,7 @@ extension EnumLiteral : Evaluatable {
     }
 }
 extension EnumeratorLiteral : Evaluatable {
-    func evaluated(with environment: Environment) -> JpfObject? {
+    func evaluate(with environment: Environment) -> JpfObject? {
         guard let enumObject = getEnumObject(from: environment) else {return undefinedIdentifier(type)}
         return JpfEnumerator(type: enumObject.name, identifier: name, rawValue: enumObject.environment[name])
     }
@@ -799,20 +798,20 @@ extension EnumeratorLiteral : Evaluatable {
     }
 }
 extension CallExpression : Evaluatable {
-    func evaluated(with environment: Environment) -> (any JpfObject)? {
+    func evaluate(with environment: Environment) -> (any JpfObject)? {
         defer {environment.isExecutable = true}
         environment.isExecutable = false    // targetの実行を抑止
-        switch target.evaluated(with: environment) {
+        switch target.evaluate(with: environment) {
         case let f as JpfFunction:
             let local = Environment(outer: f.environment)
-            arguments.forEach {_ = $0.evaluated(with: local)}
+            arguments.forEach {_ = $0.evaluate(with: local)}
             local.storeArguments(with: local)
             if let result = environment.call(f.overload, with: local) {
                 return result
             }
         case let c as JpfComputation:
             let local = Environment(outer: c.environment)
-            arguments.forEach {_ = $0.evaluated(with: local)}
+            arguments.forEach {_ = $0.evaluate(with: local)}
             local.storeArguments(with: local)
             if let result = environment.call(c.getters, with: local) {
                 return result
@@ -821,7 +820,7 @@ extension CallExpression : Evaluatable {
             switch t.create(with: environment) {    // インスタンスを生成
             case let instance as JpfInstance:
                 let args = Environment()            // 引数のみの環境
-                arguments.forEach {_ = $0.evaluated(with: args)}
+                arguments.forEach {_ = $0.evaluate(with: args)}
                 instance.environment.storeArguments(with: args, shouldMerge: true)
                 if let result = instance.initialize(with: t) {return result}
                 return instance
@@ -840,19 +839,19 @@ extension GenitiveExpression : Evaluatable {
     /// 属格：<オブジェクト>の<オブジェクト>(は、<値>。)を評価する。
     /// - Parameter environment: 入力の環境
     /// - Returns: 評価結果
-    func evaluated(with environment: Environment) -> (any JpfObject)? {
-        guard let object = left.evaluated(with: environment) ?? environment.pull() else {return nil}
+    func evaluate(with environment: Environment) -> (any JpfObject)? {
+        guard let object = left.evaluate(with: environment) ?? environment.pull() else {return nil}
         guard !object.isError else {return object}
         if let phrase = right as? PhraseExpression, phrase.token.isParticle(.WA) {
             // 代入文の処理
-            if let result = value?.evaluated(with: environment), result.isError {return result}
+            if let result = value?.evaluate(with: environment), result.isError {return result}
             guard let value = environment.pull() else {return nil}      // 値をスタックから取得
             let element = getElement(from: phrase.left, with: environment)
             let result = object.assign(value, to: element)              // 値を要素に代入
             guard !result.isError else {return result}
             return environment.assign(result, with: object.name)        // 結果を辞書に登録
         }
-        return evaluated(object, self.right, with: environment)
+        return evaluate(object, self.right, with: environment)
     }
     /// 属格の右を確認し、<object>の<right>を処理する。
     /// - Parameters:
@@ -860,13 +859,13 @@ extension GenitiveExpression : Evaluatable {
     ///   - right:  右側の式(ASTノード)
     /// - Parameter environment: 入力の環境
     /// - Returns: 評価結果
-    private func evaluated(_ object: JpfObject, _ right: Expression, with environment: Environment) -> JpfObject? {
+    private func evaluate(_ object: JpfObject, _ right: Expression, with environment: Environment) -> JpfObject? {
         var accessor: JpfObject? = nil
         let phrase = JpfPhrase(name: object.name, value: object, particle: token)
         switch right {
         case let ident as Identifier:
             if let err = environment.push(phrase) {return err}
-            accessor = ident.evaluated(with: environment)
+            accessor = ident.evaluate(with: environment)
             if environment.peek?.name == object.name && environment.isPeekParticle(.NO) {
                 environment.drop()
             } else {                // objectをsubsciptでアクセス済み
@@ -874,20 +873,20 @@ extension GenitiveExpression : Evaluatable {
             }
         case is ComputationLiteral:
             if let err = environment.push(phrase) {return err}
-            if let c = right.evaluated(with: environment) as? JpfComputation {
+            if let c = right.evaluate(with: environment) as? JpfComputation {
                 return environment.isExecutable ? c.getter(with: environment) : c
             }
             return nil
         case let expression as PhraseExpression:
-            let object = evaluated(object, expression.left, with: environment)
+            let object = evaluate(object, expression.left, with: environment)
             return JpfPhrase(name: "", value: object, particle: expression.token)
         case is PredicateExpression, is Label, is CaseExpression:
             if let err = environment.push(phrase) {return err}
-            return right.evaluated(with: environment)
+            return right.evaluate(with: environment)
         default:
-            accessor = right.evaluated(with: environment)
+            accessor = right.evaluate(with: environment)
         }
-        return object.accessed(by: accessor!, with: environment)
+        return object.accesse(by: accessor!, with: environment)
     }
     /// オブジェクトの要素を取り出す。
     /// - Parameters:
@@ -899,6 +898,6 @@ extension GenitiveExpression : Evaluatable {
             if let object = environment[ident.value] {return object}
             return JpfString(value: ident.value)
         }
-        return expression.evaluated(with: environment)
+        return expression.evaluate(with: environment)
     }
 }

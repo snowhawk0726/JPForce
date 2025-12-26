@@ -219,12 +219,12 @@ extension JpfRange : ContainerProtocol {
             (let l?, Token(.GTEQUAL),  let u?, Token(.LTEQUAL)):
             (l...u).forEach { element in
                 if environment.push(JpfInteger(value: element)) != nil {return}
-                _ = function.executed(with: environment)
+                _ = function.execute(with: environment)
             }
         case (let l?, Token(.GTEQUAL), let u?, Token(.UNDER)):
             (l..<u).forEach { element in
                 if environment.push(JpfInteger(value: element)) != nil {return}
-                _ = function.executed(with: environment)
+                _ = function.execute(with: environment)
             }
         default:
             return JpfError(rangeFormatError)
@@ -253,13 +253,13 @@ extension JpfRange : ContainerProtocol {
             (let l?, Token(.GTEQUAL),  let u?, Token(.LTEQUAL)):
             mapped = (l...u).map { element in
                 if let err = environment.push(JpfInteger(value: element)) {return err}
-                return function.executed(with: environment) ??
+                return function.execute(with: environment) ??
                 environment.pull() ?? JpfNull.object
             }
         case (let l?, Token(.GTEQUAL), let u?, Token(.UNDER)):
             mapped = (l..<u).map { element in
                 if let err = environment.push(JpfInteger(value: element)) {return err}
-                return function.executed(with: environment) ??
+                return function.execute(with: environment) ??
                 environment.pull() ?? JpfNull.object
             }
         default:
@@ -282,7 +282,7 @@ extension JpfRange : ContainerProtocol {
     private func f(_ initial: JpfObject, _ element: Int, _ function: JpfFunction, with environment: Environment) -> JpfObject {
         if let err = environment.push(initial) {return err}
         if let err = environment.push(JpfInteger(value: element)) {return err}
-        return function.executed(with: environment) ??
+        return function.execute(with: environment) ??
         environment.pull() ?? initial
     }
 }
@@ -460,7 +460,7 @@ extension JpfArray : ContainerProtocol {
     func contains(where function: JpfFunction, with environment: Environment) -> JpfObject {
         for element in elements {
             if let err = environment.push(element) {return err}
-            if let result = function.executed(with: environment) ?? environment.pull(),
+            if let result = function.execute(with: environment) ?? environment.pull(),
                result.isTrue {
                 return result
             }
@@ -470,21 +470,21 @@ extension JpfArray : ContainerProtocol {
     func foreach(_ function: JpfFunction, with environment: Environment) -> JpfObject? {
         for element in elements {
             if let err = environment.push(element) {return err}
-            _ = function.executed(with: environment)
+            _ = function.execute(with: environment)
         }
         return nil
     }
     func map(_ function: JpfFunction, with environment: Environment) -> JpfObject {
         JpfArray(name: self.name, elements: elements.map { element in
             if let err = environment.push(element) {return err}
-            return function.executed(with: environment) ??
+            return function.execute(with: environment) ??
             environment.pull() ?? JpfNull.object
         })
     }
     func filter(_ function: JpfFunction, with environment: Environment) -> JpfObject {
         JpfArray(name: self.name, elements: elements.filter { element in
             if environment.push(element) != nil {return false}
-            let result = function.executed(with: environment) ?? environment.pull()
+            let result = function.execute(with: environment) ?? environment.pull()
             return result?.isTrue ?? false
         })
     }
@@ -492,7 +492,7 @@ extension JpfArray : ContainerProtocol {
         elements.reduce(initial) { initial, element in
             if let err = environment.push(initial) {return err}
             if let err = environment.push(element) {return err}
-            return function.executed(with: environment) ??
+            return function.execute(with: environment) ??
             environment.pull() ?? initial
         }
     }
@@ -525,7 +525,7 @@ extension JpfArray : ContainerProtocol {
         return JpfArray(name: self.name, elements: elements.sorted { lhs, rhs in
             if environment.push(lhs) != nil {return false}
             if environment.push(rhs) != nil {return false}
-            let result = function.executed(with: environment) ?? environment.pull()
+            let result = function.execute(with: environment) ?? environment.pull()
             return result?.isTrue ?? false
         })
     }
@@ -579,7 +579,7 @@ extension JpfDictionary {
         for element in pairs.values {
             if let err = environment.push(element.key) {return err}
             if let err = environment.push(element.value) {return err}
-            if let result = function.executed(with: environment) ?? environment.pull(),
+            if let result = function.execute(with: environment) ?? environment.pull(),
                result.isTrue {
                 return result
             }
@@ -590,7 +590,7 @@ extension JpfDictionary {
         for (key, value) in pairs.values {
             if let err = environment.push(key) {return err}
             if let err = environment.push(value) {return err}
-            _ = function.executed(with: environment)
+            _ = function.execute(with: environment)
         }
         return nil
     }
@@ -598,7 +598,7 @@ extension JpfDictionary {
         JpfArray(name: self.name, elements: pairs.values.map { key, value in
             if let err = environment.push(key) {return err}
             if let err = environment.push(value) {return err}
-            return function.executed(with: environment) ??
+            return function.execute(with: environment) ??
             environment.pull() ?? JpfNull.object
         })
     }
@@ -606,7 +606,7 @@ extension JpfDictionary {
         let values = pairs.values.filter { key, value in
             if environment.push(key) != nil {return false}
             if environment.push(value) != nil {return false}
-            let result = function.executed(with: environment) ?? environment.pull()
+            let result = function.execute(with: environment) ?? environment.pull()
             return result?.isTrue ?? false
         }
         let keys = values.map {
@@ -620,7 +620,7 @@ extension JpfDictionary {
             if let err = environment.push(initial) {return err}
             if let err = environment.push(element.key) {return err}
             if let err = environment.push(element.value) {return err}
-            return function.executed(with: environment) ??
+            return function.execute(with: environment) ??
             environment.pull() ?? initial
         }
     }

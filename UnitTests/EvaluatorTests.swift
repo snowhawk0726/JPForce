@@ -263,7 +263,7 @@ final class EvaluatorTests: XCTestCase {
         let input = "関数であって、【入力がxであり、本体が、xに2を足す】。"
         print("テストパターン: \(input)")
         let function = try XCTUnwrap(testEvaluator(input) as? JpfFunction)
-        let functionBlock = try XCTUnwrap(function.overload.array.first)
+        let functionBlock = try XCTUnwrap(function.overload.single)
         XCTAssertEqual(functionBlock.parameters.count, 1)
         XCTAssertEqual(functionBlock.parameters.first?.string, "x")
         XCTAssertEqual(functionBlock.body?.string, "xに2を足す。")
@@ -456,7 +456,7 @@ final class EvaluatorTests: XCTestCase {
         let input = "加算は、さらに、関数【入力がa「数値に」とb「数値を」で、aにbを足す】。加算。"
         print("テストパターン: \(input)")
         let function = try XCTUnwrap(testEvaluator(input) as? JpfFunction)
-        let functionBlock = try XCTUnwrap(function.overload.array.first)
+        let functionBlock = try XCTUnwrap(function.overload.single)
         XCTAssertEqual(functionBlock.parameters.count, 2)
         XCTAssertEqual(functionBlock.parameters[0].string, "a")
         XCTAssertEqual(functionBlock.parameters[1].string, "b")
@@ -473,9 +473,9 @@ final class EvaluatorTests: XCTestCase {
         """
         print("テストパターン: \(input)")
         let computation = try XCTUnwrap(testEvaluatorWithLabel(input) as? JpfComputation)
-        XCTAssertTrue(computation.getters.hasRedefine)
+        XCTAssertTrue(computation.getters.hasRedefinition)
         XCTAssertTrue(computation.setters.isEmpty)
-        let functionBlocks = computation.getters.array
+        let functionBlocks = computation.getters.all
         XCTAssertEqual(functionBlocks.count, 3)
         XCTAssertEqual(functionBlocks[0].paramForm.numberOfInputs, 2)
         XCTAssertEqual(functionBlocks[0].paramForm.strings[0], "「数値」")
@@ -503,7 +503,7 @@ final class EvaluatorTests: XCTestCase {
         """
         print("テストパターン: \(input)")
         let computation = try XCTUnwrap(testEvaluatorWithLabel(input) as? JpfComputation)
-        let functionBlocks = computation.getters.array
+        let functionBlocks = computation.getters.all
         XCTAssertEqual(functionBlocks.count, 2)
         XCTAssertEqual(functionBlocks[0].paramForm.numberOfInputs, 2)
         XCTAssertEqual(functionBlocks[0].paramForm.strings[0], "「文字列」")
@@ -594,7 +594,7 @@ final class EvaluatorTests: XCTestCase {
         """
         print("テストパターン: \(input)")
         let type = try XCTUnwrap(testEvaluator(input) as? JpfType)
-        let initializer = try XCTUnwrap(type.initializers.array.first)
+        let initializer = try XCTUnwrap(type.initializers.single)
         XCTAssertEqual(initializer.parameters.count, 0)
         XCTAssertEqual(initializer.paramForm.numberOfInputs, 0)
         let initialization = try XCTUnwrap(initializer.body?.statements.first as? DefineStatement)
@@ -1859,7 +1859,7 @@ final class EvaluatorTests: XCTestCase {
             let environment: Environment
             /// 出力述語の演算
             /// - Returns: 文字列(JpfString)もしくはエラー(JpfError)を出力
-            func operated() -> (any JpfObject)? {
+            func operate() -> (any JpfObject)? {
                 var result = OutputString()
                 guard let object = leftOperand else {return nil}
                 if let error = output(object, withEscapeProcessing: true,
@@ -1905,7 +1905,7 @@ final class EvaluatorTests: XCTestCase {
             let evaluated = Evaluator(from: program, with: environment).object
             XCTAssertFalse(evaluated != nil && evaluated!.isError, evaluated?.string ?? "nil")
             let output = OutputOperator(environment)
-            let result = try XCTUnwrap(output.operated())
+            let result = try XCTUnwrap(output.operate())
             XCTAssertEqual(result.string, test.expected)
             print("テスト(\(result.string))終了")
         }

@@ -13,11 +13,11 @@ protocol Accessible {
     ///   - accessor: 対象のオブジェクトにアクセスする後置オブジェクト
     ///   - environment: ローカル環境
     /// - Returns: アクセス結果(オブジェクト)
-    func accessed(by accessor: JpfObject, with environment: Environment) -> JpfObject?
+    func accesse(by accessor: JpfObject, with environment: Environment) -> JpfObject?
 }
 extension JpfObject {
     /// デフォルト実装(acessorが文字列ならば、オブジェクトの属性を取得)
-    func accessed(by accessor: JpfObject, with environment: Environment) -> JpfObject? {
+    func accesse(by accessor: JpfObject, with environment: Environment) -> JpfObject? {
         guard let string = accessor as? JpfString else {
             return "\(self.string)を\(accessor.type)" + cannotAccessObjectWith
         }
@@ -28,7 +28,7 @@ extension JpfObject {
     var cannotAccessObjectWith: JpfError{JpfError("でアクセスすることはできない。")}
 }
 extension JpfArray : Accessible {
-    func accessed(by accessor: JpfObject, with environment: Environment) -> (any JpfObject)? {
+    func accesse(by accessor: JpfObject, with environment: Environment) -> (any JpfObject)? {
         switch accessor {
         case let int as JpfInteger:     // <配列>の<位置>
             return self[int.value]
@@ -44,7 +44,7 @@ extension JpfArray : Accessible {
     }
 }
 extension JpfInput : Accessible {
-    func accessed(by accessor: JpfObject, with environment: Environment) -> (any JpfObject)? {
+    func accesse(by accessor: JpfObject, with environment: Environment) -> (any JpfObject)? {
         switch accessor {
         case let int as JpfInteger:     // <入力>の<位置>
             return self[int.value]
@@ -57,7 +57,7 @@ extension JpfInput : Accessible {
     }
 }
 extension JpfDictionary : Accessible {
-    func accessed(by accessor: JpfObject, with environment: Environment) -> (any JpfObject)? {
+    func accesse(by accessor: JpfObject, with environment: Environment) -> (any JpfObject)? {
         switch accessor {
         case let string as JpfString:   // <辞書>の<索引(文字列)>、または<オブジェクト>の<属性>
             if let pair = pairs[string.hashKey] {
@@ -77,7 +77,7 @@ extension JpfDictionary : Accessible {
     }
 }
 extension JpfString : Accessible {
-    func accessed(by accessor: any JpfObject, with environment: Environment) -> (any JpfObject)? {
+    func accesse(by accessor: any JpfObject, with environment: Environment) -> (any JpfObject)? {
         switch accessor {
         case let int as JpfInteger:     // <文字列>の<位置>
             return self[int.value]

@@ -519,7 +519,7 @@ extension Parsable {
         ))
     }
     func parseFunctionBlocks(of name: String, in typename: String) -> Result<FunctionBlocks, FunctionBlockError> {
-        var functionBlocks = FunctionBlocks()
+        let functionBlocks = FunctionBlocks()
         while getNext(whenNextKeywordIs: name) {
             let isOverloaded = getNext(whenNextIs: DefineStatement.further)
             _ = getNext(whenNextIs: .COMMA)
@@ -613,7 +613,7 @@ struct DefStatementParser : StatementParsable {
         let isExtended = getNext(whenNextIs: DefineStatement.further)   // 「さらに、」
         _ = getNext(whenNextIs: .COMMA)
         getNext()
-        guard var parsed = ExpressionStatementParser(parser).parse() as? ExpressionStatement else {
+        guard let parsed = ExpressionStatementParser(parser).parse() as? ExpressionStatement else {
             error(message: "\(syntax)で、式の解釈に失敗した。")
             return nil
         }
@@ -623,7 +623,7 @@ struct DefStatementParser : StatementParsable {
             _ = getNext(whenNextIs: .PERIOD)
             skipNextEols()                  // EOLの前で解析を停止する。
         }
-        if var function = parsed.expressions.first as? FunctionLiteral {
+        if let function = parsed.expressions.first as? FunctionLiteral {
             function.name = identifier.value// 関数の名前を記録
             function.function.isOverloaded = isExtended
             parsed.expressions[0] = function// DefineStatement.valueに反映する。
@@ -638,8 +638,10 @@ struct ExpressionStatementParser : StatementParsable {
     init(_ parser: Parser) {self.parser = parser}
     let parser: Parser
     func parse() -> Statement? {
-        var expressions: [Expression] = []
         let token = currentToken
+        var expressions: [Expression] = []
+        var semanticStartIndex = 0
+        
         while !isEndOfStatement && !currentToken.isEof {
             skipEols()
             guard let expression = ExpressionParser(parser).parse() else {
@@ -647,92 +649,92 @@ struct ExpressionStatementParser : StatementParsable {
                 return nil
             }
             expressions.append(expression)
-            // 要素代入する対象の属格を２つの句に分割する
-            if isElementAssignPredicate(expression) {
-                splitElementAssignTarget(in: &expressions)
-            }
-            // LHSに代入する述語の場合、LHS対象の識別子に印をつける
+            // 未確定区間の意味処理
+            if isPredicateAssignment(expression) {
+                markLhsIdentifiers(in: expressions, from: semanticStartIndex)
+                splitElementAssignmentTarget(in: &expressions, from: semanticStartIndex)
+                semanticStartIndex = expressions.count
+            } else
             if isLhsAssignPredicate(expression) {
-                setLhsFlag(into: &expressions)
+                markLhsIdentifiers(in: expressions, from: semanticStartIndex)
+                semanticStartIndex = expressions.count
             }
+            //
             if getNextWhenNextIsEndOfStatement || isBreakFactor {break}    // 文の終わり
             _ = getNext(whenNextIs: .COMMA)     // 読点を読み飛ばし、
             getNext()                           // 次の式解析に
         }
         return ExpressionStatement(token: token, expressions: expressions)
     }
-    private var isEndOfStatement: Bool {currentToken.isPeriod || currentToken.isEol || isEndOfBlock}
+}
+private extension ExpressionStatementParser {
+    var isEndOfStatement: Bool {currentToken.isPeriod || currentToken.isEol || isEndOfBlock}
     /// 文の終わりを検出する。(例えば、「】。」の場合、isBreakFactorによるbreakを抑止する)
-    private var getNextWhenNextIsEndOfStatement: Bool {
+    var getNextWhenNextIsEndOfStatement: Bool {
         getNext(whenNextIs: .PERIOD) ||
         getNext(whenNextIs: .RBBRACKET) ||
         getNext(whenNextIs: .EOL)
     }
     /// 式が左辺(代入される対象の識別子)を持つ述語かどうか
-    private func isLhsAssignPredicate(_ exp: Expression) -> Bool {
+    func isLhsAssignPredicate(_ exp: Expression) -> Bool {
         guard let predicate = exp as? PredicateExpression else {
             return false
         }
         return predicate.token.hasLhsIdentifier
     }
     /// 式が要素代入をする述語かどうか
-    private func isElementAssignPredicate(_ exp: Expression) -> Bool {
+    func isPredicateAssignment(_ exp: Expression) -> Bool {
         guard let predicate = exp as? PredicateExpression else {
             return false
         }
         return predicate.token.isKeyword(.ASSIGN)
     }
-    /// 左辺を持つ式配列の対象識別子に、左辺フラグを立てる
-    private func setLhsFlag(into exps: inout [Expression]) {
-        var candidates: [Int] = []  // 左辺識別子の候補
-        for i in 0..<exps.count {
+    // LHSフラグ付け
+    func markLhsIdentifiers(
+        in expressions: [Expression],
+        from startIndex: Int
+    ) {
+        var candidates: [PhraseExpression] = []
+        for exp in expressions[startIndex...] {
             // 関係の無い述語であれば、候補をキャンセル
-            if let predicate = exps[i] as? PredicateExpression,
+            if let predicate = exp as? PredicateExpression,
                !predicate.token.hasLhsIdentifier {
-                candidates = []
+                candidates.removeAll()
                 continue
             }
-            guard let phrase = exps[i] as? PhraseExpression,
+            guard let phrase = exp as? PhraseExpression,
                   phrase.left is Identifier else {
                 continue
             }
             switch phrase.token {
             case .particle(.TO):
-                candidates.append(i)
+                candidates.append(phrase)
                 continue
             case .particle(.NO):
-                candidates = [i]
+                candidates = [phrase]
                 continue
             case .particle(.NI):
-                if let idx = candidates.first,
-                   let phrase = exps[idx] as? PhraseExpression,
-                       phrase.token == .particle(.NO) { // aのbに → a/
-                        break
+                if let first = candidates.first,
+                   first.token.isParticle(.NO) {
+                    break   // aのbに → 代入対象: a
                 }
-                candidates.append(i)
+                candidates.append(phrase)
             default:
                 continue
             }
-            // 確定した候補の識別子を、[Expression]に代入する。
-            for idx in candidates {
-                guard let targetPhrase = exps[idx] as? PhraseExpression,
-                      let targetIdent = targetPhrase.left as? Identifier else {
-                    continue
-                }
-                let newIdent = Identifier(token: targetIdent.token, value: targetIdent.value, isLhs: true)
-                exps[idx] = PhraseExpression(token: targetPhrase.token, left: newIdent)
+            // 確定した候補の識別子のisLhsをtrueにする。
+            candidates.forEach {
+                ($0.left as? Identifier)?.isLhs = true
             }
-            candidates = []
+            candidates.removeAll()
         }
     }
     /// 要素代入する対象の属格を２つの句に分割する
-    private func splitElementAssignTarget(in exps: inout [Expression]) {
-        for i in 0..<exps.count {
-            // 関係ない述語であれば、候補をキャンセル
-            if let predicate = exps[i] as? PredicateExpression,
-               !predicate.token.isKeyword(.ASSIGN) {
-                continue
-            }
+    func splitElementAssignmentTarget(
+        in exps: inout [Expression],
+        from startIndex: Int
+    ) {
+        for i in startIndex..<exps.count {
             guard let genitive = exps[i] as? GenitiveExpression,
                   let rightPhrase = genitive.right as? PhraseExpression,
                   rightPhrase.token.isParticle(.NI)  else {
@@ -1106,7 +1108,7 @@ struct ProtocolLiteralParser : ExpressionParsable {
         case .keyword(.INITIALIZATION): // 初期化
             switch parseFunctionBlocks(of: token.literal, in: token.literal) {
             case .success(let blocks):
-                return blocks.array.map {
+                return blocks.all.map {
                     .initializer(FunctionSignature(
                         parameters: $0.parameters,
                         paramForm:  $0.paramForm,
@@ -1123,8 +1125,8 @@ struct ProtocolLiteralParser : ExpressionParsable {
     }
     /// 算出内の多重定義(FunctionBlocks) → [SignatureKind]変換
     private func makeComputationSignatures(from literal: ComputationLiteral) -> [SignatureKind]? {
-        var getters = literal.getters.array.map {Optional($0)}
-        var setters = literal.setters.array.map {Optional($0)}
+        var getters = literal.getters.all.map {Optional($0)}
+        var setters = literal.setters.all.map {Optional($0)}
         let n = max(getters.count, setters.count)
         guard n > 0 else {
             error(message: "規約の算出には、取得か設定の少なくともいずれかの定義が必要。")

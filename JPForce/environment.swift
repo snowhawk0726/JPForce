@@ -203,12 +203,11 @@ class Environment {
                 }
             }
         }
-        if let keyword = functions.keyword {        // 予約語再定義の既定動作
-            let predicate = PredicateOperableFactory.create(from: keyword, with: self)
-            return predicate.operated()
+        if functions.isRedefinedPredicate {         // 予約語再定義の既定動作
+            return functions.operateBuiltinPredicate(with: self)
         }
-        if functions.array.count == 1 {             // 単体の定義の場合、エラーメッセージを作成する
-            return errorMessage(to: functions.array.last!)
+        if functions.isSingleDefinition {            // 単体の定義の場合、エラーメッセージを作成する
+            return errorMessage(to: functions.latest!)
         }
         return InputFormatError.noMatchingSignature.message
     }
@@ -218,26 +217,31 @@ class Environment {
     ///   - local: 関数の実行環境
     /// - Returns: 処理結果、エラー、またはnil
     func call(_ functions: FunctionBlocks, with local: Environment) -> JpfObject? {
-        if let function = functions.function(with: local) {
+        if let function = functions.resolve(with: local) {
             if let error = local.apply(function) {  // 残りの引数を割り当てる
                 return error
             }
             return execute(function, with: local)
         }
-        if let keyword = functions.keyword {        // 予約語再定義の既定動作
-            let predicate = PredicateOperableFactory.create(from: keyword, with: self)
-            return predicate.operated()
+        if functions.isRedefinedPredicate {         // 予約語再定義の既定動作
+            return functions.operateBuiltinPredicate(with: self)
         }
-        if functions.array.count == 1 {             // 単体の定義の場合、エラーメッセージを作成する
-            let f = functions.array.last!           // 最新定義
-            let n = local.store.count               // 指定引数の数
-            guard functions.dictionary.keys.contains(n) || f.paramForm.numberOfInputs == nil else {
-                let n = f.parameters.count - f.paramForm.numberOfDefaultValues
-                return InputFormatError.numberOfParameters(n).message
-            }
-            return errorMessage(to: f, with: local)
+        if functions.isSingleDefinition {           // 単体の定義の場合、エラーメッセージを作成する
+            return local.inputFormatError(for: functions)
         }
         return InputFormatError.noMatchingSignature.message
+    }
+    /// 関数呼び出し時の引数形式エラーを判定し、適切なエラーを返す
+    private func inputFormatError(for functions: FunctionBlocks) -> JpfError? {
+        guard let f = functions.latest else {
+            return InputFormatError.noMatchingSignature.message
+        }
+        let provided = store.count
+        let required = f.requiredParameterCount
+        if provided < required {
+            return InputFormatError.numberOfParameters(required).message
+        }
+        return errorMessage(to: f, with: self)
     }
     /// 関数のローカル環境で、関数を実行する。
     /// - Parameters:
@@ -349,7 +353,7 @@ class Environment {
     /// - Returns: 既定値、またはエラー
     private func getDefaultValue(with designated: InputFormat, at p: Int) -> JpfObject {
         if let expression = designated.values[p] {
-            guard let result = expression.evaluated(with: self) else {
+            guard let result = expression.evaluate(with: self) else {
                 return InputFormatError.failedToEvaluate.message
             }
             if result.isError {return result}
@@ -510,9 +514,9 @@ class Environment {
         case let function as JpfFunction:
             guard let signature = clause.signature else {break}     // 型(関数)のみチェック
             // 関数シグネチャのチェック
-            if function.overload.hasSameSignature(as: signature) {break}// 関数シグネチャ準拠
+            if function.overload.hasSameSignature(for: signature) {break}               // 関数シグネチャ準拠
             // エラー処理(関数シグネチャ準拠違反)
-            guard let f = function.overload.array.last else {
+            guard let f = function.overload.latest else {
                 return ConformanceError.targetNotFound(function.type, in: function.name).error
             }
             return errorMessage(to: name, of: signature, with: f)
@@ -520,19 +524,19 @@ class Environment {
             // 算出シグネチャのチェック
             if clause.getterSignature == nil && clause.setterSignature == nil {break}   // 型(算出)のみチェック
             // 取得、設定が準拠しているか個別にチェック
-            let isGetterConformed = clause.getterSignature.map {computation.getters.hasSameSignature(as: $0)} ?? true
-            let isSetterConformed = clause.setterSignature.map {computation.setters.hasSameSignature(as: $0)} ?? true
+            let isGetterConformed = clause.getterSignature.map {computation.getters.hasSameSignature(for: $0)} ?? true
+            let isSetterConformed = clause.setterSignature.map {computation.setters.hasSameSignature(for: $0)} ?? true
             // 両方が準拠
             if isGetterConformed && isSetterConformed {break}
             // エラー処理(算出シグネチャ準拠違反)
             // 両方要求されているが、実装が両方とも無い場合
             if clause.getterSignature != nil && clause.setterSignature != nil &&
-                computation.getters.array.isEmpty && computation.setters.array.isEmpty {
+                computation.getters.isEmpty && computation.setters.isEmpty {
                 return ConformanceError.targetNotFound("設定と取得", in: computation.name).error
             }
             // 取得が準拠していない場合のエラー
             if !isGetterConformed, let getSignature = clause.getterSignature {
-                if let getter = computation.getters.array.last {
+                if let getter = computation.getters.latest {
                     return errorMessage(to: name, of: getSignature, with: getter)
                 } else {
                     return ConformanceError.targetNotFound("取得", in: computation.name).error
@@ -540,7 +544,7 @@ class Environment {
             }
             // 設定が準拠していない場合のエラー
             if !isSetterConformed, let setSignature = clause.setterSignature {
-                if let setter = computation.setters.array.last {
+                if let setter = computation.setters.latest {
                     return errorMessage(to: name, of: setSignature, with: setter)
                 } else {
                     return ConformanceError.targetNotFound("設定", in: computation.name).error
@@ -555,9 +559,9 @@ class Environment {
     }
     /// 初期化の準拠チェック
     private func conform(to signature: FunctionSignature, with inits: FunctionBlocks) -> JpfError? {
-        if inits.hasSameSignature(as: signature) {return nil}
+        if inits.hasSameSignature(for: signature) {return nil}
         // エラー処理(初期化シグネチャ準拠違反)
-        guard let i = inits.array.last else {
+        guard let i = inits.latest else {
             return ConformanceError.targetNotFound(JpfType.type, in: TypeLiteral.syokika).error
         }
         return errorMessage(to: TypeLiteral.syokika, of: signature, with: i)

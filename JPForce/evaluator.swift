@@ -12,7 +12,7 @@ struct Evaluator {
     let environment: Environment// 評価環境
     init(from node: Node, with environment: Environment) {self.node = node; self.environment = environment}
     var object: JpfObject? {    // 評価結果: オブジェクトまたはnil(評価失敗)
-        node.evaluated(with: environment)
+        node.evaluate(with: environment)
     }
 }
 // MARK: - For evaluator tests
