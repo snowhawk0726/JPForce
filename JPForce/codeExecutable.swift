@@ -399,7 +399,7 @@ struct MapPropertyExecuter : CodeExecutable {
         try vm.push(result)
     }
 }
-extension MapPropertyExecuter {
+private extension MapPropertyExecuter {
     func mapProperty(of obj: JpfObject,
                      using accessor: (JpfObject) -> JpfObject?
     ) throws(JpfError) -> JpfObject {
@@ -420,7 +420,7 @@ extension MapPropertyExecuter {
         return try getProperty(of: obj, with: accessor)
     }
 }
-extension CodeExecutable {
+private extension CodeExecutable {
     func getProperty(of obj: JpfObject,
                      with getPropertyOf: (JpfObject) -> JpfObject?
     ) throws(JpfError) -> JpfObject {

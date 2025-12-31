@@ -278,8 +278,8 @@ final class ParserTests: XCTestCase {
     func testFunctionParameterParsing() throws {
         let testPatterns: [(input: String, expectedParameters: [String])] = [
             ("関数【】", []),
-            ("関数であり、【入力がxであり、】", ["x"]),
-            ("関数であって、【入力がxとyとzであり、】", ["x","y","z"]),
+            ("関数であり、【入力がx】", ["x"]),
+            ("関数であって、【入力がxとyとz】", ["x","y","z"]),
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
@@ -895,18 +895,101 @@ final class ParserTests: XCTestCase {
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let parser = Parser(Lexer(test.input))
-            if let program = parser.parseProgram(),
-                  parser.errors.isEmpty {
+            if let program = parseProgram(with: test.input) {
                 let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
                 let literal = try XCTUnwrap(statement.expressions[1].tokenLiteral)
                 XCTAssertEqual(literal, test.expected)
             } else {
                 XCTAssertEqual("エラー", test.expected)
             }
-            let token = Parser(Lexer(test.input)).nextToken
+            let token = Parser(input: test.input).nextToken
             XCTAssertEqual(token.type, test.type)
             print("テスト(\(test.expected): \(token.type))終了")
+        }
+    }
+    func testPredicateContinuations() throws {
+        let testPatterns: [(input: String, expected: [Int], isConjuctives: [Bool])] = [
+            ("1と2を足す。", [2], [false]),
+            ("1と2を足し、3を引く。", [2,4], [true,false]),
+            ("1と2を足し3を引く。", [2,4], [true,false]),
+            ("1と2を足して、3を引く。", [2,4], [true,false]),
+            ("1と2を足し、3と4。", [2], [true]),
+        ]
+        for test in testPatterns {
+            print("テストパターン： \(test.input)")
+            let program = try XCTUnwrap(parseProgram(with: test.input))
+            let es = try XCTUnwrap(program.statements.first as? ExpressionStatement)
+            XCTAssertEqual(es.predicateIndices, test.expected)
+            XCTAssertEqual(es.predicateContinuations, test.isConjuctives)
+            print("テスト終了： 位置 ＝ \(es.predicateIndices)、接続 = \(es.predicateContinuations.map {$0 ? "継続" : "終端"})")
+        }
+    }
+    func testParseSentences() throws {
+        let testPatterns: [(input: String, expected: Int)] = [
+            ("1と2を足す。", 1),
+            ("1と2を足し、3を引く。", 2),
+            ("3と2を足し1を引く。", 2),
+            ("1と2を足して、3を引く。", 2),
+            ("1と2を足し、3と4。", 1),
+            ("aと1を足して、代入。", 2),
+            ("aと1。", 0),
+        ]
+        for test in testPatterns {
+            print("テストパターン： \(test.input)")
+            let parser = Parser(input: test.input)
+            let program = try XCTUnwrap(parseProgram(with: test.input))
+            let es = try XCTUnwrap(program.statements.first as? ExpressionStatement)
+            let esp = ExpressionStatementParser(parser)
+            let stmt = esp.parseSentecne(from: es)
+            var count = 0
+            var type: String
+            if let compound = stmt as? CompoundSentence {
+                count = compound.sentences.count
+                type = "複文"
+            } else
+            if stmt is SimpleSentence {
+                count = 1
+                type = "単文"
+            } else {
+                count = 0
+                XCTAssert(stmt is ExpressionStatement)
+                type = "式文"
+            }
+            XCTAssertEqual(count, test.expected)
+            print("テスト終了： 単文数 ＝ \(count)、型 = \(type)。\(stmt?.string ?? "")")
+        }
+    }
+    func testSentenceTreminators() throws {
+        let testPatterns: [(input: String, expected: SentenceTerminator?)] = [
+            ("1と2を足す。", .period),
+            ("1と2を足し。", .period),
+            ("1と2を足す】", .rbbracket),
+            ("1と2を足し】", .rbbracket),
+            ("1と2を足し。】", .period),
+            ("1と2を足し】。", .rbbracket),
+            ("1と2を足し、", .eof),
+            ("1と2を足し、", .eof),
+            ("1と2を足す、", .eof),
+            ("1と2を足す", .eof),
+            ("""
+            1と2を足す
+            
+            """, .eol),
+            ("1と2を足し、。", nil),
+            ("1と2を足し、】", nil),
+        ]
+        for test in testPatterns {
+            print("テストパターン： \(test.input)")
+            var terminator: SentenceTerminator? = nil
+            if let program = parseProgram(with: test.input) {
+                let es = try XCTUnwrap(program.statements.first as? ExpressionStatement)
+                terminator = es.terminator
+            }
+            XCTAssertEqual(terminator, test.expected)
+            let symbol = (terminator?.rawValue ?? "構文エラー")
+                .replacingOccurrences(of: "\n", with: "EOL")
+                .replacingOccurrences(of: "\0", with: "EOF")
+            print("テスト終了： 終端記号 ＝ \(symbol)")
         }
     }
     // MARK: - ヘルパー

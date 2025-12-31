@@ -7,13 +7,16 @@
 //
 import Foundation
 
-class Parser {
+final class Parser {
     // MARK: 変数メンバーとその初期化
     init(_ lexer: Lexer) {
         self.lexer = lexer
         previousToken = Lexer.EoT           // 前のトークン
         currentToken = lexer.getNext()      // カレントトークン
         nextToken =    lexer.getNext()      // 次のトークン
+    }
+    convenience init(input: String) {       // テスト用
+        self.init(Lexer(input))
     }
     /// コピーコンストラクタ
     init(from other: Parser) {
@@ -37,12 +40,12 @@ class Parser {
     var switchCase = SwitchCase()           // Switch-case監視
     // MARK: - プログラムの解析
     func parseProgram() -> Program? {
-        let program = Program()
+        var statements: [Statement] = []
         switchCase.enter()
         while !currentToken.isEof {
             skipEols()
             guard let statement = StatementParserFactory.create(from: self).parse() else {return nil}
-            program.statements.append(statement)
+            statements.append(statement)
             while getNext(whenNextIs: Token.symbol(.EOL)) {}
             getNext()
         }
@@ -51,7 +54,7 @@ class Parser {
             return nil
         }
         switchCase.leave()
-        return program
+        return Program(statements: statements)
     }
     // MARK: - ヘルパー
     // トークン解析制御

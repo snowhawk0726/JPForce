@@ -114,14 +114,12 @@ final class EvaluatorTests: XCTestCase {
         ]
         print("テストパターン: \(input)")
         let environment = Environment()
-        let parser = Parser(Lexer(input))
-        let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+        let eval = Evaluator(from: parseProgram(with: input)!, with: environment)
         let result = eval.object ?? environment.pull()
         XCTAssertFalse(result?.isError ?? false, result?.error?.message ?? "")
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let parser = Parser(Lexer(test.input))
-            let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+            let eval = Evaluator(from: parseProgram(with: test.input)!, with: environment)
             let result = try XCTUnwrap(eval.object ?? environment.pull())
             try testObject(result, with: test.expected)
             print("テスト結果(\(result.string))")
@@ -158,8 +156,7 @@ final class EvaluatorTests: XCTestCase {
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let lexer = Lexer(test.input)
-            let parser = Parser(lexer)
+            let parser = Parser(input: test.input)
             guard let program = parser.parseProgram() else {
                 XCTAssertEqual(test.exptected as? String, parser.errors.first!)
                 print("テスト(\(parser.errors.first!))終了")
@@ -332,14 +329,12 @@ final class EvaluatorTests: XCTestCase {
             ("乙。", 2),
         ]
         let environment = Environment()
-        let parser = Parser(Lexer(input))
-        let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+        let eval = Evaluator(from: parseProgram(with: input)!, with: environment)
         let result = eval.object ?? environment.pull()
         XCTAssertFalse(result?.isError ?? false, result?.error?.message ?? "")
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let parser = Parser(Lexer(test.input))
-            let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+            let eval = Evaluator(from: parseProgram(with: test.input)!, with: environment)
             let result = try XCTUnwrap(eval.object ?? environment.pull())
             try testObject(result, with: test.expected)
             print("テスト(\(result))終了")
@@ -404,14 +399,12 @@ final class EvaluatorTests: XCTestCase {
         ]
         print("テストパターン: \(input)")
         let environment = Environment()
-        let parser = Parser(Lexer(input))
-        let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+        let eval = Evaluator(from: parseProgram(with: input)!, with: environment)
         let result = eval.object ?? environment.pull()
         XCTAssertFalse(result?.isError ?? false, result?.error?.message ?? "")
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let parser = Parser(Lexer(test.input))
-            let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+            let eval = Evaluator(from: parseProgram(with: test.input)!, with: environment)
             let result = try XCTUnwrap(eval.object ?? environment.pull())
             try testObject(result, with: test.expected)
             environment.empty()
@@ -438,14 +431,12 @@ final class EvaluatorTests: XCTestCase {
         ]
         print("テストパターン: \(input)")
         let environment = Environment()
-        let parser = Parser(Lexer(input))
-        let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+        let eval = Evaluator(from: parseProgram(with: input)!, with: environment)
         let result = eval.object ?? environment.pull()
         XCTAssertFalse(result?.isError ?? false, result?.error?.message ?? "")
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let parser = Parser(Lexer(test.input))
-            let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+            let eval = Evaluator(from: parseProgram(with: test.input)!, with: environment)
             let result = try XCTUnwrap(eval.object ?? environment.pull())
             try testObject(result, with: test.expected)
             print("テスト結果(\(result.string))")
@@ -570,14 +561,12 @@ final class EvaluatorTests: XCTestCase {
         ]
         print("テストパターン: \(input)")
         let environment = Environment()
-        let parser = Parser(Lexer(input))
-        let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+        let eval = Evaluator(from: parseProgram(with: input)!, with: environment)
         let result = eval.object ?? environment.pull()
         XCTAssertFalse(result?.isError ?? false, result?.error?.message ?? "")
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let parser = Parser(Lexer(test.input))
-            let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+            let eval = Evaluator(from: parseProgram(with: test.input)!, with: environment)
             let actual = try XCTUnwrap(eval.object ?? environment.pull())
             try testObject(actual, with: test.expected)
             print("テスト(\(actual))終了")
@@ -644,14 +633,12 @@ final class EvaluatorTests: XCTestCase {
         ]
         print("テストパターン: \(input)")
         let environment = Environment()
-        let parser = Parser(Lexer(input))
-        let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+        let eval = Evaluator(from: parseProgram(with: input)!, with: environment)
         let result = eval.object ?? environment.pull()
         XCTAssertFalse(result?.isError ?? false, result?.error?.message ?? "")
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let parser = Parser(Lexer(test.input))
-            let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+            let eval = Evaluator(from: parseProgram(with: test.input)!, with: environment)
             let expected = try XCTUnwrap(eval.object ?? environment.pull())
             try testObject(expected, with: test.expected)
             print("テスト(\(expected))終了")
@@ -722,14 +709,12 @@ final class EvaluatorTests: XCTestCase {
         ]
         print("テストパターン: \(input)")
         let environment = Environment()
-        let parser = Parser(Lexer(input))
-        let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+        let eval = Evaluator(from: parseProgram(with: input)!, with: environment)
         let result = eval.object ?? environment.pull()
         XCTAssertFalse(result?.isError ?? false, result?.error?.message ?? "")
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let parser = Parser(Lexer(test.input))
-            let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+            let eval = Evaluator(from: parseProgram(with: test.input)!, with: environment)
             let expected = eval.object ?? environment.pull()!
             try testObject(expected, with: test.expected)
             print("テスト(\(expected))終了")
@@ -755,14 +740,12 @@ final class EvaluatorTests: XCTestCase {
         ]
         print("テストパターン: \(input)")
         let environment = Environment()
-        let parser = Parser(Lexer(input))
-        let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+        let eval = Evaluator(from: parseProgram(with: input)!, with: environment)
         let result = eval.object ?? environment.pull()
         XCTAssertFalse(result?.isError ?? false, result?.error?.message ?? "")
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let parser = Parser(Lexer(test.input))
-            let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+            let eval = Evaluator(from: parseProgram(with: test.input)!, with: environment)
             let expected = try XCTUnwrap(eval.object ?? environment.pull())
             try testObject(expected, with: test.expected)
             print("テスト(\(expected))終了")
@@ -790,14 +773,12 @@ final class EvaluatorTests: XCTestCase {
         ]
         print("テストパターン: \(input)")
         let environment = Environment()
-        let parser = Parser(Lexer(input))
-        let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+        let eval = Evaluator(from: parseProgram(with: input)!, with: environment)
         let result = eval.object ?? environment.pull()
         XCTAssertFalse(result?.isError ?? false, result?.error?.message ?? "")
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let parser = Parser(Lexer(test.input))
-            let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+            let eval = Evaluator(from: parseProgram(with: test.input)!, with: environment)
             let result = try XCTUnwrap(eval.object ?? environment.pull())
             try testObject(result, with: test.expected)
             print("テスト(\(result))終了")
@@ -833,14 +814,12 @@ final class EvaluatorTests: XCTestCase {
         ]
         print("テストパターン: \(input)")
         let environment = Environment()
-        let parser = Parser(Lexer(input))
-        let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+        let eval = Evaluator(from: parseProgram(with: input)!, with: environment)
         let result = eval.object ?? environment.pull()
         XCTAssertFalse(result?.isError ?? false, result?.error?.message ?? "")
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let parser = Parser(Lexer(test.input))
-            let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+            let eval = Evaluator(from: parseProgram(with: test.input)!, with: environment)
             let result = try XCTUnwrap(eval.object ?? environment.pull())
             try testObject(result, with: test.expected)
             print("テスト(\(result))終了")
@@ -862,14 +841,12 @@ final class EvaluatorTests: XCTestCase {
         ]
         print("テストパターン: \(input)")
         let environment = Environment()
-        let parser = Parser(Lexer(input))
-        let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+        let eval = Evaluator(from: parseProgram(with: input)!, with: environment)
         let result = eval.object ?? environment.pull()
         XCTAssertFalse(result?.isError ?? false, result?.error?.message ?? "")
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let parser = Parser(Lexer(test.input))
-            let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+            let eval = Evaluator(from: parseProgram(with: test.input)!, with: environment)
             let expected = eval.object ?? environment.pull()!
             try testObject(expected, with: test.expected)
             print("テスト(\(expected))終了")
@@ -890,14 +867,12 @@ final class EvaluatorTests: XCTestCase {
         ]
         print("テストパターン: \(input)")
         let environment = Environment()
-        let parser = Parser(Lexer(input))
-        let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+        let eval = Evaluator(from: parseProgram(with: input)!, with: environment)
         let result = eval.object ?? environment.pull()
         XCTAssertFalse(result?.isError ?? false, result?.error?.message ?? "")
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let parser = Parser(Lexer(test.input))
-            let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+            let eval = Evaluator(from: parseProgram(with: test.input)!, with: environment)
             let result = try XCTUnwrap(eval.object ?? environment.pull())
             try testObject(result, with: test.expected)
             print("テスト(\(result))終了")
@@ -1433,14 +1408,12 @@ final class EvaluatorTests: XCTestCase {
         ]
         print("テストパターン: \(input)")
         let environment = Environment()
-        let parser = Parser(Lexer(input))
-        let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+        let eval = Evaluator(from: parseProgram(with: input)!, with: environment)
         let result = eval.object ?? environment.pull()
         XCTAssertFalse(result?.isError ?? false, result?.error?.message ?? "")
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let parser = Parser(Lexer(test.input))
-            let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+            let eval = Evaluator(from: parseProgram(with: test.input)!, with: environment)
             let result = try XCTUnwrap(eval.object ?? environment.pull())
             try testObject(result, with: test.expected)
             print("テスト(\(result))終了")
@@ -1652,14 +1625,12 @@ final class EvaluatorTests: XCTestCase {
         ]
         print("テストパターン: \(input)")
         let environment = Environment()
-        let parser = Parser(Lexer(input))
-        let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+        let eval = Evaluator(from: parseProgram(with: input)!, with: environment)
         let result = eval.object ?? environment.pull()
         XCTAssertFalse(result?.isError ?? false, result?.error?.message ?? "")
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let parser = Parser(Lexer(test.input))
-            let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+            let eval = Evaluator(from: parseProgram(with: test.input)!, with: environment)
             let expected = eval.object ?? environment.pull()!
             try testObject(expected, with: test.expected)
             print("テスト(\(expected))終了")
@@ -1680,14 +1651,12 @@ final class EvaluatorTests: XCTestCase {
         ]
         print("テストパターン: \(input)")
         let environment = Environment()
-        let parser = Parser(Lexer(input))
-        let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+        let eval = Evaluator(from: parseProgram(with: input)!, with: environment)
         let result = eval.object ?? environment.pull()
         XCTAssertFalse(result?.isError ?? false, result?.error?.message ?? "")
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let parser = Parser(Lexer(test.input))
-            let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+            let eval = Evaluator(from: parseProgram(with: test.input)!, with: environment)
             let expected = eval.object ?? environment.pull()!
             try testObject(expected, with: test.expected)
             print("テスト(\(expected))終了")
@@ -1734,14 +1703,12 @@ final class EvaluatorTests: XCTestCase {
         ]
         print("テストパターン: \(input)")
         let environment = Environment()
-        let parser = Parser(Lexer(input))
-        let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+        let eval = Evaluator(from: parseProgram(with: input)!, with: environment)
         let result = eval.object ?? environment.pull()
         XCTAssertFalse(result?.isError ?? false, result?.error?.message ?? "")
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let parser = Parser(Lexer(test.input))
-            let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+            let eval = Evaluator(from: parseProgram(with: test.input)!, with: environment)
             let expected = try XCTUnwrap(eval.object ?? environment.pull())
             try testObject(expected, with: test.expected)
             print("テスト(\(expected))終了")
@@ -1767,14 +1734,12 @@ final class EvaluatorTests: XCTestCase {
         ]
         print("テストパターン: \(input)")
         let environment = Environment()
-        let parser = Parser(Lexer(input))
-        let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+        let eval = Evaluator(from: parseProgram(with: input)!, with: environment)
         let result = eval.object ?? environment.pull()
         XCTAssertFalse(result?.isError ?? false, result?.error?.message ?? "")
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let parser = Parser(Lexer(test.input))
-            let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+            let eval = Evaluator(from: parseProgram(with: test.input)!, with: environment)
             let expected = try XCTUnwrap(eval.object ?? environment.pull())
             try testObject(expected, with: test.expected)
             print("テスト(\(expected))終了")
@@ -1800,14 +1765,12 @@ final class EvaluatorTests: XCTestCase {
         ]
         print("テストパターン: \(input)")
         let environment = Environment()
-        let parser = Parser(Lexer(input))
-        let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+        let eval = Evaluator(from: parseProgram(with: input)!, with: environment)
         let result = eval.object ?? environment.pull()
         XCTAssertFalse(result?.isError ?? false, result?.error?.message ?? "")
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let parser = Parser(Lexer(test.input))
-            let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+            let eval = Evaluator(from: parseProgram(with: test.input)!, with: environment)
             let expected = try XCTUnwrap(eval.object ?? environment.pull())
             try testObject(expected, with: test.expected)
             print("テスト(\(expected))終了")
@@ -1838,19 +1801,56 @@ final class EvaluatorTests: XCTestCase {
         ]
         print("テストパターン: \(input)")
         let environment = Environment()
-        let parser = Parser(Lexer(input))
-        let eval = Evaluator(from: parser.parseProgram()!, with: environment)
+        let eval = Evaluator(from: parseProgram(with: input)!, with: environment)
         let result = eval.object ?? environment.pull()
         XCTAssertFalse(result?.isError ?? false, result?.error?.message ?? "")
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let parser = Parser(Lexer(test.input))
-            let eval = Evaluator(from: parser.parseProgram()!, with: environment)
-            let expected = try XCTUnwrap(eval.object ?? environment.pull())
-            try testObject(expected, with: test.expected)
-            print("テスト(\(expected))終了")
+            let eval = Evaluator(from: parseProgram(with: test.input)!, with: environment)
+            let result = try XCTUnwrap(eval.object ?? environment.pull())
+            try testObject(result, with: test.expected)
+            print("テスト(\(result))終了")
         }
         print("テスト終了")
+    }
+    func testSentencesEvaluation() throws {
+        let testPatterns: [(input: String, expected: Any?)] = [
+            ("1と2を足す。", 3),
+            ("1と2を足し、3を足す。", 6),
+            ("1と2を足し、3を足し", 6),
+            ("aは1。aに2を足し、３を足して代入。a", 6),
+            ("1と2を足し、", 3),
+            ("1と2を足し。", nil), // エラー
+            ("1と2を足す、3を足す。", nil), // エラー
+        ]
+        let environment = Environment()
+        for test in testPatterns {
+            print("テスト開始：\(test.input)")
+            let parser = Parser(input: test.input)
+            let program = try XCTUnwrap(parser.parseProgram())
+            var newStmt: [Statement] = []
+            for statement in program.statements {
+                if let es = statement as? ExpressionStatement {
+                    guard let stmt = ExpressionStatementParser(parser).parseSentecne(from: es) else {
+                        newStmt.removeAll()
+                        break
+                    }
+                    newStmt.append(stmt)
+                    continue
+                }
+                newStmt.append(statement)
+            }
+            if !newStmt.isEmpty {
+                let eval = Evaluator(from: Program(statements: newStmt), with: environment)
+                let result = try XCTUnwrap(eval.object ?? environment.pull())
+                try testObject(result, with: test.expected)
+                print("テスト結果： \(result)")
+            } else {
+                XCTAssertNil(test.expected)
+                parser.errors.forEach {print($0)}
+                print("テスト結果： 構文エラー(正常)")
+            }
+        }
     }
     func testOutputs() throws {
         /// テスト用の述語：PredicateOperable.output(_:withEscapeProcessing:out:)をテストする。
@@ -1894,13 +1894,7 @@ final class EvaluatorTests: XCTestCase {
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let lexer = Lexer(test.input)
-            let parser = Parser(lexer)
-            guard let program = parser.parseProgram(), parser.errors.isEmpty else {
-                parser.errors.forEach {print("Parser errors: \($0)")}
-                XCTFail()
-                return
-            }
+            let program = try XCTUnwrap(parseProgram(with: test.input))
             let environment = Environment()
             let evaluated = Evaluator(from: program, with: environment).object
             XCTAssertFalse(evaluated != nil && evaluated!.isError, evaluated?.string ?? "nil")
@@ -2044,10 +2038,7 @@ private func testObject(_ object: JpfObject, with exptected: Any?) throws {
     }
 }
 private func testEvaluatorWithLabel(_ input: String) -> JpfObject? {
-    let lexer = Lexer(input)
-    let parser = Parser(lexer)
-    guard let program = parser.parseProgram(), parser.errors.isEmpty else {
-        parser.errors.forEach {print("Parser errors: \($0)")}
+    guard let program = parseProgram(with: input) else {
         return nil
     }
     let environment = Environment()

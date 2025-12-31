@@ -16,7 +16,7 @@ import NaturalLanguage
 
 // MARK: - 字句解析器(Lexer)
 /// input文字列を解析し、トークンに分解する。
-class Lexer {
+final class Lexer {
     //
     init(_ input: String) {self.input = input; tagging(input)}
     init(from other: Lexer) {

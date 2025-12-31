@@ -6,7 +6,7 @@
 //
 import Foundation
 
-class Environment {
+final class Environment {
     init(outer: Environment? = nil) {self.outer = outer; self.stack = Stack()}
     init(with stack: Stack) {self.outer = nil; self.stack = stack}
     let outer: Environment?     // 拡張環境

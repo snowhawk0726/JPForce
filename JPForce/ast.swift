@@ -13,7 +13,10 @@ protocol Node : Evaluatable, Compilable {
     var string: String {get}
 }
 protocol Statement : Node {}
-protocol Expression : Node {}
+protocol Expression : Node {
+    var isPredicate: Bool {get}
+    var predicateExpression: PredicateExpression? {get}
+}
 //
 protocol ValueExpression : Expression, Equatable {
     associatedtype ValueType : Equatable
@@ -24,23 +27,28 @@ protocol ValueExpression : Expression, Equatable {
 extension Node {
     var string: String {tokenLiteral}
 }
+extension Expression {
+    var isPredicate: Bool {false}
+    var predicateExpression: PredicateExpression? {nil}
+}
 extension ValueExpression {
     var tokenLiteral: String {token.literal}
  }
 // MARK: Program(プログラム)
-class Program : Statement {
-    var statements: [Statement] = []
-    init() {}
+final class Program : Statement {
+    let statements: [Statement]
+    init() {self.statements = []}
     init(statements: [Statement]) {self.statements = statements}
     //
     var tokenLiteral: String {statements.first?.tokenLiteral ?? ""}
     var string: String {statements.reduce("") {$0 + $1.string}}
 }
 // MARK: Statement(文)
-class DefineStatement : Statement {
-    var token: Token                // とは、は、
-    var name: Identifier            // 識別子
-    var value: ExpressionStatement  // 値(複数の式)
+// 値を返さないノード
+final class DefineStatement : Statement {
+    let token: Token                // とは、は、
+    let name: Identifier            // 識別子
+    let value: ExpressionStatement  // 値(複数の式)
     var isExtended: Bool = false    // 拡張(多重)識別
     init(token: Token, name: Identifier, value: ExpressionStatement, isExtended: Bool = false) {
         self.token = token
@@ -59,26 +67,7 @@ class DefineStatement : Statement {
     static let dearu = "である"        // 省略可
     static let desu = "です"          // 代替可
 }
-class ExpressionStatement : Statement {
-    var token: Token                // 式の最初のトークン
-    var expressions: [Expression]   // 式
-    init(token: Token, expressions: [Expression]) {
-        self.token = token
-        self.expressions = expressions
-    }
-    //
-    var tokenLiteral: String {token.literal}
-    var string: String {
-        let s = expressions.reduce("") {$0 + $1.string + ($1 is PredicateExpression ? "、" : "")} + "。"
-        return s.replacingOccurrences(of: "。】", with: "】")
-                .replacingOccurrences(of: "、】", with: "】")
-                .replacingOccurrences(of: "、。", with: "。")
-                .replacingOccurrences(of: "が。", with: "が、")
-                .replacingOccurrences(of: "、場合", with: "場合")
-                .replacingOccurrences(of: "、する", with: "する")
-                .replacingOccurrences(of: "、し", with: "し")
-    }
-    //
+final class ExpressionStatement : Statement {
     static let yousoga = "要素が、"
     static let yousowa = "要素は、"
     static let hontaiga = "本体が、"
@@ -88,9 +77,38 @@ class ExpressionStatement : Statement {
     static let ga = "が"
     static let wa = "は"
     static let to = "と"
+    //
+    let token: Token                // 式の最初のトークン
+    let expressions: [Expression]   // 式
+    let terminator: SentenceTerminator
+    init(token: Token, expressions: [Expression], terminator: SentenceTerminator = .none) {
+        self.token = token
+        self.expressions = expressions
+        self.terminator = terminator
+    }
+    //
+    var tokenLiteral: String {token.literal}
+    var string: String {
+        let s = expressions.reduce("") {$0 + $1.string + ($1 is PredicateExpression ? "、" : "")} + "。"
+        return s.replacingOccurrences(of: "。】", with: "】")
+            .replacingOccurrences(of: "、】", with: "】")
+            .replacingOccurrences(of: "、。", with: "。")
+            .replacingOccurrences(of: "が。", with: "が、")
+            .replacingOccurrences(of: "、場合", with: "場合")
+            .replacingOccurrences(of: "、する", with: "する")
+            .replacingOccurrences(of: "、し", with: "し")
+    }
 }
-class BlockStatement: Statement {
-    var token: Token                // 【トークン
+extension ExpressionStatement {
+    var predicateIndices: [Int] {
+        expressions.enumerated().compactMap {$1.isPredicate ? $0 : nil}
+    }
+    var predicateContinuations: [Bool] {
+        predicateIndices.map {expressions[$0].predicateExpression?.isConjunctive == true}
+    }
+}
+final class BlockStatement : Statement {
+    let token: Token                // 【トークン
     var statements: [Statement]
     init(token: Token, statements: [Statement]) {
         self.token = token
@@ -101,10 +119,49 @@ class BlockStatement: Statement {
     var string: String {statements.reduce("") {$0 + $1.string}}
     var stringWithBracket: String {statements.isEmpty ? "【】" : "【\n\t" + string + "\n】"}
 }
+// MARK: Sentences(節)
+// 述語を含む単文、複文
+enum SentenceTerminator : String {
+    case none       = ""
+    case period     = "。"
+    case rbbracket  = "】"
+    case eol        = "\n"
+    case eof        = "\0"
+    //
+    init(symbol: String) {
+        self = Self(rawValue: symbol) ?? .none
+    }
+    var isExplicit: Bool {self == .period || self == .rbbracket}
+}
+final class SimpleSentence : Statement {
+    let token: Token
+    let expressions: [Expression]
+    let predicateIndex: Int
+    init(token: Token, expressions: [Expression], index: Int) {
+        self.token = token
+        self.expressions = expressions
+        self.predicateIndex = index
+    }
+    //
+    var tokenLiteral: String {token.literal}
+    var string: String {expressions.reduce("") {$0 + $1.string}}
+}
+final class CompoundSentence : Statement {
+    let token: Token
+    let sentences: [SimpleSentence]
+    init(token: Token, sentences: [SimpleSentence]) {
+        self.token = token
+        self.sentences = sentences
+    }
+    //
+    var tokenLiteral: String {token.literal}
+    var string: String {sentences.reduce("") {$0 + $1.string}}
+}
 // MARK: Expressions(式)
-class Identifier : Expression {
-    var token: Token                // 識別子(.IDENT(value))トークン
-    var value: String               // 値(識別子名)
+// 値を返すノード
+final class Identifier : Expression {
+    let token: Token                // 識別子(.IDENT(value))トークン
+    let value: String               // 値(識別子名)
     var isLhs: Bool = false         // 左辺(代入される側)
     //
     init(token: Token, value: String, isLhs: Bool = false) {self.token = token; self.value = value; self.isLhs = isLhs}
@@ -116,55 +173,55 @@ class Identifier : Expression {
     //
     static let directoryPath = "ディレクトリパス"
 }
-class StringLiteral : ValueExpression {
+final class StringLiteral : ValueExpression {
     static func == (lhs: StringLiteral, rhs: StringLiteral) -> Bool {
         lhs.token == rhs.token && lhs.value == rhs.value
     }
     //
-    var token: Token                // 文字列(.STRING(value))トークン
-    var value: String               // 値(文字列)
+    let token: Token                // 文字列(.STRING(value))トークン
+    let value: String               // 値(文字列)
     init(token: Token, value: String) {self.token = token; self.value = value}
     convenience init(from string: String) {self.init(token: Token(string: string), value: string)}
     convenience init(from token: Token) {self.init(token: token, value: token.literal)}
     //
     var string: String {"「\(value)」".color(token.color)}
 }
-class Label : Expression {
-    var token: Token                // ラベル(.keyword())トークン
-    var value: Token                // 値(文字列または識別子)
+final class Label : Expression {
+    let token: Token                // ラベル(.keyword())トークン
+    let value: Token                // 値(文字列または識別子)
     init(token: Token, value: Token) {self.token = token; self.value = value}
     //
     var tokenLiteral: String {token.literal}
     var string: String {token.coloredLiteral + "「\(value)」".color(token.color)}
 }
-class IntegerLiteral : ValueExpression {
+final class IntegerLiteral : ValueExpression {
     static func == (lhs: IntegerLiteral, rhs: IntegerLiteral) -> Bool {
         lhs.token == rhs.token && lhs.value == rhs.value
     }
     //
-    var token: Token                // 数値(.INT(value))トークン
-    var value: Int                  // 値(整数)
+    let token: Token                // 数値(.INT(value))トークン
+    let value: Int                  // 値(整数)
     init(token: Token, value: Int) {self.token = token; self.value = value}
     convenience init(from integer: Int) {self.init(token: Token(number: integer), value: integer)}
     //
     var string: String {token.coloredLiteral}
 }
-class Boolean: ValueExpression {
+final class Boolean: ValueExpression {
     static func == (lhs: Boolean, rhs: Boolean) -> Bool {
         lhs.token == rhs.token && lhs.value == rhs.value
     }
     //
-    var token: Token                // 真偽値トークン(.TRUEまたは.FALSE)
-    var value: Bool
+    let token: Token                // 真偽値トークン(.TRUEまたは.FALSE)
+    let value: Bool
     init(token: Token, value: Bool) {self.token = token; self.value = value}
     convenience init(from bool: Bool) {self.init(token: Token(bool: bool), value: bool)}
     //
     var string: String {tokenLiteral.color(.magenta)}
 }
-class RangeLiteral : Expression {
-    var token: Token                // 範囲トークン
-    var lowerBound: ExpressionStatement?    // 下限式(例：1以上）
-    var upperBound: ExpressionStatement?    // 上限式(例：100以下、100未満)
+final class RangeLiteral : Expression {
+    let token: Token                // 範囲トークン
+    let lowerBound: ExpressionStatement?    // 下限式(例：1以上）
+    let upperBound: ExpressionStatement?    // 上限式(例：100以下、100未満)
     init(token: Token, lowerBound: ExpressionStatement? = nil, upperBound: ExpressionStatement? = nil) {
         self.token = token
         self.lowerBound = lowerBound
@@ -181,9 +238,9 @@ class RangeLiteral : Expression {
     private var comma: String {(lowerBound != nil && upperBound != nil) ? "、" : ""}
 }
 /// 句(式+助詞)。助詞(token)はToken.Particle
-class PhraseExpression : Expression {
-    var token: Token                // 助詞(postpotional paticle)
-    var left: Expression            // 式
+final class PhraseExpression : Expression {
+    let token: Token                // 助詞(postpotional paticle)
+    let left: Expression            // 式
     init(token: Token, left: Expression) {
         self.token = token
         self.left = left
@@ -192,18 +249,28 @@ class PhraseExpression : Expression {
     var tokenLiteral: String {token.literal}
     var string: String {left.string + token.coloredLiteral}
 }
+extension PhraseExpression {
+    var isPredicate: Bool {left.isPredicate}
+    var predicateExpression: PredicateExpression? {left.predicateExpression}
+}
 /// 述語。tokenはToken.Keyword, Token.IDENT(_)
-class PredicateExpression : Expression {
-    var token: Token                // 述語(predicate keyword)
+final class PredicateExpression : Expression {
+    let token: Token                // 述語(predicate keyword)
     init(token: Token) {self.token = token}
     //
     var tokenLiteral: String {token.literal}
     var string: String {token.coloredLiteral}
 }
-class OrExpression : Expression {
-    var token: Token
-    var left: Expression
-    var right: Expression
+extension PredicateExpression {
+    var isPredicate: Bool {true}
+    var predicateExpression: PredicateExpression? {self}
+    var isConjunctive: Bool {token.isConjunctiveForm}
+    var isTerminal: Bool {!isConjunctive}
+}
+final class OrExpression : Expression {
+    let token: Token
+    let left: Expression
+    let right: Expression
     init(token: Token, left: Expression, right: Expression) {
         self.token = token
         self.left = left
@@ -214,11 +281,11 @@ class OrExpression : Expression {
     var string: String {left.string + "、" + tokenLiteral + "、" + right.string}
 }
 /// 属格。<オブジェクト>の<要素>(は、<値>。)
-class GenitiveExpression : Expression {
-    var token: Token                // 属格(genitive case)
-    var left: Expression
-    var right: Expression
-    var value: ExpressionStatement? // 値
+final class GenitiveExpression : Expression {
+    let token: Token                // 属格(genitive case)
+    let left: Expression
+    let right: Expression
+    let value: ExpressionStatement? // 値
     init(token: Token, left: Expression, right: Expression, value: ExpressionStatement? = nil) {
         self.token = token
         self.left = left
@@ -233,11 +300,11 @@ class GenitiveExpression : Expression {
 }
 /// 場合文１： <論理式>場合【<続文>】、それ以外は【<代文>】。
 /// 場合文２：<識別子>が<値１>の場合【<文１>】、<値２>の場合【<文２>】、…それ以外は【<代文>】。
-class CaseExpression : Expression {
+final class CaseExpression : Expression {
     static let soreigai = "それ以外"
-    var token: Token                // .CASEキーワード(場合)
-    var consequence: BlockStatement
-    var alternative: BlockStatement?// 「それ以外は」(else)
+    let token: Token                // .CASEキーワード(場合)
+    let consequence: BlockStatement
+    let alternative: BlockStatement?// 「それ以外は」(else)
     init(token: Token, consequence: BlockStatement, alternative: BlockStatement? = nil) {
         self.token = token
         self.consequence = consequence
@@ -250,9 +317,9 @@ class CaseExpression : Expression {
         (alternative.map {"、" + "それ以外は" + "、【" + $0.string + "】"} ?? "")
     }
 }
-class LogicalExpression : Expression {
-    var token: Token                // かつ(AND)または、または(OR)
-    var right: BlockStatement
+final class LogicalExpression : Expression {
+    let token: Token                // かつ(AND)または、または(OR)
+    let right: BlockStatement
     init(token: Token, right: BlockStatement) {
         self.token = token
         self.right = right
@@ -261,11 +328,11 @@ class LogicalExpression : Expression {
     var tokenLiteral: String {token.literal}
     var string: String {"\(token.coloredLiteral)、【\(right.string)】"}
 }
-class ConditionalOperation : Expression {
+final class ConditionalOperation : Expression {
     static let ka = "か"
-    var token: Token                // .CONDITIONALキーワード(よって)
-    var consequence: Expression     // 成立時の値(式)
-    var alternative: Expression     // 不成立の値(式)
+    let token: Token                // .CONDITIONALキーワード(よって)
+    let consequence: Expression     // 成立時の値(式)
+    let alternative: Expression     // 不成立の値(式)
     init(token: Token, consequence: Expression, alternative: Expression) {
         self.token = token
         self.consequence = consequence
@@ -277,15 +344,15 @@ class ConditionalOperation : Expression {
         "\(token.coloredLiteral)、\(consequence.string)か、\(alternative.string)"
     }
 }
-class LoopExpression : Expression {
+final class LoopExpression : Expression {
     static let condition = "条件"
     static let aida = "間"
     static let syoriga = "処理が、"
     static let syoriwa = "処理は、"
-    var token: Token                // .LOOPキーワード(反復)
-    var parameters: [Identifier]    // カウンターまたは要素
-    var condition: [Expression]     // 条件式
-    var body: BlockStatement
+    let token: Token                // .LOOPキーワード(反復)
+    let parameters: [Identifier]    // カウンターまたは要素
+    let condition: [Expression]     // 条件式
+    let body: BlockStatement
     init(token: Token, parameters: [Identifier], condition: [Expression], body: BlockStatement) {
         self.token = token
         self.parameters = parameters
@@ -301,10 +368,10 @@ class LoopExpression : Expression {
         "処理が、" + body.string + "】"
     }
 }
-class FunctionLiteral : Expression {
-    var token: Token                // 関数トークン
-    var name = ""                   // 名前
-    var function: FunctionBlock     // 関数部
+final class FunctionLiteral : Expression {
+    let token: Token                // 関数トークン
+    var name: String                // 名前
+    let function: FunctionBlock     // 関数部
     init(token: Token, function: FunctionBlock, name: String = "") {
         self.token = token
         self.function = function
@@ -314,12 +381,12 @@ class FunctionLiteral : Expression {
     var tokenLiteral: String {token.literal}
     var string: String {"\(token.coloredLiteral)であって、【\(function.string)】"}
 }
-class ComputationLiteral : Expression {
+final class ComputationLiteral : Expression {
     static let settei = "設定"
     static let syutoku = "取得"
-    var token: Token                // 算出トークン
-    var setters: FunctionBlocks     // 設定ブロック
-    var getters: FunctionBlocks     // 取得ブロック
+    let token: Token                // 算出トークン
+    let setters: FunctionBlocks     // 設定ブロック
+    let getters: FunctionBlocks     // 取得ブロック
     init(token: Token, setters: FunctionBlocks, getters: FunctionBlocks) {
         self.token = token
         self.setters = setters
@@ -334,12 +401,12 @@ class ComputationLiteral : Expression {
         "】"
     }
 }
-class ProtocolLiteral : Expression {
+final class ProtocolLiteral : Expression {
     static let kiyaku = "規約"
     static let junkyosuru = "準拠する"
-    var token: Token                // 規約トークン
-    var protocols: [String]         // 準拠する規約
-    var clauses: [ClauseLiteral]    // 規約条項
+    let token: Token                // 規約トークン
+    let protocols: [String]         // 準拠する規約
+    let clauses: [ClauseLiteral]    // 規約条項
     init(token: Token, protocols: [String], clauses: [ClauseLiteral]) {
         self.token = token
         self.protocols = protocols
@@ -363,10 +430,10 @@ struct ClauseLiteral {
     static let joukouga = "条項が、"
     static let joukouwa = "条項は、"
     //
-    var isTypeMember: Bool = false  // 型の要素
-    var identifier: Identifier      // 識別子
-    var type: String                // 型の文字列
-    var kind: SignatureKind         // シグネチャ種別(無しの場合、.none)
+    let isTypeMember: Bool          // 型の要素
+    let identifier: Identifier      // 識別子
+    let type: String                // 型の文字列
+    let kind: SignatureKind         // シグネチャ種別(無しの場合、.none)
     //
     var signature: FunctionSignature? {
         switch kind {
@@ -403,24 +470,25 @@ struct ClauseLiteral {
     }
 }
 struct FunctionSignature {          // 関数シグネチャ
-    var parameters: [Identifier]    // 引数
-    var paramForm: InputFormat      // 引数形式
-    var returnTypes: [String]       // 返り値の型
+    let parameters: [Identifier]    // 引数
+    let paramForm: InputFormat      // 引数形式
+    let returnTypes: [String]       // 返り値の型
     //
     var string: String {
         (parameters.isEmpty ? "" : "入力が\(zip(parameters, paramForm.strings).map {$0.string + $1}.joined(separator: "と"))。") +
         (returnTypes.isEmpty ? "" : "出力が「\(returnTypes.joined(separator: "」と「"))」。")
     }
 }
-class TypeLiteral : Expression {
+final class TypeLiteral : Expression {
     static let syokika = "初期化"
     static let typemembers = "型の要素"
     static let katano = "型の"
-    var token: Token                // 型トークン
-    var protocols: [String]         // 準拠する規約
-    var typeMembers: BlockStatement?// 型の要素
-    var initializers: FunctionBlocks// 初期化処理
-    var body: BlockStatement?       // インスタンスのメンバー
+    //
+    let token: Token                // 型トークン
+    let protocols: [String]         // 準拠する規約
+    let typeMembers: BlockStatement?// 型の要素
+    let initializers: FunctionBlocks// 初期化処理
+    let body: BlockStatement?       // インスタンスのメンバー
     init(token: Token, protocols: [String], typeMembers: BlockStatement? = nil, initializers: FunctionBlocks, body: BlockStatement? = nil) {
         self.token = token
         self.protocols = protocols
@@ -450,9 +518,9 @@ struct InputFormat {
             return concat.isEmpty ? "" : "「\(concat)」"
         }
     }
-    var numberOfInputs: Int?                        // 期待するパラメータ数(可変の場合はnil)
-    var formats: [Format]                           // 期待するパラメータ毎の型と格(無い場合は"")
-    var values: [ExpressionStatement?]              // 既定値
+    let numberOfInputs: Int?                        // 期待するパラメータ数(可変の場合はnil)
+    let formats: [Format]                           // 期待するパラメータ毎の型と格(無い場合は"")
+    let values: [ExpressionStatement?]              // 既定値
     //
     var strings: [String] {
         zip(formats, values).map { format, value in
@@ -460,6 +528,8 @@ struct InputFormat {
             return s.replacingOccurrences(of: "。", with: "")
         }
     }
+}
+extension InputFormat {
     var numberOfDefaultValues: Int {values.compactMap {$0}.count}   // 既定値の数
     // 既定値を持たない最初の位置、形式
     var firstParamIndex: Int? {values.firstIndex {$0 == nil}}
@@ -476,10 +546,10 @@ final class FunctionBlock {
     static let input = "入力"
     static let output = "出力"
     static let ari = "あり"
-    var parameters: [Identifier]    // 入力パラメータ
-    var paramForm: InputFormat      // 入力形式
-    var returnTypes: [String]       // 出力型
-    var body: BlockStatement?       // 処理本体
+    let parameters: [Identifier]    // 入力パラメータ
+    let paramForm: InputFormat      // 入力形式
+    let returnTypes: [String]       // 出力型
+    let body: BlockStatement?       // 処理本体
     var isOverloaded: Bool = false  // 多重識別
     init(parameters: [Identifier], paramForm: InputFormat, returnTypes: [String], body: BlockStatement? = nil, isOverloaded: Bool = false) {
         self.parameters = parameters
@@ -496,7 +566,9 @@ final class FunctionBlock {
         (body.map {"本体が、\($0.string)"} ?? "")
         return s.hasSuffix("であり、") ? String(s.dropLast("であり、".count)) : s
     }
-    //
+}
+//
+extension FunctionBlock {
     var rangeOfInputs: ClosedRange<Int> {   // 入力数の範囲
         guard let max = paramForm.numberOfInputs else {return (-1)...(-1)}
         let min = max - paramForm.numberOfDefaultValues
@@ -545,148 +617,12 @@ final class FunctionBlock {
         return returnTypes == other.returnTypes // 返り値の型の一致/不一致
     }
 }
-/// 必要入力数ごとの関数ブロック配列(多重定義)
-final class FunctionBlocks {
-    private static let variadicArity = -1
-    private var dictionary: [Int : [FunctionBlock]] = [:]   // 引数数毎の関数ブロック
-    private var array: [FunctionBlock] = []                 // 関数ブロック定義順
-    private var keyword: Token.Keyword? = nil               // 予約語多重定義
+final class CallExpression : Expression {
+    static let arguments = "引数が、"
     //
-    init() {}
-    init(by keyword: Token.Keyword) {self.keyword = keyword}
-    /// 関数定義で初期化
-    init(_ functionBlock: FunctionBlock) {_ = self.append(functionBlock)}
-    /// 必要入力数毎の多重定義配列を返す。(無い場合は空)
-    subscript(index: Int) -> [FunctionBlock] {dictionary[index] ?? []}
-    /// 関数定義を多重定義(自身)に追加する。
-    /// - Parameter functionBlock: 追加する関数ブロック (isOverloaded==falseならば上書き)
-    /// - Returns: 追加した自身を返す
-    func append(_ functionBlock: FunctionBlock) -> Self {
-        functionBlock.rangeOfInputs.forEach {
-            register(functionBlock, for: $0)
-        }
-        if array.isEmpty || functionBlock.isOverloaded {
-            array.append(functionBlock)
-        }
-        return self
-    }
-    /// 多重定義を多重定義(自身)に追加する。
-    /// - Parameter functionBlocks: 追加する多重定義 (hasRedefineならば上書き)
-    /// - Returns: 追加した自身を返す
-    func append(_ functionBlocks: FunctionBlocks) -> Self {
-        if functionBlocks.hasRedefinition {
-            applyRedefinition(from: functionBlocks)
-        } else {
-            applyOverloads(from: functionBlocks)
-        }
-        return self
-    }
-    // array/dictionary/keywordを隠蔽
-    var all: [FunctionBlock] {array}
-    var count: Int {array.count}
-    var isEmpty: Bool {array.isEmpty}
-    var hasDefinitions: Bool {!array.isEmpty}
-    /// 最新定義を取得する
-    var latest: FunctionBlock? {array.last}
-    var single: FunctionBlock? {array.first}
-    /// 単体定義かどうか
-    var isSingleDefinition: Bool {array.count == 1}
-    /// 指定入力数を受け付ける可能性があるか
-    func accepts(numberOfInputs n: Int) -> Bool {
-        dictionary.keys.contains(n) ||
-        dictionary.keys.contains(Self.variadicArity)
-    }
-    var isRedefinedPredicate: Bool {keyword != nil}
-    //
-    @discardableResult
-    func markAsOverloaded() -> Self {
-        self.array.forEach {$0.isOverloaded = true}
-        return self
-    }
-    @discardableResult
-    func redefinePredicate(by keyword: Token.Keyword) -> Self {
-        self.keyword = keyword
-        return self
-    }
-    /// 再定義している(多重定義でない関数ブロックが含まれる)
-    var hasRedefinition: Bool {array.contains {!$0.isOverloaded}}
-    /// 多重定義に、指定のシグネチャと一致する関数ブロックがあるか？
-    /// - Parameter signature: 関数シグネチャ
-    /// - Returns: シグネチャが一致ならば、true
-    func hasSameSignature(for signature: FunctionSignature) -> Bool {
-        array.reversed().contains {$0.matches(for: signature)}
-    }
-    /// 入力と引数の形式が一致する関数ブロックを得る。(call expression用)
-    /// - Parameter env: 引数をもつ環境
-    /// - Returns: 関数ブロック(無ければnil)
-    func resolve(with env: Environment) -> FunctionBlock? {
-        let pairs = env.parameterPairs          // 引数の名前(k)と値(v)の組
-        let vFunctions = dictionary[Self.variadicArity] // 可変長の定義
-        let fFunctions = dictionary[pairs.count]// 固定長の定義
-        switch (vFunctions, fFunctions) {
-        case let (v?, f?):                      // 両方チェック
-            if let function = match(in: v, with: pairs) {return function}
-            return match(in: f, with: pairs)
-        case let (f?, nil), let (nil, f?):      // 片方チェック
-            return match(in: f, with: pairs)
-        default:
-            return nil
-        }
-    }
-    func operateBuiltinPredicate(with env: Environment) -> JpfObject? {
-        guard let keyword else {
-            preconditionFailure("operateBuiltinPredicate called without keyword")
-        }
-        let predicate = PredicateOperableFactory.create(from: keyword, with: env)
-        return predicate.operate()
-    }
-    /// 候補の関数ブロック配列から、指定引数(名前と値)形式を持つ関数ブロックを返す。
-    /// - Parameters:
-    ///   - functions: 候補の関数ブロック配列
-    ///   - pairs: 指定引数(名前と値)
-    /// - Returns: 関数ブロック(見つからなければnil)
-    private func match(in functions: [FunctionBlock], with pairs: [(String, JpfObject)]) -> FunctionBlock? {
-        functions: for f in functions.reversed() {
-            arguments: for (k, v) in pairs {
-                if f.hasVariableParameter(named: k) {// 可変長識別子の値の型は配列
-                    guard v.type == JpfArray.type else {continue functions}
-                } else {                            // 固定長識別子の値の型は引数の型
-                    guard f.hasParameter(named: k,  ofType: v.type) else {continue functions}
-                }
-            }
-            return f                                // 引数名と型が全て一致
-        }
-        return nil                                  // 一致する関数が無い
-    }
-    //
-    private func register(_ block: FunctionBlock, for arity: Int) {
-        if dictionary[arity] != nil && block.isOverloaded {
-            dictionary[arity]!.append(block)
-        } else {
-            dictionary[arity] = [block]
-        }
-    }
-    private func applyRedefinition(from other: FunctionBlocks) {
-        for (arity, blocks) in other.dictionary {
-            dictionary[arity] = blocks
-        }
-        array = other.array
-    }
-    private func applyOverloads(from other: FunctionBlocks) {
-        for (arity, blocks) in other.dictionary {
-            if dictionary[arity] != nil {
-                dictionary[arity]! += blocks
-            } else {
-                dictionary[arity] = blocks
-            }
-        }
-        array += other.array
-    }
-}
-class CallExpression : Expression {
-    var token: Token                // トークン
-    var target: Expression          // 呼び出し対象
-    var arguments: [DefineStatement]// 引数
+    let token: Token                // トークン
+    let target: Expression          // 呼び出し対象
+    let arguments: [DefineStatement]// 引数
     init(token: Token, target: Expression, arguments: [DefineStatement]) {
         self.token = token
         self.target = target
@@ -698,11 +634,10 @@ class CallExpression : Expression {
         "\(target.string)【" +
         (arguments.isEmpty ? "" : Self.arguments + arguments.reduce("") {$0 + $1.string.withoutComma}) + "】"
     }
-    static let arguments = "引数が、"
 }
-class ArrayLiteral : Expression {
-    var token: Token                // 配列トークン
-    var elements: [ExpressionStatement]
+final class ArrayLiteral : Expression {
+    let token: Token                // 配列トークン
+    let elements: [ExpressionStatement]
     init(token: Token, elements: [ExpressionStatement]) {
         self.token = token
         self.elements = elements
@@ -714,9 +649,9 @@ class ArrayLiteral : Expression {
         (elements.isEmpty ? "" : "要素が、\(elements.map {$0.string}.joined(separator: "と、"))".withoutPeriod) + "】"
     }
 }
-class DictionaryLiteral : Expression {
-    var token: Token                // 辞書トークン
-    var pairs: [PairExpression]
+final class DictionaryLiteral : Expression {
+    let token: Token                // 辞書トークン
+    let pairs: [PairExpression]
     init(token: Token, pairs: [PairExpression]) {
         self.token = token
         self.pairs = pairs
@@ -729,12 +664,12 @@ class DictionaryLiteral : Expression {
     }
 }
 struct PairExpression {
-    var pair: (key: ExpressionStatement, value: ExpressionStatement)
+    let pair: (key: ExpressionStatement, value: ExpressionStatement)
     var string: String {pair.key.string.withoutPeriod + "が" + pair.value.string.withoutPeriod}
 }
-class EnumLiteral : Expression {
-    var token: Token                // 列挙トークン
-    var elements: [Statement]       // 列挙子(定義文または列挙子)
+final class EnumLiteral : Expression {
+    let token: Token                // 列挙トークン
+    let elements: [Statement]       // 列挙子(定義文または列挙子)
     init(token: Token, elements: [Statement]) {
         self.token = token
         self.elements = elements
@@ -746,11 +681,11 @@ class EnumLiteral : Expression {
         (elements.isEmpty ? "" : "要素が、\(elements.map {$0.string}.joined(separator: "と、"))".withoutPeriod) + "】"
     }
 }
-class EnumeratorLiteral : Expression {
+final class EnumeratorLiteral : Expression {
     static let dot = "・"
-    var token: Token                // 列挙子トークン(type・name)
-    var type: String                // 列挙型の名前(空は無し)
-    var name: String                // 列挙子名
+    let token: Token                // 列挙子トークン(type・name)
+    let type: String                // 列挙型の名前(空は無し)
+    let name: String                // 列挙子名
     init(token: Token, type: String, name: String) {
         self.token = token
         self.type = type

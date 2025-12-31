@@ -255,6 +255,9 @@ enum Token : Equatable {
     var isKeyword: Bool {if case .keyword(_) = unwrappedType {return true} else {return false}}
     var isParticle: Bool {if case .particle(_) = unwrappedType {return true} else {return false}}
     var isWrapped: Bool {if case .wrapped(_,_) = self {return true} else {return false}}
+    var isConjunctiveForm: Bool {
+        isWrapped
+    }
     var isIdent: Bool   {type == .ident}
     var isString: Bool  {type == .string}
     var isNumber: Bool  {type == .int}
@@ -322,7 +325,7 @@ extension String {
 // MARK: - 連用形(Continuative Form)
 /// 連用形の文字列(word)を、終止形(Plain Form)に変換する。
 // ※ structにすると、Token内で Cannot use mutating getter on immutable value: function call returns immutable value
-class ContinuativeForm : Equatable {
+final class ContinuativeForm : Equatable {
     init(_ word: String) {self.literal = word}
     init(_ token: Token) {self.literal = token.literal}
     let literal: String

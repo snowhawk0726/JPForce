@@ -7,7 +7,7 @@
 
 import Foundation
 
-class GlobalStore {
+final class GlobalStore {
     private let globalsSize = 65536
     private var globals: [JpfObject]
     init() {
@@ -19,7 +19,7 @@ class GlobalStore {
     }
 }
 
-class Stack {
+final class Stack {
     init() {
         self.stack = [JpfObject](repeating: JpfNull.object, count: stackSize)
         self.sp = 0
@@ -118,7 +118,7 @@ class Stack {
     }
 }
 
-class VM {
+final class VM {
     init(with bytecode: Bytecode) {
         self.constants = bytecode.constants
         self.globals = GlobalStore()

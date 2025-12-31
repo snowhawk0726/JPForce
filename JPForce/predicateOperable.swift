@@ -310,7 +310,7 @@ struct ReadOperator : PredicateOperable {
         }
         CFRunLoopRun()
     }
-    private class ReadDelegate : NSObject, AVSpeechSynthesizerDelegate {
+    private final class ReadDelegate : NSObject, AVSpeechSynthesizerDelegate {
         func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
             CFRunLoopStop(CFRunLoopGetCurrent())
         }

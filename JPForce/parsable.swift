@@ -623,12 +623,13 @@ struct DefStatementParser : StatementParsable {
             _ = getNext(whenNextIs: .PERIOD)
             skipNextEols()                  // EOLの前で解析を停止する。
         }
+        var value = parsed
         if let function = parsed.expressions.first as? FunctionLiteral {
             function.name = identifier.value// 関数の名前を記録
             function.function.isOverloaded = isExtended
-            parsed.expressions[0] = function// DefineStatement.valueに反映する。
+            value = ExpressionStatement(token: parsed.token, expressions: [function])
         }
-        return DefineStatement(token: token, name: identifier, value: parsed, isExtended: isExtended)
+        return DefineStatement(token: token, name: identifier, value: value, isExtended: isExtended)
     }
 }
 /// 文の終わりまで、式を解析する。
@@ -661,10 +662,64 @@ struct ExpressionStatementParser : StatementParsable {
             }
             //
             if getNextWhenNextIsEndOfStatement || isBreakFactor {break}    // 文の終わり
-            _ = getNext(whenNextIs: .COMMA)     // 読点を読み飛ばし、
-            getNext()                           // 次の式解析に
+            _ = getNext(whenNextIs: .COMMA)             // 読点を読み飛ばし、
+            getNext()                                   // 次の式解析に
         }
-        return ExpressionStatement(token: token, expressions: expressions)
+        let terminator = SentenceTerminator(symbol: currentToken.literal)
+        if terminator.isExplicit && previousToken.isComma {
+            error(message: "文の終端前の読点「、」が正しくない。")
+            return nil
+        }
+        return ExpressionStatement(token: token, expressions: expressions, terminator: terminator)
+    }
+}
+extension ExpressionStatementParser {
+    func parseSentecne(from es: ExpressionStatement) -> Statement? {
+        let predicateIndices = es.predicateIndices
+        if predicateIndices.isEmpty {
+            return es                           // 式文(述語が無い)
+        }
+        var sentences: [SimpleSentence] = []
+        var start = 0
+        for idx in predicateIndices {
+            let slice = es.expressions[start...idx]
+            let predicate = slice.last!.predicateExpression!
+            let simple = SimpleSentence(
+                token: predicate.token,
+                expressions: Array(slice),
+                index: idx - start)
+            sentences.append(simple)
+            start = idx + 1
+            if predicate.isTerminal {
+                if start < es.expressions.count {
+                    error(message: "終止形の文の後に、式を続けることはできない。")
+                    return nil
+                }
+                break
+            }
+        }
+        // 文末の連用形をチェック
+        if es.terminator.isExplicit,
+           isEndPredicateConjunctive(in: es) {
+            error(message: "連用形の文を「\(es.terminator.rawValue)」で終えることはできない。")
+            return nil
+        }
+        if sentences.count == 1 {
+            return sentences.first!             // 単文
+        }
+        return CompoundSentence(
+            token: sentences.first!.token,
+            sentences: sentences)               // 複文
+    }
+    /// 式文中の文末の述語が連用形か？
+    //   1と2を足し。     → エラー(文末の連用形)
+    //   1と2を足し、。   → エラー(文末の連用形)
+    //   1と2を足し、3と4。→ 正常(文末の連用形ではない)
+    private func isEndPredicateConjunctive(in es: ExpressionStatement) -> Bool {
+        guard let last = es.predicateIndices.last else {return false}   // 最後か
+        guard last == es.expressions.count - 1 else {return false}      // 文末か
+        guard let predicate = es.expressions[last].predicateExpression else {return false}
+        return predicate.isConjunctive                                  // 述語が連用形か
     }
 }
 private extension ExpressionStatementParser {

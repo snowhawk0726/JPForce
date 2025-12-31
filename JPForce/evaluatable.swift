@@ -206,6 +206,31 @@ extension DefineStatement : Evaluatable {
         return original.append(definition)
     }
 }
+// MARK: Sentence evaluators
+extension SimpleSentence : Evaluatable {
+    func evaluate(with environment: Environment) -> JpfObject? {
+        var lastResult: JpfObject?
+        for expression in expressions {
+            lastResult = expression.evaluate(with: environment)
+            if let result = lastResult {
+                if result.isBreakFactor {break}
+                if let err = environment.push(result) {return err}
+            }
+        }
+        environment.remove(name: Environment.OUTER)
+        return lastResult
+    }
+}
+extension CompoundSentence : Evaluatable {
+    func evaluate(with environment: Environment) -> JpfObject? {
+        var lastResult: JpfObject?
+        for sentence in sentences {
+            lastResult = sentence.evaluate(with: environment)
+            if let result = lastResult, result.isBreakFactor {break}
+        }
+        return lastResult
+    }
+}
 // MARK: Expression evaluators
 extension IntegerLiteral : Evaluatable {
     /// 数値オブジェクトを返す。
