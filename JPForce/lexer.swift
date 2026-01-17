@@ -54,15 +54,9 @@ final class Lexer {
         case (.keyword(let keyword),.IDENT(_),_):
             guard keyword != .ITS else {return token}
             token = Token(word: token.literal + getNext().literal)  // 識別子を合成
-        case (.keyword(let current),.keyword(let next),_):     // 予約語 + 予約語
-            if next == .KOTO ||                         // 「こと」
-               (current == .EXECUTE && next == .SURU) { // 「実行する」
-                _ = getNext()                           //　「する」「こと」は飛ばす
-            }
-        case  (.keyword(let current),.wrapped(.keyword,let next),_): // 予約語 + 連用形
-            if current == .EXECUTE &&
-                ContinuativeForm(next).plainFormType == .keyword(.SURU) {   // 「実行し」
-                _ = getNext()                           // 「し」は飛ばす
+        case (.keyword(_),.keyword(let next),_):     // 予約語 + 予約語
+            if next == .KOTO {                          
+                _ = getNext()                           //　「こと」は飛ばす
             }
         case (.INT(_),.IDENT(_),_):                     // 数値 + 単位 → 単位を無視する
             while nextToken.type == .ident {skipToken()}

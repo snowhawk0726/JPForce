@@ -197,7 +197,7 @@ struct AssignOperationCompiler : PredicateCompilable {
             case (.none, Token(.NI), Token(.WO)):
                 try emitAssignment(value: third, ident: second)
                 // 複合代入
-            case (.none, _, Token(word: "て")):
+            case (.none, _, Token(.TE)):
                 try emitCompoundAssignment(value: third?.value, ident: second?.value)
                 // 実行時(コード出力済み)処理
             default:
@@ -283,8 +283,8 @@ private extension AssignOperationCompiler {
         guard let name = compiler.identifier else {
             throw assignIdentiferNotFound
         }
-        if compiler.isLastOpPhrase(particle: .TA) {         // 直前の出力「た」でを取り除く
-            _ = compiler.removeLastOpPhrase(particle: .TA)
+        if compiler.isLastOpPhrase(particle: .TE) {         // 直前の出力「て」でを取り除く
+            _ = compiler.removeLastOpPhrase(particle: .TE)
             compiler.identifier = nil                       // 複合代入用識別子をクリア
         } else {
             _ = compiler.emit(predicate: .ASSIGN)   // 代入する

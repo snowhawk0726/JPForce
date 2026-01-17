@@ -52,6 +52,7 @@ enum Token : Equatable {
         case NO         = "の"
         case DA         = "だ"   // 助動詞
         case TA         = "た"
+        case TE         = "て"   // 連用形の接続助詞
         case TOWA       = "とは"  // 格助詞 + 係助詞
         case DEWA       = "では"  // ??
         case KO         = "個"   // 数助詞
@@ -221,10 +222,6 @@ enum Token : Equatable {
         if case .keyword(let k) = unwrappedType {return k}
         return nil
     }
-    var unwrappedParticle: Particle? {
-        if case .particle(let p) = unwrappedType {return p}
-        return nil
-    }
     var coloredLiteral: String {literal.color(color)}
     var number: Int? {if case .INT(let int) = self {return int} else {return nil}}
     var keyword: Token.Keyword? {unwrappedKeyword}
@@ -253,11 +250,10 @@ enum Token : Equatable {
         }
     }
     var isKeyword: Bool {if case .keyword(_) = unwrappedType {return true} else {return false}}
-    var isParticle: Bool {if case .particle(_) = unwrappedType {return true} else {return false}}
+    var isParticle: Bool {if case .particle(_) = self {return true} else {return false}}
     var isWrapped: Bool {if case .wrapped(_,_) = self {return true} else {return false}}
-    var isConjunctiveForm: Bool {
-        isWrapped
-    }
+    var isConjunctiveForm: Bool {isWrapped}
+    var isPlainForm: Bool {!isWrapped }
     var isIdent: Bool   {type == .ident}
     var isString: Bool  {type == .string}
     var isNumber: Bool  {type == .int}
@@ -271,10 +267,10 @@ enum Token : Equatable {
         unwrappedType == .keyword(k) ? true : false
     }
     func isParticle(_ p: Token.Particle) -> Bool {
-        unwrappedType == .particle(p) ? true : false
+        self == .particle(p) ? true : false
     }
     func isSymbol(_ s: Token.Symbol) -> Bool {
-        unwrappedType == .symbol(s) ? true : false
+        self == .symbol(s) ? true : false
     }
     //
     // MARK: - 再定義可能な予約語(述語)(redefinable predicate keywords)
@@ -302,13 +298,48 @@ enum Token : Equatable {
         return d
     }()
     // MARK: - 左辺識別子を持つ述語
-    static let assignmentPredicates = [.ASSIGN, .SET, .PULL, .DUPLICATE] as [Token.Keyword]
+    static let assignmentPredicates: Set<Token.Keyword> = [.ASSIGN, .PULL, .DUPLICATE]
     var hasLhsIdentifier: Bool {Self.assignmentPredicates.contains {self.isKeyword($0)}}
     // MARK: - 助詞一覧とそのインデックス
     static let particles = Particle.allCases
     var particleIndex: Int? {Token.particles.firstIndex {self.isParticle($0)}}
+    // MARK: - 文として完結可能な述語（句点を付与可能）
+    var isTerminalCandidate: Bool {keyword?.predicateKind != nil}
+    // MARK: - 文末の述語(単文、節を形成する名詞、動詞、形容詞)
+    var isPredicate: Bool {
+        keyword?.predicateKind?.isPredicate ?? false
+    }
+    // MARK: - 述語が値を出力する(しうる)か否か
+    var isValuePredicate: Bool {keyword?.predicateKind == .value || keyword == .MONO}
 }
-    
+/// 述語の分類
+extension Token.Keyword {
+    enum PredicateKind {
+        case value      // 値を出力する
+        case void       // 値を出力しない
+        case breakFactor// フロー制御
+        case nominalizer// 値を名詞化する
+        //
+        var isPredicate: Bool {
+            self == .value || self == .void || self == .breakFactor
+        }
+    }
+    var predicateKind: PredicateKind? {
+        switch self {
+        case .TRUE, .FALSE, .NULL, .EMPTY, .INPUT, .ARRAY, .DICTIONARY, .FILES, .IDENTIFIERS,   // 名詞
+             .ADD, .SUBSTRACT, .MULTIPLY, .DIVIDE, .NEGATE, .EQUAL, .BE, .NOT, .LT, .GT, .EXECUTE, .CREATE, .AVAILABLE, .APPEND, .REMOVE, .FOREACH, .MAP, .REDUCE, .FILTER, .SORT, .REVERSE, .CONTAINS, .PULL, .DUPLICATE, .SURU:   // 動詞、形容詞
+            return .value
+        case .ASSIGN, .SWAP, .SET, .INITIALIZATION, .PRINT, .ASK, .NEWLINE, .READ, .PUSH, .DROP:
+            return .void
+        case .RETURN, .GOBACK, .BREAK, .CONTINUE:   // 制御終端動詞
+            return .breakFactor
+        case .MONO, .KOTO:  // 形式名詞
+            return .nominalizer
+        default:
+            return nil
+        }
+    }
+}
 // MARK: - String extension
 extension String {
     var hankaku: String? {applyingTransform(.fullwidthToHalfwidth, reverse: false)} // 半角変換(Fullwidth to Halfwidth (ascii))

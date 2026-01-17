@@ -17,21 +17,96 @@ final class CommonTests: XCTestCase {
     }
     func testLhsAssingments() throws {
         let testPattern: [VmTestCase] = [
-        ("xに1を代入。x。",1),
-        ("yは1。yをxに代入。x。",1),
-        ("配列【1,2,3】の1に0を代入。",[1,0,3]),
-        ("aは配列【1,2,3】。iは1。aのiに0を代入。a。",[1,0,3]),
-        ("aは配列【1,2,3】。iは1。aの1にaの2を足す。",5),
-        ("1をxに代入し、xと１を足し、cに代入。c。",2),
-        ("1と2を積む。aとbに得、aとbを足す。",3),
-        ("xと１を足し、cに代入。c。","識別子『x』が定義されていない。"),
+            ("xに1を代入。x。",1),
+            ("yは1。yをxに代入。x。",1),
+            ("配列【1,2,3】の1に0を代入。",[1,0,3]),
+            ("aは配列【1,2,3】。iは1。aのiに0を代入。a。",[1,0,3]),
+            ("aは配列【1,2,3】。iは1。aの1にaの2を足す。",5),
+            ("1をxに代入し、xと１を足し、cに代入。c。",2),
+            ("1と2を積む。aとbに得、aとbを足す。",3),
+            ("xと１を足し、cに代入。c。","識別子『x』が定義されていない。"),
         ]
-        print("評価器テスト開始！！")
+        print("評価器テスト開始")
         try evaluateTests(with: testPattern)
-        print("翻訳器・VMテスト開始！！")
+        print("翻訳器・VMテスト開始")
         try runVmTests(with: testPattern)
     }
+    func testSentences() throws {
+        let testPatterns: [(input: String, expected: Any?)] = [
+            ("1と2を足す。", 3),
+            ("1と2を足し、", 3),
+            ("1と2を足し、3を足す。", 6),
+            ("1と2を足し、3を足し", 6),
+            ("aに1を代入。a", 1),
+            ("1をaに代入し、2をbに代入。bからaを引く。", 1),
+            ("aは1。aに2を足し、bに代入。b", 3),
+            ("aは1。aに2を足し、３を足して代入。a", 6),
+            ("xは１。xを負数にして代入。x。", -1),
+            ("1、aに代入。a", 1),
+//            ("aは100。関数【aは1。外部「a」に0を代入】を実行。a。", 0),    // TODO: Compilerで「外部」実装
+            ("aに1個代入。a", assignUsage.message),  // エラー(「個」)
+            ("xを負数にして代入。x。", undefinedIdentifier("x").message), // 未定義エラー
+            ("aに1を足して代入。a。", undefinedIdentifier("a").message), // 未定義エラー
+        ]
+        for test in testPatterns {
+            print("テスト開始：\(test.input)")
+            let parser = Parser(input: test.input)
+            do {
+                let statements = try parseSentenses(with: parser)
+                // インタープリタテスト
+                let environment = Environment()
+                let eval = Evaluator(from: Program(statements: statements), with: environment)
+                let evaluated = eval.object ?? environment.pull()
+                try testExpectedObject(test.expected, evaluated)
+                print("テスト結果(評価)：\t\(evaluated?.string ?? "nil")")
+
+                // コンパイラー/VMテスト
+                let vmResult = compileAndRun(statements)
+                try testExpectedObject(test.expected, vmResult)
+                print("テスト結果(VM)：\t\(vmResult?.string ?? "nil")")
+
+            } catch CommonTestError.syntax {
+                XCTAssertNil(test.expected)
+                parser.errors.forEach { print($0) }
+                print("テスト結果：構文エラー")
+            }
+        }
+    }
     // MARK: - Helpers
+    enum CommonTestError: Error {
+        case syntax
+    }
+    let syntaxError: Error = CommonTestError.syntax
+    //
+    private func parseSentenses(with parser: Parser) throws -> [Statement] {
+        let program = try XCTUnwrap(parser.parseProgram())
+        var statements: [Statement] = []
+        for statement in program.statements {
+            guard let es = statement as? ExpressionStatement else {
+                statements.append(statement)
+                continue
+            }
+            guard let stmt = ExpressionStatementParser(parser).parseSentecne(from: es) else {
+                throw syntaxError
+            }
+            statements.append(stmt)
+        }
+        return statements
+    }
+    private func compileAndRun(_ statements: [Statement]) -> JpfObject? {
+        let compiler = Compiler(from: Program(statements: statements))
+        if let error = compiler.compile() {
+            return error // コンパイルエラー
+        } else {
+            let vm = VM(with: compiler.bytecode)
+            // run() が nil なら stackTop を使うが、いずれも JpfObject? に正規化
+            if let runResult = vm.run() {
+                return runResult
+            } else {
+                return vm.stackTop
+            }
+        }
+    }
     private func evaluateTests(with tests: [VmTestCase]) throws {
         for t in tests {
             print("テスト開始：「\(t.input)」")

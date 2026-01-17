@@ -1,5 +1,5 @@
 //
-//  compilerObjectsExtension.swift
+//  compilerObjectsExtension.swift
 //  コンパイラ、VM用JpfObjectのextension
 //  JPForce
 //

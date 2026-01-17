@@ -18,6 +18,22 @@ protocol Compilable {
     func compile(with c: Compiler) -> JpfObject?
 }
 // MARK: - implementations for ast mode compiler
+// [Expression]のコンパイル
+extension Array where Element == Expression {
+    /// 複数の式（または引数）を順に翻訳する共通処理
+    /// - Parameter expressions:
+    /// - Returns:
+    ///   - nil : 返す結果が無い(翻訳終了)
+    ///   - JpfObject : 翻訳エラー、またはスタックエラー
+    func compile(with c: Compiler) -> JpfObject? {
+        for expression in self {
+            guard let object = expression.compile(with: c) else { continue }
+            if object.isError { return object }
+            if let err = c.push(object) { return err }
+        }
+        return nil
+    }
+}
 extension Node {
     func compile(with c: Compiler) -> JpfObject? {
         return notImplemented(type: String(describing: self.self), description: self.string)
@@ -40,13 +56,12 @@ extension Program : Compilable {
 }
 extension ExpressionStatement : Compilable {
     func compile(with c: Compiler) -> JpfObject? {
-        casheLeadingIdentifer(with: c)                              // 文頭の識別子をキャッシュ
-        for expression in expressions {
-            guard let object = expression.compile(with: c) else {continue}
-            if object.isError {return object}
-            if let err = c.push(object), err.isError {return err}   // キャッシュで計算を継続
+        expressions.finalizeLhsCandidates() // TODO: parseSentenceに移行後削除予定
+        casheLeadingIdentifer(with: c)      // 文頭の識別子をキャッシュ TODO: 削除予定
+        if let exit = expressions.compile(with: c) {
+            return exit
         }
-        c.identifier = nil
+        c.identifier = nil                  // TODO: 削除予定
         do {try c.emitAllCashe()} catch {return jpfError(from: error)}
         return nil
     }
@@ -60,17 +75,35 @@ private extension ExpressionStatement {
         }
     }
 }
+extension CompoundStatement : Compilable {
+    func compile(with c: Compiler) -> JpfObject? {
+        for sentence in sentences {
+            if let error = sentence.compile(with: c) {
+                guard error.isError else {
+                    assertionFailure("キャッシュが出力された。")
+                    fatalError()
+                }
+                return error
+            }
+        }
+        return nil
+    }
+}
 extension BlockStatement : Compilable {
     func compile(with c: Compiler) -> JpfObject? {
         c.switchCase.enter()
-        var result: JpfObject?
         for statement in statements {
-            result = statement.compile(with: c)
-            if let object = result, object.isBreakFactor {break}
+            if let error = statement.compile(with: c) {
+                guard error.isError else {
+                    assertionFailure("キャッシュが出力された。")
+                    fatalError()
+                }
+                return error
+            }
         }
         if c.switchCase.hasJumpPositions {return JpfError(c.switchCase.defaultError)}
         c.switchCase.leave()
-        return result
+        return nil
     }
 }
 extension DefineStatement : Compilable {
@@ -84,11 +117,86 @@ extension DefineStatement : Compilable {
         return nil
     }
 }
+// MARK: Sentence compilers
+extension SimpleSentence : Compilable {
+    func compile(with c: Compiler) -> JpfObject? {
+        if let exit = arguments.compile(with: c) {
+            return exit
+        }
+        if let result = predicateKind.compile(token: token, auxiliaryVerb: auxiliaryVerb, with: c) {// 述語をコンパイル
+            if result.isError {return result}
+            if let err = c.push(result) {return err}
+        }
+        do {try c.emitAllCashe()} catch {return jpfError(from: error)}
+        return nil
+    }
+}
+extension SentencePredicateKind {
+    func compile(token: Token, auxiliaryVerb: AuxiliaryVerb, with c: Compiler) -> JpfObject? {
+        switch self {
+        case .builtin:
+            let predicate = PredicateExpression(token: token, auxiliaryToken: auxiliaryVerb.token)
+            return predicate.compile(with: c)
+        case .custom:
+            let identifier = Identifier(from: token, with: auxiliaryVerb.token)
+            return identifier.compile(with: c)
+        }
+    }
+}
+extension AssignmentSentence : Compilable {
+    func compile(with c: Compiler) -> JpfObject? {
+        // 右辺の式を抽出(ヲ格をチェック)
+        let rhsExpressionsResult = extractRightHandExpressions()
+        switch rhsExpressionsResult {
+        case .failure(let error):
+            return error
+        case .success(let expressions):
+            // 右辺の計算（キャッシュで継続可能な場合は push）
+            if let exit = expressions.compile(with: c) {
+                return exit
+            }
+        }
+        // キャッシュを出力し、左辺への代入コードを emit
+        do {
+            try c.emitAllCashe()
+            let ident = JpfIdentifier(ensuring: target.value, with: c)
+            try ident.emitOpSet(with: c)
+        } catch {
+            return jpfError(from: error)
+        }
+        return nil
+    }
+    // 右辺の式リストを抽出する。
+    // 最後が PhraseExpression かつ 格「を」(WO) の場合は、その左項を右辺に含める。
+    private func extractRightHandExpressions() -> Result<[Expression], JpfError> {
+        var expressions = Array(arguments.dropLast())
+        if let phrase = arguments.last as? PhraseExpression {
+            guard phrase.token.isParticle(.WO) else {
+                return .failure(assignUsage)
+            }
+            expressions.append(phrase.left)
+        } else if let last = arguments.last {
+            expressions.append(last)
+        }
+        return .success(expressions)
+    }
+}
+// MARK: Expression compilers
 extension Identifier : Compilable {
     func compile(with c: Compiler) -> JpfObject? {
         let ident = JpfIdentifier(resolving: self, with: c)
         guard ident.hasSymbol || ident.isLhs else {     // 登録済み、または左辺識別子
             return undefinedIdentifier(value)
+        }
+        if auxiliaryToken != nil {
+            do {
+                try c.emitAllCashe()
+                try ident.emit(with: c)
+                _ = c.emit(op: .opCall)
+            } catch {
+                return jpfError(from: error)
+            }
+            return nil
         }
         if !c.isEmpty, ident.isProperty  {
             if let cashe = c.peek as? JpfIdentifier {

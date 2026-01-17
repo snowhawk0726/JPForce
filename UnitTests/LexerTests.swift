@@ -62,7 +62,7 @@ final class LexerTests: XCTestCase {
             (.particle(.DE), "で"), (.symbol(.COMMA), "、"),
             (.particle(.DA), "だ"), (.symbol(.PERIOD), "。"),
             (.particle(.TA), "た"), (.symbol(.COMMA), "、"),
-            (.particle(.TA), "て"), (.symbol(.COMMA), "、"),
+            (.particle(.TE), "て"), (.symbol(.COMMA), "、"),
             (.particle(.DEWA), "では"), (.symbol(.PERIOD), "。"),
         ]
         let lexer = Lexer(input)

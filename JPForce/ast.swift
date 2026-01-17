@@ -13,9 +13,23 @@ protocol Node : Evaluatable, Compilable {
     var string: String {get}
 }
 protocol Statement : Node {}
+
 protocol Expression : Node {
+    var token: Token {get}
     var isPredicate: Bool {get}
-    var predicateExpression: PredicateExpression? {get}
+    var isAssignment: Bool {get}
+    var isTerminalCandidate: Bool {get}
+    var isConjunctiveForm: Bool {get}
+    var auxiliaryVerb: AuxiliaryVerb {get}
+    func hasKeyword(_ k: Token.Keyword) -> Bool
+    var sentenceToken: Token {get}
+    var sentenceParticle: Token.Particle? {get}
+}
+protocol Sentence : Statement {
+    var token: Token {get}
+    var auxiliaryVerb: AuxiliaryVerb {get}
+    var baseString: String {get}
+    var isIdentifierOnlySentence: Bool {get}
 }
 //
 protocol ValueExpression : Expression, Equatable {
@@ -29,11 +43,48 @@ extension Node {
 }
 extension Expression {
     var isPredicate: Bool {false}
-    var predicateExpression: PredicateExpression? {nil}
+    var isAssignment: Bool {hasKeyword(.ASSIGN)}
+    var isNominalized: Bool {hasKeyword(.MONO)}
+    var isTerminalCandidate: Bool {false}
+    var isConjunctiveForm: Bool {false}
+    var sentenceParticle: Token.Particle? {nil}
 }
 extension ValueExpression {
     var tokenLiteral: String {token.literal}
- }
+}
+extension Sentence {
+    var isIdentifierOnlySentence: Bool {false}
+    // 句読点(pretty-print用)
+    var string: String {
+        return baseString + punctuation
+    }
+    var baseString: String {""}
+    private var punctuation: String {
+        switch terminality {
+        case .terminal:     return "。"
+        case .conjunctive:  return "、"
+        default:            return ""
+        }
+    }
+}
+extension Array where Element == Expression {
+    func toStringWithComma(
+        includeTrailingComma: Bool = false,
+        insertCommaAfter shouldInsert: (Expression) -> Bool
+    ) -> String {
+        guard !isEmpty else { return "" }
+        return enumerated().map { index, expr in
+            let isLast = index == count - 1
+            if shouldInsert(expr) && (includeTrailingComma || !isLast) {
+                return expr.string + "、"
+            }
+            return expr.string
+        }.joined()
+    }
+    var toStringWithComma: String {
+        toStringWithComma {$0.isNominalized || $0 is (any ValueExpression)}
+    }
+}
 // MARK: Program(プログラム)
 final class Program : Statement {
     let statements: [Statement]
@@ -67,18 +118,8 @@ final class DefineStatement : Statement {
     static let dearu = "である"        // 省略可
     static let desu = "です"          // 代替可
 }
-final class ExpressionStatement : Statement {
-    static let yousoga = "要素が、"
-    static let yousowa = "要素は、"
-    static let hontaiga = "本体が、"
-    static let hontaiwa = "本体は、"
-    static let deatte = "であって、"
-    static let deari = "であり、"
-    static let ga = "が"
-    static let wa = "は"
-    static let to = "と"
-    //
-    let token: Token                // 式の最初のトークン
+final class ExpressionStatement : Sentence {
+    let token: Token                // 式の最後のトークン
     let expressions: [Expression]   // 式
     let terminator: SentenceTerminator
     init(token: Token, expressions: [Expression], terminator: SentenceTerminator = .none) {
@@ -98,14 +139,15 @@ final class ExpressionStatement : Statement {
             .replacingOccurrences(of: "、する", with: "する")
             .replacingOccurrences(of: "、し", with: "し")
     }
-}
-extension ExpressionStatement {
-    var predicateIndices: [Int] {
-        expressions.enumerated().compactMap {$1.isPredicate ? $0 : nil}
-    }
-    var predicateContinuations: [Bool] {
-        predicateIndices.map {expressions[$0].predicateExpression?.isConjunctive == true}
-    }
+    static let yousoga = "要素が、"
+    static let yousowa = "要素は、"
+    static let hontaiga = "本体が、"
+    static let hontaiwa = "本体は、"
+    static let deatte = "であって、"
+    static let deari = "であり、"
+    static let ga = "が"
+    static let wa = "は"
+    static let to = "と"
 }
 final class BlockStatement : Statement {
     let token: Token                // 【トークン
@@ -119,57 +161,94 @@ final class BlockStatement : Statement {
     var string: String {statements.reduce("") {$0 + $1.string}}
     var stringWithBracket: String {statements.isEmpty ? "【】" : "【\n\t" + string + "\n】"}
 }
-// MARK: Sentences(節)
+// MARK: Sentence(節)
 // 述語を含む単文、複文
-enum SentenceTerminator : String {
-    case none       = ""
-    case period     = "。"
-    case rbbracket  = "】"
-    case eol        = "\n"
-    case eof        = "\0"
-    //
-    init(symbol: String) {
-        self = Self(rawValue: symbol) ?? .none
-    }
-    var isExplicit: Bool {self == .period || self == .rbbracket}
-}
-final class SimpleSentence : Statement {
+final class CompoundStatement : Statement {
     let token: Token
-    let expressions: [Expression]
-    let predicateIndex: Int
-    init(token: Token, expressions: [Expression], index: Int) {
-        self.token = token
-        self.expressions = expressions
-        self.predicateIndex = index
-    }
-    //
-    var tokenLiteral: String {token.literal}
-    var string: String {expressions.reduce("") {$0 + $1.string}}
-}
-final class CompoundSentence : Statement {
-    let token: Token
-    let sentences: [SimpleSentence]
-    init(token: Token, sentences: [SimpleSentence]) {
+    let sentences: [Sentence]
+    init(token: Token, sentences: [Sentence]) {
         self.token = token
         self.sentences = sentences
     }
     //
     var tokenLiteral: String {token.literal}
-    var string: String {sentences.reduce("") {$0 + $1.string}}
+    var string: String {
+        sentences.map(\.string).joined()
+    }
+}
+final class SimpleSentence : Sentence {
+    let token: Token                    // 述語(または識別子)
+    let auxiliaryVerb: AuxiliaryVerb
+    let arguments: [Expression]
+    let predicateKind: SentencePredicateKind
+    init(token: Token,
+         auxiliaryVerb: AuxiliaryVerb = .none,
+         arguments: [Expression],
+         predicateKind: SentencePredicateKind,
+         string: String
+    ) {
+        self.token = token
+        self.auxiliaryVerb = auxiliaryVerb
+        self.arguments = arguments
+        self.predicateKind = predicateKind
+        self.baseString = string
+    }
+    //
+    var tokenLiteral: String {token.literal}
+    var baseString: String
+}
+enum AssignmentKind {
+    case simple                     // 単純代入
+    case compound                   // 複合代入文
+}
+final class AssignmentSentence : Sentence {
+    let token: Token                // 代入
+    let auxiliaryVerb: AuxiliaryVerb
+    let kind: AssignmentKind
+    let target: Identifier          // 左辺
+    let arguments: [Expression]     // 右辺候補
+    init(token: Token,
+         auxiliaryVerb: AuxiliaryVerb = .none,
+         kind: AssignmentKind,
+         target: Identifier,
+         arguments: [Expression],
+         string: String
+    ) {
+        self.token = token
+        self.auxiliaryVerb = auxiliaryVerb
+        self.kind = kind
+        self.target = target
+        self.arguments = arguments
+        self.baseString = string
+    }
+    //
+    var tokenLiteral: String {token.literal}
+    var baseString: String
 }
 // MARK: Expressions(式)
 // 値を返すノード
 final class Identifier : Expression {
     let token: Token                // 識別子(.IDENT(value))トークン
     let value: String               // 値(識別子名)
+    let auxiliaryToken: Token?      // 補助動詞(する)
+    var isLhsCandidate: Bool = false// 左辺候補
     var isLhs: Bool = false         // 左辺(代入される側)
     //
-    init(token: Token, value: String, isLhs: Bool = false) {self.token = token; self.value = value; self.isLhs = isLhs}
-    convenience init(from string: String) {self.init(token: Token(ident: string), value: string)}
-    convenience init(from token: Token) {self.init(token: token, value: token.literal)}
+    init(token: Token, value: String, auxiliaryToken: Token?, isLhs: Bool = false) {
+        self.token = token
+        self.value = value
+        self.auxiliaryToken = auxiliaryToken
+        self.isLhs = isLhs
+    }
+    convenience init(from string: String, with auxiliaryToken: Token? = nil) {
+        self.init(token: Token(ident: string), value: string, auxiliaryToken: auxiliaryToken)
+    }
+    convenience init(from token: Token, with auxiliaryToken: Token? = nil) {
+        self.init(token: token, value: token.literal, auxiliaryToken: auxiliaryToken)
+    }
     //
     var tokenLiteral: String {token.literal}
-    var string: String {token.coloredLiteral}
+    var string: String {token.coloredLiteral + (auxiliaryToken?.coloredLiteral ?? "")}
     //
     static let directoryPath = "ディレクトリパス"
 }
@@ -249,23 +328,17 @@ final class PhraseExpression : Expression {
     var tokenLiteral: String {token.literal}
     var string: String {left.string + token.coloredLiteral}
 }
-extension PhraseExpression {
-    var isPredicate: Bool {left.isPredicate}
-    var predicateExpression: PredicateExpression? {left.predicateExpression}
-}
 /// 述語。tokenはToken.Keyword, Token.IDENT(_)
 final class PredicateExpression : Expression {
     let token: Token                // 述語(predicate keyword)
-    init(token: Token) {self.token = token}
+    let auxiliaryToken: Token?      // 助動詞(する)
+    init(token: Token, auxiliaryToken: Token? = nil) {
+        self.token = token
+        self.auxiliaryToken = auxiliaryToken
+    }
     //
     var tokenLiteral: String {token.literal}
-    var string: String {token.coloredLiteral}
-}
-extension PredicateExpression {
-    var isPredicate: Bool {true}
-    var predicateExpression: PredicateExpression? {self}
-    var isConjunctive: Bool {token.isConjunctiveForm}
-    var isTerminal: Bool {!isConjunctive}
+    var string: String {token.coloredLiteral + (auxiliaryToken?.coloredLiteral ?? "")}
 }
 final class OrExpression : Expression {
     let token: Token

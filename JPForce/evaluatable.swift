@@ -51,28 +51,68 @@ extension Node {
     var whileLoopUsage: JpfError            {JpfError("仕様：反復【条件が<条件式>(の)間、<処理>】。")}
     var closedLoopUsage: JpfError           {JpfError("仕様：反復【<処理>。<条件式>場合、中止する】。")}
 }
+//
+extension Array where Element == Expression {
+    /// 複数の式（または引数）を順に評価する共通処理
+    /// - Parameter expressions:
+    /// - Returns:
+    ///   - nil : 返す結果が無い(評価終了)
+    ///   - JpfObject : 評価を中断すべき値（制御フロー or エラー）、または結果
+    func evaluate(with environment: Environment) -> JpfObject? {
+        var lastResult: JpfObject?
+        for expression in self {
+            lastResult = expression.evaluate(with: environment)
+            if let exit = processEvaluationResult(lastResult, in: environment) {
+                return exit
+            }
+        }
+        return lastResult
+    }
+}
+/// 評価結果を処理し、評価を中断すべき場合のみ値を返す。
+/// 1. result == nil
+///    - 正常終了（副作用のみ）
+///    - 評価は継続
+/// 2. result が制御フロー値の場合
+///    - 即座に中断し、その値を返す
+/// 3. 通常値の場合
+///    - 環境に push する
+///    - push 失敗時はエラーとして中断
+/// - Returns:
+///   - nil : 評価を継続してよい
+///   - JpfObject : 評価を中断すべき値（制御フロー or エラー）
+func processEvaluationResult(_ result: JpfObject?, in environment: Environment) -> JpfObject? {
+    guard let result else {return nil}
+    if result.isBreakFactor {return result}
+    if let err = environment.push(result) {return err}
+    
+    return nil
+}
 // MARK: Program/Statement/Block evaluators
 extension Program : Evaluatable {
     func evaluate(with environment: Environment) -> JpfObject? {
         var lastResult: JpfObject?
         for statement in statements {
             lastResult = statement.evaluate(with: environment)
-            if let result = lastResult, result.isBreakFactor {return result.value}
+            if let lastResult, lastResult.isBreakFactor {return lastResult.value}
         }
         return lastResult
     }
 }
 extension ExpressionStatement : Evaluatable {
     func evaluate(with environment: Environment) -> JpfObject? {
+        defer {environment.remove(name: Environment.OUTER)}
+        expressions.finalizeLhsCandidates() // TODO: parseSentenceに移行後削除予定
+        return expressions.evaluate(with: environment)
+    }
+}
+extension CompoundStatement : Evaluatable {
+    func evaluate(with environment: Environment) -> JpfObject? {
         var lastResult: JpfObject?
-        for expression in expressions {
-            lastResult = expression.evaluate(with: environment)
-            if let result = lastResult {
-                if result.isBreakFactor {break}
-                if let err = environment.push(result) {return err}
-            }
+        for sentence in sentences {
+            lastResult = sentence.evaluate(with: environment)
+            if let lastResult, lastResult.isBreakFactor {break}
         }
-        environment.remove(name: Environment.OUTER)
         return lastResult
     }
 }
@@ -81,7 +121,7 @@ extension BlockStatement : Evaluatable {
         var lastResult: JpfObject?
         for statement in statements {
             lastResult = statement.evaluate(with: environment)
-            if let result = lastResult, result.isBreakFactor {break}
+            if let lastResult, lastResult.isBreakFactor {break}
         }
         return lastResult
     }
@@ -209,26 +249,52 @@ extension DefineStatement : Evaluatable {
 // MARK: Sentence evaluators
 extension SimpleSentence : Evaluatable {
     func evaluate(with environment: Environment) -> JpfObject? {
-        var lastResult: JpfObject?
-        for expression in expressions {
-            lastResult = expression.evaluate(with: environment)
-            if let result = lastResult {
-                if result.isBreakFactor {break}
-                if let err = environment.push(result) {return err}
+        defer {environment.remove(name: Environment.OUTER)}
+        //
+        if let result = arguments.evaluate(with: environment),
+           result.isBreakFactor {
+            return result
+        }
+        if let result = predicateKind.evaluate(token: token, auxiliaryVerb: auxiliaryVerb, with: environment) { // 述語を評価
+            if let exit = processEvaluationResult(result, in: environment) {
+                return exit
             }
         }
-        environment.remove(name: Environment.OUTER)
-        return lastResult
+        return nil
     }
 }
-extension CompoundSentence : Evaluatable {
-    func evaluate(with environment: Environment) -> JpfObject? {
-        var lastResult: JpfObject?
-        for sentence in sentences {
-            lastResult = sentence.evaluate(with: environment)
-            if let result = lastResult, result.isBreakFactor {break}
+extension SentencePredicateKind {
+    func evaluate(token: Token, auxiliaryVerb: AuxiliaryVerb, with environment: Environment) -> JpfObject? {
+        switch self {
+        case .builtin:
+            let predicate = PredicateOperableFactory.create(from: token, with: environment)
+            return predicate.operate()
+        case .custom:
+            let identifier = Identifier(from: token, with: auxiliaryVerb.token)
+            return identifier.evaluate(with: environment)
         }
-        return lastResult
+    }
+}
+extension AssignmentSentence : Evaluatable {
+    func evaluate(with environment: Environment) -> JpfObject? {
+        if let exit = arguments.evaluate(with: environment),
+           exit.isBreakFactor {
+            return exit
+        }
+        var rhs: JpfObject?
+        if let phrase = environment.peek as? JpfPhrase {
+            guard phrase.isParticle(.WO) else {
+                return assignUsage
+            }
+            rhs = phrase.value
+        } else {
+            rhs = environment.peek
+        }
+        guard let rhs else {return assignUsage}
+        environment.drop()
+        environment[target.value] = rhs
+        return nil
+//        return environment.assign(target: target, value: rhs) TODO: 外部代入の実装
     }
 }
 // MARK: Expression evaluators
@@ -300,6 +366,10 @@ extension Identifier : Evaluatable {
         }
         if let computation = object as? JpfComputation, environment.isExecutable {
             return computation.getter(with: environment)
+        }
+        if let function = object as? JpfFunction,
+           auxiliaryToken != nil {
+            return function.execute(with: environment)
         }
         return object
     }

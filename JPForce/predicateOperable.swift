@@ -758,7 +758,7 @@ struct AssignOperator : PredicateOperable {
         if let param = environment.peek {           // 計算して代入
             guard param.value?.name != "" else {return compoundAssignUsage}
             if let value = param.value,
-               param.particle?.unwrappedParticle == .TA {   // 助詞「て」
+               param.particle == .particle(.TE) {   // 助詞「て」
                 environment.drop()
                 return environment.assign(value, with: value.name)  // 識別子に計算した値を代入
             } else {

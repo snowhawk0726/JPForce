@@ -24,10 +24,10 @@ final class Parser {
         self.currentToken = other.currentToken
         self.nextToken = other.nextToken
         self.previousToken = other.previousToken
-        self.errors = other.errors
         self.nestedBlockCounter = other.nestedBlockCounter
         self.nestedElementsCounter = other.nestedElementsCounter
         self.switchCase = other.switchCase
+        self.errors = other.errors
     }
     //
     let lexer: Lexer
@@ -38,6 +38,7 @@ final class Parser {
     var nestedBlockCounter = NestCounter(.RBBRACKET, .EOL)
     var nestedElementsCounter = NestCounter(.RBBRACKET, .PERIOD)
     var switchCase = SwitchCase()           // Switch-case監視
+    var leadingIdentifier: Identifier? = nil
     // MARK: - プログラムの解析
     func parseProgram() -> Program? {
         var statements: [Statement] = []

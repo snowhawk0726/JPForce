@@ -80,7 +80,10 @@ extension Parsable {
     }
     /// エラー出力
     func error(message: String) {
-        parser.errors.append(message + (currentToken.isIllegal ? "" : "(解析位置: \(currentToken.literal))"))
+        error(message: message, at: currentToken)
+    }
+    func error(message: String, at token: Token) {
+        parser.errors.append(message + (currentToken.isIllegal ? "" : "(解析位置: \(token.literal))"))
     }
     /// ブロックカウンター制御
     ///  - ブロック文中のブロック記号【】とEOLをカウントし、整合性をチェックする。
@@ -651,13 +654,13 @@ struct ExpressionStatementParser : StatementParsable {
             }
             expressions.append(expression)
             // 未確定区間の意味処理
-            if isPredicateAssignment(expression) {
-                markLhsIdentifiers(in: expressions, from: semanticStartIndex)
+            if expression.isAssignment {
+                expressions.markLhsCandidates(from: semanticStartIndex)
                 splitElementAssignmentTarget(in: &expressions, from: semanticStartIndex)
                 semanticStartIndex = expressions.count
             } else
             if isLhsAssignPredicate(expression) {
-                markLhsIdentifiers(in: expressions, from: semanticStartIndex)
+                expressions.markLhsCandidates(from: semanticStartIndex)
                 semanticStartIndex = expressions.count
             }
             //
@@ -671,55 +674,6 @@ struct ExpressionStatementParser : StatementParsable {
             return nil
         }
         return ExpressionStatement(token: token, expressions: expressions, terminator: terminator)
-    }
-}
-extension ExpressionStatementParser {
-    func parseSentecne(from es: ExpressionStatement) -> Statement? {
-        let predicateIndices = es.predicateIndices
-        if predicateIndices.isEmpty {
-            return es                           // 式文(述語が無い)
-        }
-        var sentences: [SimpleSentence] = []
-        var start = 0
-        for idx in predicateIndices {
-            let slice = es.expressions[start...idx]
-            let predicate = slice.last!.predicateExpression!
-            let simple = SimpleSentence(
-                token: predicate.token,
-                expressions: Array(slice),
-                index: idx - start)
-            sentences.append(simple)
-            start = idx + 1
-            if predicate.isTerminal {
-                if start < es.expressions.count {
-                    error(message: "終止形の文の後に、式を続けることはできない。")
-                    return nil
-                }
-                break
-            }
-        }
-        // 文末の連用形をチェック
-        if es.terminator.isExplicit,
-           isEndPredicateConjunctive(in: es) {
-            error(message: "連用形の文を「\(es.terminator.rawValue)」で終えることはできない。")
-            return nil
-        }
-        if sentences.count == 1 {
-            return sentences.first!             // 単文
-        }
-        return CompoundSentence(
-            token: sentences.first!.token,
-            sentences: sentences)               // 複文
-    }
-    /// 式文中の文末の述語が連用形か？
-    //   1と2を足し。     → エラー(文末の連用形)
-    //   1と2を足し、。   → エラー(文末の連用形)
-    //   1と2を足し、3と4。→ 正常(文末の連用形ではない)
-    private func isEndPredicateConjunctive(in es: ExpressionStatement) -> Bool {
-        guard let last = es.predicateIndices.last else {return false}   // 最後か
-        guard last == es.expressions.count - 1 else {return false}      // 文末か
-        guard let predicate = es.expressions[last].predicateExpression else {return false}
-        return predicate.isConjunctive                                  // 述語が連用形か
     }
 }
 private extension ExpressionStatementParser {
@@ -737,20 +691,48 @@ private extension ExpressionStatementParser {
         }
         return predicate.token.hasLhsIdentifier
     }
-    /// 式が要素代入をする述語かどうか
-    func isPredicateAssignment(_ exp: Expression) -> Bool {
-        guard let predicate = exp as? PredicateExpression else {
-            return false
-        }
-        return predicate.token.isKeyword(.ASSIGN)
-    }
-    // LHSフラグ付け
-    func markLhsIdentifiers(
-        in expressions: [Expression],
+    /// 要素代入する対象の属格を２つの句に分割する
+    func splitElementAssignmentTarget(
+        in exps: inout [Expression],
         from startIndex: Int
     ) {
+        for i in startIndex..<exps.count {
+            guard let genitive = exps[i] as? GenitiveExpression,
+                  let rightPhrase = genitive.right as? PhraseExpression,
+                  rightPhrase.token.isParticle(.NI)  else {
+                continue
+            }
+            // 属格を句に分割
+            exps[i] = PhraseExpression(token: Token(.NO), left: genitive.left)
+            exps.insert(rightPhrase, at: i + 1)
+            break
+        }
+    }
+}
+/// 式文要素の左辺候補の操作を行う。
+extension Array where Element == Expression {
+    /// 文中に仮の左辺候補としてマークされた識別子を正式な左辺として確定する
+    func finalizeLhsCandidates() {
+        self
+            .compactMap { $0 as? PhraseExpression }
+            .compactMap { $0.left as? Identifier }
+            .filter { $0.isLhsCandidate }
+            .forEach {
+                $0.isLhs = true
+                $0.isLhsCandidate = false
+            }
+    }
+    /// 代入先の識別子を抽出
+    func extractLhsIdentifier() -> Identifier? {
+        self
+            .compactMap { $0 as? PhraseExpression }
+            .compactMap { $0.left as? Identifier }
+            .first { $0.isLhsCandidate }
+    }
+    /// LHSフラグ付け
+    mutating func markLhsCandidates(from startIndex: Int) {
         var candidates: [PhraseExpression] = []
-        for exp in expressions[startIndex...] {
+        for exp in self[startIndex...] {
             // 関係の無い述語であれば、候補をキャンセル
             if let predicate = exp as? PredicateExpression,
                !predicate.token.hasLhsIdentifier {
@@ -777,28 +759,20 @@ private extension ExpressionStatementParser {
             default:
                 continue
             }
-            // 確定した候補の識別子のisLhsをtrueにする。
+            // 確定した候補の識別子のフラグをオンにする。
             candidates.forEach {
-                ($0.left as? Identifier)?.isLhs = true
+                ($0.left as? Identifier)?.isLhsCandidate = true
             }
             candidates.removeAll()
         }
     }
-    /// 要素代入する対象の属格を２つの句に分割する
-    func splitElementAssignmentTarget(
-        in exps: inout [Expression],
-        from startIndex: Int
-    ) {
-        for i in startIndex..<exps.count {
-            guard let genitive = exps[i] as? GenitiveExpression,
-                  let rightPhrase = genitive.right as? PhraseExpression,
-                  rightPhrase.token.isParticle(.NI)  else {
-                continue
+    /// 識別子候補を破棄する。
+    mutating func clearLhsCandidates() {
+        for i in indices {
+            if let phrase = self[i] as? PhraseExpression,
+               let ident = phrase.left as? Identifier {
+                ident.isLhsCandidate = false
             }
-            // 属格を句に分割
-            exps[i] = PhraseExpression(token: Token(.NO), left: genitive.left)
-            exps.insert(rightPhrase, at: i + 1)
-            break
         }
     }
 }
@@ -924,7 +898,12 @@ struct IdentifierParser : ExpressionParsable {
             let enumerator = EnumeratorLiteral(token: token, type: names[0], name: names[1])
             return parseRangeExpression(with: enumerator)
         }
-        return parseRangeExpression(with: Identifier(from: token))
+        var auxiliary: Token? = nil
+        if nextToken.isKeyword(.SURU) {
+            getNext()
+            auxiliary = currentToken
+        }
+        return parseRangeExpression(with: Identifier(from: token, with: auxiliary))
     }
 }
 struct StringLiteralParser : ExpressionParsable {
@@ -1340,7 +1319,13 @@ struct PredicateExpressionParser : ExpressionParsable {
             error(message: "「\(nextToken.literal)」は属性名ではない。")
             return nil
         }
-        return PredicateExpression(token: currentToken)
+        let predicate = currentToken
+        var auxiliary: Token? = nil
+        if nextToken.isKeyword(.SURU) {
+            getNext()
+            auxiliary = currentToken
+        }
+        return PredicateExpression(token: predicate, auxiliaryToken: auxiliary)
     }
 }
 /// 「場合」で始まる式を解析し、「場合、」に続くブロックをCaseExpression.consequenceとし、

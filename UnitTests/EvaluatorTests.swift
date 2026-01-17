@@ -1813,45 +1813,6 @@ final class EvaluatorTests: XCTestCase {
         }
         print("テスト終了")
     }
-    func testSentencesEvaluation() throws {
-        let testPatterns: [(input: String, expected: Any?)] = [
-            ("1と2を足す。", 3),
-            ("1と2を足し、3を足す。", 6),
-            ("1と2を足し、3を足し", 6),
-            ("aは1。aに2を足し、３を足して代入。a", 6),
-            ("1と2を足し、", 3),
-            ("1と2を足し。", nil), // エラー
-            ("1と2を足す、3を足す。", nil), // エラー
-        ]
-        let environment = Environment()
-        for test in testPatterns {
-            print("テスト開始：\(test.input)")
-            let parser = Parser(input: test.input)
-            let program = try XCTUnwrap(parser.parseProgram())
-            var newStmt: [Statement] = []
-            for statement in program.statements {
-                if let es = statement as? ExpressionStatement {
-                    guard let stmt = ExpressionStatementParser(parser).parseSentecne(from: es) else {
-                        newStmt.removeAll()
-                        break
-                    }
-                    newStmt.append(stmt)
-                    continue
-                }
-                newStmt.append(statement)
-            }
-            if !newStmt.isEmpty {
-                let eval = Evaluator(from: Program(statements: newStmt), with: environment)
-                let result = try XCTUnwrap(eval.object ?? environment.pull())
-                try testObject(result, with: test.expected)
-                print("テスト結果： \(result)")
-            } else {
-                XCTAssertNil(test.expected)
-                parser.errors.forEach {print($0)}
-                print("テスト結果： 構文エラー(正常)")
-            }
-        }
-    }
     func testOutputs() throws {
         /// テスト用の述語：PredicateOperable.output(_:withEscapeProcessing:out:)をテストする。
         struct OutputOperator : PredicateOperable {

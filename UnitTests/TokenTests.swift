@@ -17,7 +17,7 @@ final class TokenTests: XCTestCase {
             ("足す", .keyword(.ADD), "足す"),
             ("足し", .wrapped(type: .keyword(.ADD), literal: "足し"), "足す"),
             ("た", .particle(.TA), "た"),
-            ("て", .wrapped(type: .particle(.TA), literal: "て"), "た"),
+            ("て", .particle(.TE), "て"),
             ("-9", .INT(-9), "-9"),
             ("識別", .IDENT("識別"), "識別"),
             ("余り", .wrapped(type: .ident, literal: "余り"), "余り"),
