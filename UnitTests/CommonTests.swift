@@ -43,10 +43,12 @@ final class CommonTests: XCTestCase {
             ("aは1。aに2を足し、３を足して代入。a", 6),
             ("xは１。xを負数にして代入。x。", -1),
             ("1、aに代入。a", 1),
-//            ("aは100。関数【aは1。外部「a」に0を代入】を実行。a。", 0),    // TODO: Compilerで「外部」実装
+            ("aは100。関数【aは1。外部「a」に0を代入】を実行。a。", 0),
             ("aに1個代入。a", assignUsage.message),  // エラー(「個」)
             ("xを負数にして代入。x。", undefinedIdentifier("x").message), // 未定義エラー
             ("aに1を足して代入。a。", undefinedIdentifier("a").message), // 未定義エラー
+            ("外部「a」に１を代入。a。", outerUndefinedIdentifier("a").message), // 外部指定エラー
+            ("関数【aは1。外部「a」に0を代入】を実行。a。", outerUndefinedIdentifier("a").message),// 外部未定義エラー
         ]
         for test in testPatterns {
             print("テスト開始：\(test.input)")

@@ -159,7 +159,7 @@ extension AssignmentSentence : Compilable {
         // キャッシュを出力し、左辺への代入コードを emit
         do {
             try c.emitAllCashe()
-            let ident = JpfIdentifier(ensuring: target.value, with: c)
+            let ident = try JpfIdentifier(ensuring: target, with: c)
             try ident.emitOpSet(with: c)
         } catch {
             return jpfError(from: error)
@@ -184,35 +184,42 @@ extension AssignmentSentence : Compilable {
 // MARK: Expression compilers
 extension Identifier : Compilable {
     func compile(with c: Compiler) -> JpfObject? {
-        let ident = JpfIdentifier(resolving: self, with: c)
-        guard ident.hasSymbol || ident.isLhs else {     // 登録済み、または左辺識別子
-            return undefinedIdentifier(value)
-        }
-        if auxiliaryToken != nil {
-            do {
-                try c.emitAllCashe()
-                try ident.emit(with: c)
-                _ = c.emit(op: .opCall)
-            } catch {
-                return jpfError(from: error)
+        do {
+            let ident = try JpfIdentifier(resolving: self, with: c)
+            guard ident.hasSymbol || ident.isLhs else { // 登録済み、または左辺識別子
+                return undefinedIdentifier(value)
             }
-            return nil
-        }
-        if !c.isEmpty, ident.isProperty  {
-            if let cashe = c.peek as? JpfIdentifier {
-                // キャッシュを識別子(属性)でアクセス
-                c.drop()
-                do {
-                    try cashe.emit(with: c)             // opGetXXX
-                    try ident.emit(with: c)             // opGetProperty
-                } catch {
-                    return jpfError(from: error)
-                }
+            if auxiliaryToken != nil {
+                try emitCall(ident: ident, with: c)
                 return nil
             }
-            return evaluate(with: c.environment)
+            if !c.isEmpty, ident.isProperty  {
+                return try compilePropertyAccess(ident: ident, with: c)
+            }
+            return ident
+        } catch {
+            return jpfError(from: error)
         }
-        return ident
+    }
+}
+private extension Identifier {
+    // 呼び出しコードを出力する
+    func emitCall(ident: JpfIdentifier, with c: Compiler) throws {
+        try c.emitAllCashe()
+        try ident.emit(with: c)
+        _ = c.emit(op: .opCall)
+    }
+    // プロパティアクセスをコンパイル
+    func compilePropertyAccess(ident: JpfIdentifier, with c: Compiler) throws -> JpfObject? {
+        if let cache = c.peek as? JpfIdentifier {
+            // キャッシュを識別子(属性)でアクセス
+            c.drop()
+            try cache.emit(with: c)             // opGetXXX
+            try ident.emit(with: c)             // opGetProperty
+            return nil
+        }
+        // キャッシュが識別子でない場合は、コンパイル時に評価を試みる
+        return evaluate(with: c.environment)
     }
 }
 extension PredicateExpression : Compilable {
@@ -533,3 +540,4 @@ extension FunctionLiteral : Compilable {
         return nil
     }
 }
+

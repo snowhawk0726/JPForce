@@ -30,37 +30,49 @@ extension JpfString {
 }
 extension JpfIdentifier {
     // 初期化
-    init(resolving ident: Identifier, with c: Compiler) {
-        self.init(resolving: ident.value, with: c, isLhs: ident.isLhs)
+    init(resolving ident: Identifier, with c: Compiler) throws {
+        try self.init(
+            resolving: ident.value,
+            with: c,
+            isLhs: ident.isLhs,
+            isOuter: ident.isOuter
+        )
     }
-    init(resolving name: String, with c: Compiler, isLhs: Bool = false) {
+    init(resolving name: String, with c: Compiler, isLhs: Bool = false, isOuter: Bool = false) throws {
         self.name = name
         self.value = name
         self.isLhs = isLhs
-        // 原形 → 終止形で、名前解決
-        if let symbol = c.symbolTable.resolve(value) {
-            self.symbol = symbol
-            return
+        if isOuter && c.symbolTable.outer == nil {
+            throw outerUndefinedIdentifier(name)
         }
-        if let plain = ContinuativeForm(value).plainForm,
-           let symbol = c.symbolTable.resolve(plain) {
-            self.value = plain
-            self.symbol = symbol
-            return
+        resolveSymbolAndNormalizeValue(with: c, isOuter: isOuter)
+        
+        if isOuter && self.symbol == nil {
+            throw outerUndefinedIdentifier(name)
         }
     }
-    init(ensuring name: String, with c: Compiler) {
-        self.init(resolving: name, with: c)
-        if self.symbol == nil {
-            self.symbol = c.symbolTable.define(name)
-        }
+    init(ensuring ident: Identifier, with c: Compiler) throws {
+        try self.init(
+            ensuring: ident.value,
+            with: c,
+            isLhs: ident.isLhs,
+            isOuter: ident.isOuter
+        )
     }
     init(ensuring object: JpfObject?, with c: Compiler) throws {
-        guard let target = object?.value as? JpfIdentifier else {
-            throw JpfError("objectから、識別子名を取得できなかった。")
+        guard let ident = object?.value as? JpfIdentifier else {
+            throw JpfError("「\(object?.string ?? "nil")」から、識別子名を取得できなかった。")
         }
-        self.init(ensuring: target.name, with: c)
+        self.name = ident.name
+        self.value = ident.value
+        self.isLhs = ident.isLhs
+        self.symbol = ident.symbol ?? c.symbolTable.define(ident.value)
     }
+    init(ensuring name: String, with c: Compiler, isLhs: Bool = false, isOuter: Bool = false) throws {
+        try self.init(resolving: name, with: c, isLhs: isLhs, isOuter: isOuter)
+        defineIfNeeded(with: c)
+    }
+
     // コンパイル
     func emit(with c: Compiler) throws {
         guard let symbol = self.symbol else {
@@ -83,6 +95,37 @@ extension JpfIdentifier {
     var hasSymbol: Bool {self.symbol != nil}
     var isProperty: Bool {symbol?.scope == .PROPETRY}
     var isVariable: Bool {symbol?.isVariable ?? false}
+}
+// MARK: - JpfIdentifier 共通ヘルパー
+private extension JpfIdentifier {
+    /// outer/ローカルの順序で名前解決を行い、連用形→終止形の変換も考慮して `value` と `symbol` を確定する。
+    mutating func resolveSymbolAndNormalizeValue(with c: Compiler, isOuter: Bool) {
+        // 1. 現在の value で解決
+        if let symbol = resolveSymbol(named: value, with: c, isOuter: isOuter) {
+            self.symbol = symbol
+            return
+        }
+        // 2. 連用形→終止形に正規化して再解決
+        if let plain = ContinuativeForm(value).plainForm,
+           let symbol = resolveSymbol(named: plain, with: c, isOuter: isOuter) {
+            self.value = plain
+            self.symbol = symbol
+        }
+    }
+    /// outer/ローカルのシンボルテーブルで名前解決する
+    func resolveSymbol(named name: String, with c: Compiler, isOuter: Bool) -> Symbol? {
+        if isOuter {
+            return c.symbolTable.outer?.resolve(name)
+        } else {
+            return c.symbolTable.resolve(name)
+        }
+    }
+    /// 未定義であればシンボルテーブルに define する
+    mutating func defineIfNeeded(with c: Compiler) {
+        if self.symbol == nil {
+            self.symbol = c.symbolTable.define(self.value)
+        }
+    }
 }
 extension JpfNull {
     func emit(with c: Compiler) throws {_ = c.emit(op: .opNull)}
@@ -164,3 +207,4 @@ extension Token {
         }
     }
 }
+

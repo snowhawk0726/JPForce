@@ -193,9 +193,9 @@ struct AssignOperationCompiler : PredicateCompilable {
                 return compileCollectionAssignment(value: third, collection: first, key: second)
                 // 識別子に代入
             case (.none, _, Token(.NI)):
-                try emitAssignment(value: second, ident: third)
+                try emitAssignment(value: second, target: third)
             case (.none, Token(.NI), Token(.WO)):
-                try emitAssignment(value: third, ident: second)
+                try emitAssignment(value: third, target: second)
                 // 複合代入
             case (.none, _, Token(.TE)):
                 try emitCompoundAssignment(value: third?.value, ident: second?.value)
@@ -235,25 +235,25 @@ private extension AssignOperationCompiler {
         // 引数が定数の場合は、値を代入したコレクションを返す
         return c.assign(v, to: k)
     }
-    func emitAssignment(value: JpfObject?, ident: JpfObject?) throws {
+    func emitAssignment(value: JpfObject?, target: JpfObject?) throws {
         // 「<配列>の」が翻訳済みの場合は、emit
         if compiler.isLastOpPhrase(particle: .NO) {
-            try emitCollectionAssignment(value: value, collection: nil, key: ident)
+            try emitCollectionAssignment(value: value, collection: nil, key: target)
             return
         }
         // 「<値>を<識別子>に代入」をemit
         try value?.value?.emit(with: compiler)
         // 引数から識別子名を取得し、opSetXXをemit
-        let ident = try JpfIdentifier(ensuring: ident, with: compiler)
+        let ident = try JpfIdentifier(ensuring: target, with: compiler)
         try ident.emitOpSet(with: compiler)
     }
     func emitCompoundAssignment(value: JpfObject?, ident: JpfObject?) throws {
         if let name = compiler.identifier {
-            let ident = JpfIdentifier(ensuring: name, with: compiler)
-            try emitAssignment(value: value, ident: ident)
+            let ident = try JpfIdentifier(ensuring: name, with: compiler)
+            try emitAssignment(value: value, target: ident)
             return
         }
-        try emitAssignment(value: value, ident: ident)
+        try emitAssignment(value: value, target: ident)
     }
     func emitCollectionAssignment(value: JpfObject?, collection: JpfObject?, key: JpfObject?) throws {
         // 引数を適切な順序で、emit
@@ -289,7 +289,7 @@ private extension AssignOperationCompiler {
         } else {
             _ = compiler.emit(predicate: .ASSIGN)   // 代入する
         }
-        let ident = JpfIdentifier(ensuring: name, with: compiler)
+        let ident = try JpfIdentifier(ensuring: name, with: compiler)
         try ident.emitOpSet(with: compiler)
     }
     //

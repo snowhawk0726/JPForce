@@ -189,6 +189,11 @@ extension Parsable {
         }
         return protocols
     }
+    func parseAuxiliaryToken() -> Token? {
+        guard nextToken.isKeyword(.SURU) else {return nil}
+        getNext()
+        return currentToken
+    }
     /// 式の解析　(例：1以上→範囲【1以上】)
     /// - Parameter expression: 式(数値、識別子)
     /// - Returns: 上限もしくは下限の範囲リテラル(もしくは元の式)
@@ -898,12 +903,12 @@ struct IdentifierParser : ExpressionParsable {
             let enumerator = EnumeratorLiteral(token: token, type: names[0], name: names[1])
             return parseRangeExpression(with: enumerator)
         }
-        var auxiliary: Token? = nil
-        if nextToken.isKeyword(.SURU) {
-            getNext()
-            auxiliary = currentToken
-        }
-        return parseRangeExpression(with: Identifier(from: token, with: auxiliary))
+        return parseRangeExpression(
+            with: Identifier(
+                from: token,
+                with: parseAuxiliaryToken()
+            )
+        )
     }
 }
 struct StringLiteralParser : ExpressionParsable {
@@ -934,29 +939,33 @@ struct LabelExpressionParser : ExpressionParsable {
     init(_ parser: Parser) {self.parser = parser}
     let parser: Parser
     func parse() -> Expression? {
-        let token = currentToken                // ラベル
-        if token.isKeyword(.OUTER) {            // 外部(outer)識別子
+        let label = currentToken                // ラベル
+        if label.isKeyword(.OUTER) {            // 外部(outer)識別子
             getNext()
-            return Label(token: token, value: Token(ident: currentToken.literal))
-        } else
-        if token.isKeyword(.RESERVEDWORD) {     // 予約語
+            return Identifier(
+                from: currentToken,
+                with: parseAuxiliaryToken(),
+                isOuter: true
+            )
+        }
+        if label.isKeyword(.RESERVEDWORD) {     // 予約語
             getNext()
             guard let keyword = Token.Keyword(rawValue: currentToken.literal), 
                     Token.redefinables.contains(keyword) else {
                 error(message: "「\(currentToken.literal)」は、再定義可能な述語ではない。")
                 return nil
             }
-            return Label(token: token, value: Token(keyword: keyword))
+            return Label(token: label, value: Token(keyword: keyword))
         }
         switch nextToken.type {
         case .string,.ident,.int,.keyword(.TRUE),.keyword(.FALSE):
             break
         default:
-            error(message: "「\(token.literal)」の後続が<文字列>、<識別子>、<真>、<偽>または<数値>ではなかった。)")
+            error(message: "「\(label.literal)」の後続が<文字列>、<識別子>、<真>、<偽>または<数値>ではなかった。)")
             return nil
         }
         getNext()
-        return Label(token: token, value: currentToken)
+        return Label(token: label, value: currentToken)
     }
 }
 // 1. 範囲【<範囲式><キーワード>】
@@ -1319,13 +1328,10 @@ struct PredicateExpressionParser : ExpressionParsable {
             error(message: "「\(nextToken.literal)」は属性名ではない。")
             return nil
         }
-        let predicate = currentToken
-        var auxiliary: Token? = nil
-        if nextToken.isKeyword(.SURU) {
-            getNext()
-            auxiliary = currentToken
-        }
-        return PredicateExpression(token: predicate, auxiliaryToken: auxiliary)
+        return PredicateExpression(
+            token:          currentToken,
+            auxiliaryToken: parseAuxiliaryToken()
+        )
     }
 }
 /// 「場合」で始まる式を解析し、「場合、」に続くブロックをCaseExpression.consequenceとし、

@@ -41,6 +41,9 @@ let setUsage =              JpfError("仕様：<値>(を)<オブジェクト>の
 func undefinedIdentifier(_ ident: String) -> JpfError {
     JpfError("識別子『\(ident)』が定義されていない。")
 }
+func outerUndefinedIdentifier(_ ident: String) -> JpfError {
+    JpfError("外部『\(ident)』が定義されていない。")
+}
 var notEnoughStackValues: JpfError      {JpfError("スタックの値の数が不足している。")}
 // MARK: - ヘルパー
 @discardableResult

@@ -233,18 +233,30 @@ final class Identifier : Expression {
     let auxiliaryToken: Token?      // 補助動詞(する)
     var isLhsCandidate: Bool = false// 左辺候補
     var isLhs: Bool = false         // 左辺(代入される側)
+    let isOuter: Bool               // 外部識別子
     //
-    init(token: Token, value: String, auxiliaryToken: Token?, isLhs: Bool = false) {
+    init(token: Token, value: String, auxiliaryToken: Token?, isLhs: Bool = false, isOuter: Bool = false) {
         self.token = token
         self.value = value
         self.auxiliaryToken = auxiliaryToken
         self.isLhs = isLhs
+        self.isOuter = isOuter
     }
-    convenience init(from string: String, with auxiliaryToken: Token? = nil) {
-        self.init(token: Token(ident: string), value: string, auxiliaryToken: auxiliaryToken)
+    convenience init(from string: String, with auxiliaryToken: Token? = nil, isOuter: Bool = false) {
+        self.init(
+            token: Token(ident: string),
+            value: string,
+            auxiliaryToken: auxiliaryToken,
+            isOuter: isOuter
+        )
     }
-    convenience init(from token: Token, with auxiliaryToken: Token? = nil) {
-        self.init(token: token, value: token.literal, auxiliaryToken: auxiliaryToken)
+    convenience init(from token: Token, with auxiliaryToken: Token? = nil, isOuter: Bool = false) {
+        self.init(
+            token: token,
+            value: token.literal,
+            auxiliaryToken: auxiliaryToken,
+            isOuter: isOuter
+        )
     }
     //
     var tokenLiteral: String {token.literal}

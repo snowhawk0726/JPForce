@@ -1568,10 +1568,10 @@ final class EvaluatorTests: XCTestCase {
             x
             """, 2),
             ("""
-            yは、関数【xは1。外部「x」に1を足して代入。】
+            yは、関数【xは1。外部「x」と1を足して代入。】
             yを実行する。
-            """, "識別子『x』が定義されていない。"),
-            ("fは関数【入力がa。aを返す】。xは１。xでfを実行して代入する。", "仕様：<識別子>(に)<計算し>て代入する。"),
+            """, outerUndefinedIdentifier("x").message),
+            ("fは関数【入力がa。aを返す】。xは１。xでfを実行して代入する。", compoundAssignUsage.message),
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")

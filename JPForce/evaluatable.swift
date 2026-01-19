@@ -292,9 +292,12 @@ extension AssignmentSentence : Evaluatable {
         }
         guard let rhs else {return assignUsage}
         environment.drop()
-        environment[target.value] = rhs
+        do {
+            try environment.assign(target: target, value: rhs)
+        } catch {
+            return jpfError(from: error)
+        }
         return nil
-//        return environment.assign(target: target, value: rhs) TODO: 外部代入の実装
     }
 }
 // MARK: Expression evaluators
@@ -344,50 +347,65 @@ extension Identifier : Evaluatable {
     /// 識別子名をキーに、オブジェクトを得る。(あれば入力に積まれる。)
     /// - 「の」による属性、メソッド、値、その他属性、の順にオブジェクト取得
     /// - 返すオブジェクトが算出で実行可であれば、取得(getter)を呼び出す。
-    func evaluate(with environment: Environment) -> JpfObject? {
+    func evaluate(with env: Environment) -> JpfObject? {
         var object: JpfObject? = nil
-        if let o = getProperty(of: value, from: environment, check: true) { // 「ノ格」による属性アクセス
+        if let o = getProperty(name: value, from: env, check: true) {           // 「ノ格」による属性アクセス
             object = o
         } else {
-            if let o = getMethod(of: value, from: environment) {    // スタックのオブジェクトからメソッドを取得
+            if let o = getMethod(name: value, from: env) {                      // スタックのオブジェクトからメソッドを取得
                 object = o
             } else
-            if let o = getObject(of: value, from: environment) {    // ローカル辞書からオブジェクトを取得
+            if let o = getObject(name: value, from: env, isOuter: isOuter) {    // 辞書からオブジェクトを取得
                 object = o
             } else
-            if let o = getProperty(of: value, from: environment) {  // スタックのオブジェクトの属性を取得
+            if let o = getProperty(name: value, from: env) {                    // 属性を取得
                 object = o
             } else
-            if self.isLhs {
-                return JpfIdentifier(from: self)
+            if isLhs {                                                          // 左辺値オブジェクトを返す。
+                let object = JpfIdentifier(from: self)                          // TODO: Sentence方式移行後削除
+                if isOuter {
+                    env.append(object, to: Environment.OUTER)
+                }
+                return object
             } else {
-                return undefinedIdentifier(value)
+                return undefinedError
             }
         }
-        if let computation = object as? JpfComputation, environment.isExecutable {
-            return computation.getter(with: environment)
+        if let computation = object as? JpfComputation, env.isExecutable {
+            return computation.getter(with: env)
         }
         if let function = object as? JpfFunction,
            auxiliaryToken != nil {
-            return function.execute(with: environment)
+            return function.execute(with: env)
         }
         return object
     }
-    ///　前句のオブジェクトにnameで問い合わせ、結果のオブジェクトを得る。
+    ///　辞書からオブジェクトを取得
     ///　または、識別名でオブジェクトを取得（できなければ識別名の終止形のでオブジェクトを取得）
     /// - Parameters:
-    ///   - env: 識別子の辞書、およびスタック
-    ///   - name: キーとなる識別名
-    /// - Returns: 対応するオブジェクト
-    private func getObject(of name: String, from env: Environment) -> JpfObject? {
-        env[name] ?? ContinuativeForm(name).plainForm.flatMap {env[$0]}
+    ///   - local: ローカル環境
+    ///   - name: キーとなる識別子名
+    ///   - isOuter: 外部環境を指定
+    /// - Returns: 取得したオブジェクト
+    private func getObject(name: String, from local: Environment, isOuter: Bool) -> JpfObject? {
+        guard let env = isOuter ? local.outer : local else {    // ローカルまたは外部環境
+            return outerUndefinedIdentifier(value)
+        }
+        guard let object = env[name] ??
+                ContinuativeForm(name).plainForm.flatMap({env[$0]}) else {
+            return nil
+        }
+        if isOuter {
+            local.append(object, to: Environment.OUTER)         // TODO: Sentence方式移行後削除
+        }
+        return object
     }
     /// スタック内のメソッド名(name)を持つオブジェクトを探し、メソッドを返す
     /// - Parameters:
     ///   - name: メソッドの名称
     ///   - env: スタックの環境
     /// - Returns: メソッド
-    private func getMethod(of name: String, from env: Environment) -> JpfObject? {
+    private func getMethod(name: String, from env: Environment) -> JpfObject? {
         if let target = env.pull(where: {
             switch $0.value {                       // スタック上のオブジェクト
             case let o as JpfInstance:
@@ -408,7 +426,7 @@ extension Identifier : Evaluatable {
     ///   - env: スタックの環境
     ///   - check: true: アクセスする格「の」をチェクする
     /// - Returns: 属性
-    private func getProperty(of name: String, from env: Environment, check: Bool = false) -> JpfObject? {
+    private func getProperty(name: String, from env: Environment, check: Bool = false) -> JpfObject? {
         let particle = env.peek?.particle
         if let target = env.unwrappedPeek,          // スタックから対象オブジェクトを取得
            !check || particle == Token(.NO),        // check = trueの場合、「の格」をチェック
@@ -417,6 +435,11 @@ extension Identifier : Evaluatable {
             return obj
         }
         return nil
+    }
+    private var undefinedError: JpfError {
+        isOuter ?
+            outerUndefinedIdentifier(value) :
+            undefinedIdentifier(value)
     }
 }
 extension PredicateExpression : Evaluatable {
@@ -678,82 +701,26 @@ extension LoopExpression : Evaluatable {
     }
 }
 extension Label : Evaluatable {
-    /// 1. ラベルに割り当てられた識別子(名)を辞書に登録する。
-    /// 2. ラベルが「位置」である場合は、数値、または識別子から取り出した数値、を返す。
-    /// 3. ラベルが「キー」である場合は、数値、真偽値、文字列または識別子から取り出した値、を返す。
-    /// 4. ラベルが「外部」である場合は、outerから値を取り出し、返す。
+    /// 1. 対象が文字列または識別子である場合は、文字列としてラベル名で辞書に登録し、文字列を返す。(識別子、ファイル等)
+    /// 2. 対象が数値である場合、数値オブジェクトを返す。
+    /// 3. ラベルが「予約語」である場合は、対象の予約語(述語)を評価する。
     /// - Parameter environment: 格納先
     /// - Returns: 識別子名、または位置の数値 (オブジェクトの識別子名は、ラベル名)
     func evaluate(with environment: Environment) -> JpfObject? {
         var object: JpfObject
         switch value.type {
+        case .keyword(let keyword) where token.isKeyword(.RESERVEDWORD):
+            let predicate = PredicateOperableFactory.create(from: keyword, with: environment)
+            return predicate.operate()
         case .int:
             object = JpfInteger(name: tokenLiteral, value: value.number!)
-        case .string:
-            object = getObject(from: environment, with: value.literal, label: tokenLiteral)
+        case .string, .ident:
+            object = JpfString(name: tokenLiteral, value: value.literal)
             environment.append(object, to: tokenLiteral)
-        case .keyword(let k):
-            if token.isKeyword(.RESERVEDWORD) {
-                let predicate = PredicateOperableFactory.create(from: k, with: environment)
-                return predicate.operate()
-            }
-            guard k == .TRUE || k == .FALSE else {return "『\(value.literal)』" + cannotUseAsKeyword}
-            object = JpfBoolean(name: tokenLiteral, value: k == .TRUE)
-        case .ident:
-            if token.isKeyword(.OUTER) {
-                guard let outer = environment.outer,
-                      let value = outer[value.literal] else {
-                    return undefinedIdentifier(value.literal)
-                }
-                object = value
-                environment.append(object, to: tokenLiteral)
-            } else {
-                object = JpfString(name: tokenLiteral, value: value.literal)
-                environment.append(object, to: tokenLiteral)
-            }
         default:
             return "『\(value.literal)』" + cannotUseAsKeyword
         }
         return object
-    }
-    /// 文字列が「外部『<識別子>』」かチェックし、外部の値、または文字列を返す。
-    /// - Parameters:
-    ///   - e: ローカル環境
-    ///   - s: 文字列
-    ///   - label: ラベル
-    /// - Returns: 外部識別子の値、または、文字列(JpfString)、エラー
-    private func getObject(from e: Environment, with s: String, label: String) -> JpfObject {
-        guard s.hasPrefix(Environment.OUTER),       // 外部『<識別子>』のチェック
-              let startRage = s.range(of: "『"),
-              let endRange  = s.range(of: "』", range: startRage.upperBound..<s.endIndex) else {
-            return JpfString(name: label, value: s)  // 文字列
-        }
-        let start = s.index(after: startRage.lowerBound)
-        let end   = endRange.lowerBound
-        let name  = String(s[start..<end])
-        guard let outer = e.outer, let object = outer[name] else {
-            return "外部" + undefinedIdentifier(name)
-        }
-        return object                               // 外部オブジェクト
-    }
-    /// 識別子が『外部「<識別子>」』かチェックし、外部またはローカルの値を取得する。
-    /// - Parameters:
-    ///   - e: ローカル環境
-    ///   - name: 識別子
-    /// - Returns: 識別子の値、またはエラー
-    private func getValue(from e: Environment, with name: String) -> JpfObject {
-        guard name.hasPrefix(Environment.OUTER),                // 外部「<識別子>」のチェック
-              let startRage = name.range(of: "「"),
-              let endRange  = name.range(of: "」", range: startRage.upperBound..<name.endIndex) else {
-            return e[name] ?? undefinedIdentifier(name)         // ローカルオブジェクト
-        }
-        let start = name.index(after: startRage.lowerBound)
-        let end   = endRange.lowerBound
-        let name  = String(name[start..<end])
-        guard let outer = e.outer, let value = outer[name] else {
-            return "外部" + undefinedIdentifier(name)
-        }
-        return value                                            // 外部オブジェクト
     }
 }
 extension ArrayLiteral : Evaluatable {
