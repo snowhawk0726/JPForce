@@ -97,6 +97,9 @@ final class LexerTests: XCTestCase {
             200m先に、鳥が２羽（単位は無視する）
             二次関数の場合、
             『割った余り』
+            《繰り返す》
+            «繰り返し≫
+            《繰り返せ》
             「foobar」
             「foo bar」
             3.14
@@ -104,7 +107,6 @@ final class LexerTests: XCTestCase {
             １、２、３
         
         """
-        print("テストパターン: \(input)")
         let testPatterns: [(expectedType: Token, expectedLiteral: String)] = [
             (Token(.EOL),"\n"),
             (.INT(),"2"),(Token(.NI),"に"),(.INT(),"3"),(Token(.WO),"を"),(Token(.ADD),"足す"),(Token(.PERIOD),"。"),(Token(.EOL),"\n"),
@@ -123,23 +125,29 @@ final class LexerTests: XCTestCase {
             (.INT(),"200"),(Token(.NI),"に"),(Token(.COMMA),"、"),(.IDENT(),"鳥"),(Token(.GA),"が"),(.INT(),"2"),(Token(.EOL),"\n"),
             (.IDENT(),"二次関数"),(Token(.NO),"の"),(Token(.CASE),"場合"),(Token(.COMMA),"、"),(Token(.EOL),"\n"),
             (.IDENT(),"割った余り"),(Token(.EOL),"\n"),
+            (.keyword(.FOREACH),"繰り返す"),(Token(.EOL),"\n"),
+            (.keyword(.FOREACH),"繰り返し"),(Token(.EOL),"\n"),
+            (.ILLEGAL("対応する予約語がない: 繰り返せ"),"対応する予約語がない: 繰り返せ"),(Token(.EOL),"\n"),
             (.STRING(),"foobar"),(Token(.EOL),"\n"),(.STRING(),"foo bar"),(Token(.EOL),"\n"),
             (.IDENT(),"3.14"),(Token(.EOL),"\n"),(.INT(),"1"),(Token(.COMMA),"、"),(.INT(),"260"),(Token(.EOL),"\n"),
             (.INT(),"1"),(Token(.COMMA),"、"),(.INT(),"2"),(Token(.COMMA),"、"),(.INT(),"3"),(Token(.EOL),"\n"),
         ]
+        print("テストパターン: \(input)")
         let lexer = Lexer(input)
-        print("tagged input: ", terminator: "")
-        lexer.enumerated.forEach {print($0 + ($0 != " " ? "(\($1))" : ""), terminator: "")}
-        print()
+//        print("tagged input: ", terminator: "")
+//        lexer.enumerated.forEach {print($0 + ($0 != " " ? "(\($1))" : ""), terminator: "")}
+//        print()
         for test in testPatterns {
             let token = lexer.getNext()
             XCTAssertEqual(token.type, test.expectedType.type)
             XCTAssertEqual(token.literal, test.expectedLiteral)
-            if token.type == test.expectedType.type &&
-               token.literal == test.expectedLiteral {
-                print("テスト(\(token.literal))成功")
+            if token.isSymbol(.EOL) {
+                print("\nテスト成功", terminator: ": ")
+            } else {
+                print(token.literal, terminator: "")
             }
         }
+        print("\nテスト終了")
     }
     func testNumberAndUnits() throws {
         let testPatterns: [(input: String, expected: Int)] = [

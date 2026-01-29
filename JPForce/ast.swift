@@ -22,14 +22,17 @@ protocol Expression : Node {
     var isConjunctiveForm: Bool {get}
     var auxiliaryVerb: AuxiliaryVerb {get}
     func hasKeyword(_ k: Token.Keyword) -> Bool
+    func hasParticle(_ p: Token.Particle) -> Bool
     var sentenceToken: Token {get}
     var sentenceParticle: Token.Particle? {get}
 }
 protocol Sentence : Statement {
     var token: Token {get}
+    var firstToken: Token? {get}
     var auxiliaryVerb: AuxiliaryVerb {get}
     var baseString: String {get}
     var isIdentifierOnlySentence: Bool {get}
+    var isTerminalConnector: Bool {get}
 }
 //
 protocol ValueExpression : Expression, Equatable {
@@ -47,6 +50,7 @@ extension Expression {
     var isNominalized: Bool {hasKeyword(.MONO)}
     var isTerminalCandidate: Bool {false}
     var isConjunctiveForm: Bool {false}
+    func hasParticle(_ p: Token.Particle) -> Bool {false}
     var sentenceParticle: Token.Particle? {nil}
 }
 extension ValueExpression {
@@ -59,12 +63,26 @@ extension Sentence {
         return baseString + punctuation
     }
     var baseString: String {""}
-    private var punctuation: String {
+    var punctuation: String {
         switch terminality {
-        case .terminal:     return "。"
-        case .conjunctive:  return "、"
+        case .terminal:     return Token.Symbol.PERIOD.rawValue
+        case .conjunctive:  return Token.Symbol.COMMA.rawValue
         default:            return ""
         }
+    }
+}
+private extension CompoundStatement {
+    func punctuation(for lhs: Sentence, and rhs: Sentence) -> String {
+        // 句読点不要
+        if rhs.firstToken?.isPuncuationCanceler == true {
+            return ""
+        }
+        // 読点必要
+        if rhs.firstToken?.isConjunction == true {
+            return Token.Symbol.COMMA.rawValue
+        }
+        // 文末による句読点
+        return lhs.punctuation
     }
 }
 extension Array where Element == Expression {
@@ -138,6 +156,7 @@ final class ExpressionStatement : Sentence {
             .replacingOccurrences(of: "、場合", with: "場合")
             .replacingOccurrences(of: "、する", with: "する")
             .replacingOccurrences(of: "、し", with: "し")
+            .replacingOccurrences(of: "、ない", with: "ない")
     }
     static let yousoga = "要素が、"
     static let yousowa = "要素は、"
@@ -158,8 +177,23 @@ final class BlockStatement : Statement {
     }
     //
     var tokenLiteral: String {token.literal}
-    var string: String {statements.reduce("") {$0 + $1.string}}
-    var stringWithBracket: String {statements.isEmpty ? "【】" : "【\n\t" + string + "\n】"}
+    var string: String {String((statements.reduce("") {$0 + $1.string}).withoutPunctuation)}
+    var stringWithBracket: String {"【" + string + "】"}
+}
+extension String {
+    var withoutPunctuation: Self {
+        last == "。" || last == "、" ? String(dropLast()) : self
+    }
+}
+extension BlockStatement {
+    var containsLogicalExpression: Bool {
+        statements.contains {
+            if let exprStmt = $0 as? ExpressionStatement {
+                return exprStmt.expressions.contains { $0 is LogicalExpression }
+            }
+            return false
+        }
+    }
 }
 // MARK: Sentence(節)
 // 述語を含む単文、複文
@@ -173,7 +207,14 @@ final class CompoundStatement : Statement {
     //
     var tokenLiteral: String {token.literal}
     var string: String {
-        sentences.map(\.string).joined()
+        var string = ""
+        for (i, sentence) in sentences.enumerated() {
+            string += sentence.baseString
+            guard i < sentences.count - 1 else {continue}
+            let next = sentences[i + 1]
+            string += punctuation(for: sentence, and: next) // 句読点
+        }
+        return string
     }
 }
 final class SimpleSentence : Sentence {
@@ -340,6 +381,11 @@ final class PhraseExpression : Expression {
     var tokenLiteral: String {token.literal}
     var string: String {left.string + token.coloredLiteral}
 }
+extension PhraseExpression {
+    func hasParticle(_ p: Token.Particle) -> Bool {
+        token.isParticle(p)
+    }
+}
 /// 述語。tokenはToken.Keyword, Token.IDENT(_)
 final class PredicateExpression : Expression {
     let token: Token                // 述語(predicate keyword)
@@ -411,7 +457,11 @@ final class LogicalExpression : Expression {
     }
     //
     var tokenLiteral: String {token.literal}
-    var string: String {"\(token.coloredLiteral)、【\(right.string)】"}
+    var string: String {
+        // 右結合をしている場合、わかりやすい様、明示的に【】を付ける。
+        "\(token.coloredLiteral)、" +
+        (right.containsLogicalExpression ? right.stringWithBracket : right.string)
+    }
 }
 final class ConditionalOperation : Expression {
     static let ka = "か"

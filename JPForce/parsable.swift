@@ -426,7 +426,7 @@ extension Parsable {
     ///   - expressions: 要素式
     /// - Returns: 取り除いた(true)か否(false)か
     private func remove(lastParticle p: Token.Particle, from expressions: inout [Expression]) -> Bool {
-        if let phrase = expressions.last as? PhraseExpression, phrase.token.isParticle(p) {
+        if let phrase = expressions.last as? PhraseExpression, phrase.hasParticle(p) {
             expressions[expressions.endIndex - 1] = phrase.left
             return true
         }
@@ -444,7 +444,7 @@ extension Parsable {
             }
             expressions.append(expression)
             if let phrase = expression as? PhraseExpression,
-               let particle = p, phrase.token.isParticle(particle) {
+               let particle = p, phrase.hasParticle(particle) {
                 return expressions      // 指定格があった
             }
             if isEndOfElements {break}
@@ -678,7 +678,12 @@ struct ExpressionStatementParser : StatementParsable {
             error(message: "文の終端前の読点「、」が正しくない。")
             return nil
         }
-        return ExpressionStatement(token: token, expressions: expressions, terminator: terminator)
+        let es = ExpressionStatement(token: token, expressions: expressions, terminator: terminator)
+        // Shadow mode: run sentence parsing in parallel for diagnostics only
+        if parser.options.enableSentenceShadowMode {
+            ExpressionStatementShadowRunner.shadowCheck(es, parser: parser)
+        }
+        return es
     }
 }
 private extension ExpressionStatementParser {
@@ -704,7 +709,7 @@ private extension ExpressionStatementParser {
         for i in startIndex..<exps.count {
             guard let genitive = exps[i] as? GenitiveExpression,
                   let rightPhrase = genitive.right as? PhraseExpression,
-                  rightPhrase.token.isParticle(.NI)  else {
+                  rightPhrase.hasParticle(.NI)  else {
                 continue
             }
             // 属格を句に分割
@@ -734,6 +739,23 @@ extension Array where Element == Expression {
             .compactMap { $0.left as? Identifier }
             .first { $0.isLhsCandidate }
     }
+    /// 代入先が不変(immutable)かをチェック
+    /// - Returns: 最初に見つかった「に」格の句の左辺が識別子でない場合に true。
+    ///            条件を満たさない場合は false。
+    var hasImmutableLhs: Bool {
+        for (i, element) in self.enumerated() {
+            guard let lhsPhrase = element as? PhraseExpression,
+                  lhsPhrase.hasParticle(.NI) else {
+                continue
+            }
+            if i > 0, let genitivePhrase = self[i-1] as? PhraseExpression,
+               genitivePhrase.hasParticle(.NO) {
+                return true
+            }
+            return !(lhsPhrase.left is Identifier)
+        }
+        return false
+    }
     /// LHSフラグ付け
     mutating func markLhsCandidates(from startIndex: Int) {
         var candidates: [PhraseExpression] = []
@@ -756,9 +778,10 @@ extension Array where Element == Expression {
                 candidates = [phrase]
                 continue
             case .particle(.NI):
-                if let first = candidates.first,
-                   first.token.isParticle(.NO) {
-                    break   // aのbに → 代入対象: a
+                // 新仕様: 直前が「の」格 (aのbに) の場合は不変とみなし、候補確定しない。
+                if let first = candidates.first, first.hasParticle(.NO) {
+                    candidates.removeAll()
+                    continue
                 }
                 candidates.append(phrase)
             default:
@@ -824,11 +847,14 @@ struct BlockStatementParser : StatementParsable {
     }
 }
 // MARK: - expression parser
-/// 中間置演算子の優先順位(未使用)
+/// 中間置演算子の優先順位
 enum Precedence : Int {
     case lowest = 1, block, genitive, or, and
     static func < (lhs: Self, rhs: Self) -> Bool {lhs.rawValue < rhs.rawValue}
+    static func > (lhs: Self, rhs: Self) -> Bool {lhs.rawValue > rhs.rawValue}
+    static func >= (lhs: Self, rhs: Self) -> Bool {lhs.rawValue >= rhs.rawValue}
     static let precedences: [Token.TokenType: Self] = [
+        .keyword(.AND):         .and,
         .keyword(.OR):          .or,
         .particle(.NO):         .genitive,
         .symbol(.LBBRACKET):    .block,
@@ -883,7 +909,7 @@ struct PrefixExpressionParserFactory {
         case .keyword(.CASE):       return CaseExpressionParser(parser)
         case .keyword(.LOOP):       return LoopExpressionParser(parser)
         case .keyword(.CONDITIONAL):return ConditionalOperationParser(parser)
-        case .keyword(.IDENTIFIER),.keyword(.FILE),.keyword(.MEMBER),.keyword(.OUTER),.keyword(.RESERVEDWORD):
+        case .keyword(.IDENTIFIER),.keyword(.FILE),.keyword(.MEMBER),.keyword(.OUTER):
                                     return LabelExpressionParser(parser)
         case .keyword(_):           return PredicateExpressionParser(parser)
         case .illegal:              break
@@ -947,15 +973,6 @@ struct LabelExpressionParser : ExpressionParsable {
                 with: parseAuxiliaryToken(),
                 isOuter: true
             )
-        }
-        if label.isKeyword(.RESERVEDWORD) {     // 予約語
-            getNext()
-            guard let keyword = Token.Keyword(rawValue: currentToken.literal), 
-                    Token.redefinables.contains(keyword) else {
-                error(message: "「\(currentToken.literal)」は、再定義可能な述語ではない。")
-                return nil
-            }
-            return Label(token: label, value: Token(keyword: keyword))
         }
         switch nextToken.type {
         case .string,.ident,.int,.keyword(.TRUE),.keyword(.FALSE):
@@ -1343,10 +1360,12 @@ struct CaseExpressionParser : ExpressionParsable {
         let token = currentToken                            // 場合
         _ = getNext(whenNextIs: .COMMA)                     // (、)
         var endSymbol: Token.Symbol = getNext(whenNextIs: .LBBRACKET) ? .RBBRACKET : .EOL
+        parser.isInCaseClause = true
         guard let consequence = BlockStatementParser(parser, symbol: endSymbol).blockStatement else {
             error(message: "「場合、」に続くブロック解析に失敗した。")
             return nil
         }
+        parser.isInCaseClause = false
         _ = getNext(whenNextIs: .COMMA)                     // 読点(、)を読み飛ばす
         _ = getNext(whenNextIs: .EOL)                       // EOLを読み飛ばす
         var alternative: BlockStatement? = nil
@@ -1363,15 +1382,16 @@ struct CaseExpressionParser : ExpressionParsable {
         return CaseExpression(token: token, consequence: consequence, alternative: alternative)
     }
 }
-/// 「または」または「かつ」で始まる式を解析し、に続くブロック(または条件式)をLogicalExpression.rightとする。
+/// 「または」または「かつ」で始まる式を解析し、続くブロック(または条件式)をLogicalExpression.rightとする。
 struct LogicalExpressionParser : ExpressionParsable {
     init(_ parser: Parser) {self.parser = parser}
     let parser: Parser
     func parse() -> Expression? {
         let token = currentToken                            // 「または」または「かつ」
+        let precedence = Precedence[token.type]
         _ = getNext(whenNextIs: .COMMA)                     // (、)
         let endSymbol: Token.Symbol = getNext(whenNextIs: .LBBRACKET) ? .RBBRACKET : .EOL
-        guard let consequence = parseLogicalExpressions(parser, symbol: endSymbol) else {
+        guard let consequence = parseLogicalExpressions(parser, symbol: endSymbol, precedance: precedence) else {
             error(message: "「\(currentToken.literal)、」に続くブロック解析に失敗した。")
             return nil
         }
@@ -1383,35 +1403,44 @@ struct LogicalExpressionParser : ExpressionParsable {
     ///   - parser: 解析器
     ///   - symbol: ブロックの終端。「】」ならばブロック、そうでなければ条件式として解析する。
     /// - Returns: ブロック文を返す。(解析失敗は、nil)
-    private func parseLogicalExpressions(_ parser: Parser, symbol: Token.Symbol) -> BlockStatement? {
+    private func parseLogicalExpressions(_ parser: Parser, symbol: Token.Symbol, precedance: Precedence) -> BlockStatement? {
         if symbol == .RBBRACKET {
             return BlockStatementParser(parser, symbol: symbol).blockStatement
         }
         getNext()
         var expressions: [Expression] = []
         let token = currentToken
-        while !isEndOfStatement && !isEndOfBlock && !currentToken.isEof {
+        while !(currentToken.isPeriod || currentToken.isEof || currentToken.isSymbol(.RBBRACKET)) {
             skipEols()
             guard let expression = ExpressionParser(parser).parse() else {
                 error(message: "条件式で、右辺の解析に失敗した。")
                 return nil
             }
             expressions.append(expression)
-            if isEndOfLogicalExpression(expression) || isBreakFactor ||
-                getNext(whenNextIs: .PERIOD) || getNext(whenNextIs: .EOL) {
-                break
-            }   // 文の終わり、または停止要因
             _ = getNext(whenNextIs: .COMMA)     // 読点を読み飛ばし、
+            if isBreakFactor || shouldFoldLogicalExpression(currentPrecedence: precedance) {
+                break
+            }
             getNext()                           // 次の式解析に
         }
         let statement = ExpressionStatement(token: token, expressions: expressions)
         return BlockStatement(token: token, statements: [statement])
     }
-    /// 条件式の終わりを、述語(PredicateExpression)として判断する。
-    /// - Parameter expression: 式
-    /// - Returns: 条件式か否か
-    private func isEndOfLogicalExpression(_ expression: Expression) -> Bool {
-        expression is PredicateExpression
+    /// 論理式を畳み込むか否か
+    /// 畳み込みにより、かつ > または、の優先順位を実現する。
+    /// - Parameter currentPrecedence: 左側の優先順位
+    /// - Returns: true: 左結合、false: 右結合
+    private func shouldFoldLogicalExpression(currentPrecedence: Precedence) -> Bool {
+        // 文・行の終端
+        if nextToken.isPeriod || nextToken.isEol {
+            return true
+        }
+        // 次の論理演算子の方が弱い場合は、ここで畳む（左結合）
+        if nextToken.consumeLogicalExpression &&
+            (currentPrecedence >= Precedence[nextToken.type]) {
+            return true
+        }
+        return false
     }
 }
 /// 条件演算「よって」

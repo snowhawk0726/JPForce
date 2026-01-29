@@ -24,6 +24,8 @@ enum Token : Equatable {
         case RBRACKET   = "」"
         case LWBRACKET  = "『"   // 二重かぎ括弧(white corner bracket)
         case RWBRACKET  = "』"
+        case LDABRACKET = "《"   // 二重山括弧(double angle bracket)
+        case RDABRACKET = "》"
         case LBBRACKET  = "【"   // 墨付き括弧(black lenticular bracket)
         case RBBRACKET  = "】"
         case LPAREN     = "（"   // 丸かっこ
@@ -134,7 +136,6 @@ enum Token : Equatable {
         case SET        = "設定"
         case COMPUTATION = "算出"
         case INITIALIZATION = "初期化"
-        case RESERVEDWORD = "予約語"
     }
     /// 文字列の連想値について識別しないための分類(.IDENT("文字列") → .ident)
     enum TokenType: Hashable {
@@ -155,6 +156,7 @@ enum Token : Equatable {
     }
     // MARK: - イニシャライザ
     init(symbol: String) {self = Self.symbols[symbol].map {.symbol($0)} ?? .IDENT(symbol)}
+    /// 文字列をトークンに正規化
     init(word: String) {
         self =
         Keyword(rawValue: word).map {.keyword($0)} ??
@@ -163,6 +165,18 @@ enum Token : Equatable {
         ContinuativeForm(word).plainFormType.map {.wrapped(type: $0, literal: word)} ??
         .IDENT(word)
     }   // let n = "２".hankaku.map {Int($0)} → Int(_)がInt?を返すため、nはInt??。
+    /// 文字列を予約語(keyword)トークンに正規化
+    init?(resolvingKewyword: String) {
+        if let keyword = Keyword(rawValue: resolvingKewyword) {
+            self = .keyword(keyword)
+            return
+        }
+        if case .keyword(let k) = ContinuativeForm(resolvingKewyword).plainFormType {
+            self = .wrapped(type: .keyword(k), literal: resolvingKewyword)
+            return
+        }
+        return nil
+    }
     init(symbol: Symbol)        {self = .symbol(symbol)}
     init(keyword: Keyword)      {self = .keyword(keyword)}
     init(paticle: Particle)     {self = .particle(paticle)}
@@ -295,6 +309,8 @@ enum Token : Equatable {
         d["−"] = .MINUS
         d["，"] = .COMMA;    d[","] = .COMMA
         d["．"] = .PERIOD;   d["."] = .PERIOD
+        d["«"] = .LDABRACKET
+        d["≫"] = .RDABRACKET
         return d
     }()
     // MARK: - 左辺識別子を持つ述語
@@ -311,6 +327,10 @@ enum Token : Equatable {
     }
     // MARK: - 述語が値を出力する(しうる)か否か
     var isValuePredicate: Bool {keyword?.predicateKind == .value || keyword == .MONO}
+    // MARK: - 論理式を入力とする述語
+    var consumeLogicalExpression: Bool {
+        [.CASE, .OR, .AND].contains {isKeyword($0)}
+    }
 }
 /// 述語の分類
 extension Token.Keyword {

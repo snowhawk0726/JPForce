@@ -37,10 +37,13 @@ struct Repl {
             }
             let lexer = Lexer(line)
             let parser = Parser(lexer)
+            parser.options.enableSentenceShadowMode = true
+            parser.options.verboseShadowLog = false
             guard let program = parser.parseProgram(), parser.errors.isEmpty else {
                 printErros(of: parser.errors)
                 continue
             }
+            printMetrics(parser: parser)
             if mode == .vm {
                 runVirtualMachine(of: program, &constants, symbolTable, globals, stack)
             } else {

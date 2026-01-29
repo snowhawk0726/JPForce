@@ -703,15 +703,11 @@ extension LoopExpression : Evaluatable {
 extension Label : Evaluatable {
     /// 1. 対象が文字列または識別子である場合は、文字列としてラベル名で辞書に登録し、文字列を返す。(識別子、ファイル等)
     /// 2. 対象が数値である場合、数値オブジェクトを返す。
-    /// 3. ラベルが「予約語」である場合は、対象の予約語(述語)を評価する。
     /// - Parameter environment: 格納先
     /// - Returns: 識別子名、または位置の数値 (オブジェクトの識別子名は、ラベル名)
     func evaluate(with environment: Environment) -> JpfObject? {
         var object: JpfObject
         switch value.type {
-        case .keyword(let keyword) where token.isKeyword(.RESERVEDWORD):
-            let predicate = PredicateOperableFactory.create(from: keyword, with: environment)
-            return predicate.operate()
         case .int:
             object = JpfInteger(name: tokenLiteral, value: value.number!)
         case .string, .ident:
@@ -904,7 +900,7 @@ extension GenitiveExpression : Evaluatable {
     func evaluate(with environment: Environment) -> (any JpfObject)? {
         guard let object = left.evaluate(with: environment) ?? environment.pull() else {return nil}
         guard !object.isError else {return object}
-        if let phrase = right as? PhraseExpression, phrase.token.isParticle(.WA) {
+        if let phrase = right as? PhraseExpression, phrase.hasParticle(.WA) {
             // 代入文の処理
             if let result = value?.evaluate(with: environment), result.isError {return result}
             guard let value = environment.pull() else {return nil}      // 値をスタックから取得

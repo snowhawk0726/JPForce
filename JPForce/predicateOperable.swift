@@ -72,7 +72,7 @@ struct PredicateOperableFactory {
     }()
     // アクセサ
     static func index(of keyword: Token.Keyword) -> Int? {
-        predicates.firstIndex(where: {$0.keyword == keyword})
+        predicates.firstIndex { $0.keyword == keyword }
     }
     // ファクトリーメソッド
     static func create(from keyword: Token.Keyword, with environment: Environment) -> PredicateOperable {

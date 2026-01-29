@@ -23,7 +23,7 @@ final class ParserTests: XCTestCase {
                 zは、0。
             """, 2, "z", [1, 0], false),
             ("『割った余り』は、2。",1,"割った余り",[2], false),
-            ("正しいは、さらに、関数であって、入力が甲で、本体が、甲である。", 1, "正しい", ["関数であって、【入力が、甲であり、本体が、甲である。】"], true),
+            ("正しいは、さらに、関数であって、入力が甲で、本体が、甲である。", 1, "正しい", ["関数であって、【入力が、甲であり、本体が、甲である】"], true),
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
@@ -950,7 +950,7 @@ final class ParserTests: XCTestCase {
         for test in testPatterns {
             print("テストパターン： \(test.input)")
             let parser = Parser(input: test.input)
-            let program = try XCTUnwrap(parseProgram(with: test.input))
+            let program = try XCTUnwrap(parseProgram(with: test.input, isShadowMode: false))
             let es = try XCTUnwrap(program.statements.first as? ExpressionStatement)
             let esp = ExpressionStatementParser(parser)
             guard let stmt = esp.parseSentecne(from: es) else {

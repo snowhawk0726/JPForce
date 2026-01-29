@@ -324,9 +324,9 @@ final class VMTests: XCTestCase {
             ("aは2。aに3を代入する。a。", 3),
             ("1と3を足し、aに代入する。a。", 4),
             // 複合代入
-            ("aに、1と4を足して代入する。a。", 5),
             ("aは1。aに5を足して代入する。a。", 6),
             ("aは1。aとaと5を足して代入する。a。", 7),
+            ("aに、1と4を足して代入する。a。", undefinedIdentifier("a")),
             ("aに、1を代入し、7を足して代入する。a。", "「足す」には、２つ以上の数値、文字列、配列の入力が必要。仕様：(〜と…)〜を足す。"),
             // 要素代入
             ("iは1。配列【1,2,3】のiに0を代入する。",[1,0,3]),
@@ -446,10 +446,11 @@ final class VMTests: XCTestCase {
     // MARK: - Helpers
     private func runVmTests(with tests: [VmTestCase]) throws {
         for t in tests {
-            var result: JpfObject?
             print("テスト開始：「\(t.input)」")
-            let lexer = Lexer(t.input)
-            let parser = Parser(lexer)
+            var result: JpfObject?
+            let parser = Parser(input: t.input)
+            parser.options.enableSentenceShadowMode = true
+            parser.options.verboseShadowLog = false
             guard let program = parser.parseProgram() else {
                 XCTAssertEqual(t.expected as? String, parser.errors.first!)
                 print("テスト結果：\(parser.errors.first!)")

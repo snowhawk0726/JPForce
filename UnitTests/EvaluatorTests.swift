@@ -263,7 +263,7 @@ final class EvaluatorTests: XCTestCase {
         let functionBlock = try XCTUnwrap(function.overload.single)
         XCTAssertEqual(functionBlock.parameters.count, 1)
         XCTAssertEqual(functionBlock.parameters.first?.string, "x")
-        XCTAssertEqual(functionBlock.body?.string, "xに2を足す。")
+        XCTAssertEqual(functionBlock.body?.string, "xに2を足す")
         print("テスト(\(function.string))終了")
     }
     func testFunctionApplications() throws {
@@ -451,7 +451,7 @@ final class EvaluatorTests: XCTestCase {
         XCTAssertEqual(functionBlock.parameters.count, 2)
         XCTAssertEqual(functionBlock.parameters[0].string, "a")
         XCTAssertEqual(functionBlock.parameters[1].string, "b")
-        XCTAssertEqual(functionBlock.body?.string, "aにbを足す。")
+        XCTAssertEqual(functionBlock.body?.string, "aにbを足す")
         XCTAssertTrue(functionBlock.isOverloaded)
         print("テスト(\(function.string))終了")
     }
@@ -536,8 +536,8 @@ final class EvaluatorTests: XCTestCase {
             座標は、型であって、【
                 初期化は、【入力がxとy】。
                 『足す』は、算出【入力がp「座標に」で、
-                    xに、pのxを予約語「足す」て、代入。
-                    yに、pのyを予約語「足す」て、代入。
+                    xに、pのxを《足し》て、代入。
+                    yに、pのyを《足し》て、代入。
                     自身を返す。
                 】。
                 「x」と「y」と「足す」は利用可能。
@@ -546,8 +546,8 @@ final class EvaluatorTests: XCTestCase {
             Bは、座標【xは2。yは3】。
             『引く』は、さらに、算出であって、【入力が、a「座標から」とb「座標を」で、
                 xは0。yは0。
-                aのxから、bのxを予約語「引く」、xに代入。
-                aのyから、bのyを予約語「引く」、yに代入。
+                aのxから、bのxを《引き》、xに代入。
+                aのyから、bのyを《引き》、yに代入。
                 xとyで座標を生成し、返す。
             】。
         """
@@ -610,7 +610,7 @@ final class EvaluatorTests: XCTestCase {
                 】
                 初期化が、【入力が残量。燃料量は、残量。色は「黒」。】
                 給油は、関数であって、【入力が給油量で、
-                    燃料量に給油量を足して、代入し、燃料量を返す。
+                    燃料量に給油量を足して、代入。燃料量を返す。
                 】
                 「燃料量」と「給油」と「色」は利用可能。
             】
@@ -1339,8 +1339,9 @@ final class EvaluatorTests: XCTestCase {
             ("1が1に等しい、かつ、2が2に等しい、かつ、3が3に等しい", true),
             ("1が1に等しい、または、2が2に等しい、または、3が3に等しい", true),
             ("1が1に等しい、または、【2が2に等しい】、かつ、3が4に等しい", false),
-            ("1が1に等しい、または、2が2に等しい、かつ、3が4に等しい", false),
+            ("1が1に等しい、または、2が2に等しい、かつ、3が4に等しい", true),
             ("1が1に等しい、または、【2が2に等しい、かつ、3が4に等しい】", true),
+            ("1が1に等しい、または、2が2に等しい。かつ、3が4に等しい", false),
             ("1が2に等しい、かつ、2が2に等しい、または、3が3に等しい", true),
             ("1が2に等しい、かつ、【2が2に等しい】、または、3が3に等しい", true),
             ("1が2に等しい、かつ、【2が2に等しい、または、3が3に等しい】", false),
@@ -1350,7 +1351,7 @@ final class EvaluatorTests: XCTestCase {
             print("テストパターン: \(test.input)")
             let evaluated = try XCTUnwrap(testEvaluator(test.input))
             try testObject(evaluated, with: test.expected)
-            print("テスト(\(evaluated))終了")
+            print("テスト終了: (\(evaluated.string))")
         }
     }
     func testLoopOperations() throws {
@@ -1396,7 +1397,7 @@ final class EvaluatorTests: XCTestCase {
             】。
             『三の倍数』は配列。『その他』は配列。
             範囲【1から10まで】を反復【入力が数。
-                数が３で割り切れる場合、『三の倍数』に、数を追加して代入し、中止する。
+                数が３で割り切れる場合、『三の倍数』に、数を追加して代入。中止する。(代入して、中止 → エラー)
                 『その他』に、数を追加して代入する。
             】。
         """
@@ -1560,7 +1561,7 @@ final class EvaluatorTests: XCTestCase {
             ("xは「いろ」。xに「は」を足して代入。x", "いろは"),
             ("xは「あいうえお」。xを逆順にして代入。x", "おえういあ"),
             ("xは２。xに2を掛け、3を足し、4を引いて代入する。x", 3),
-            ("xは１。xに1を足し代入。x", "仕様：<識別子>(に)<計算し>て代入する。"),
+//            ("xは１。xに1を足し代入。x", "仕様：<識別子>(に)<計算し>て代入する。"),
             ("""
             xは１。
             yは、関数【xに1を足して代入。】

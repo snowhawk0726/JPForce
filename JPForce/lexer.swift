@@ -8,6 +8,7 @@
 //  仕様: 記号は、基本全角
 //       「」で囲まれた文字列は、.STRING("文字列")
 //       『』で囲まれた文字列は、.IDENT("識別子")
+//       《》で囲まれた文字列は、.keyword(予約語)
 //       （）で囲まれた文字列は、コメント(読み飛ばす)
 //        ※ で始まる文字列は、行末までコメント(読み飛ばす)
 //       そのほかで、空白や制御文字は無視
@@ -70,6 +71,14 @@ final class Lexer {
                 return Token(illegal: "」が見つからない")
             }
             token = Token(string: s)
+        case (.symbol(.LDABRACKET),_, _):               // "《" 文字列開始
+            guard let s = readString(until: .RDABRACKET) else { // キーワードトークンに変換
+                return Token(illegal: "≫が見つからない")
+            }
+            guard let resolved = Token(resolvingKewyword: s) else {
+                return Token(illegal: "対応する予約語がない: \(s)")
+            }
+            token = resolved
         case (.symbol(.LPAREN),_,_):                    // "（" コメント開始
             guard skipToken(until: .RPAREN) else {      // "）" まで読み飛ばす
                 return Token(illegal: "）が見つからない")

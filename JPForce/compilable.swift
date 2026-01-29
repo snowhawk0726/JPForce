@@ -171,7 +171,7 @@ extension AssignmentSentence : Compilable {
     private func extractRightHandExpressions() -> Result<[Expression], JpfError> {
         var expressions = Array(arguments.dropLast())
         if let phrase = arguments.last as? PhraseExpression {
-            guard phrase.token.isParticle(.WO) else {
+            guard phrase.hasParticle(.WO) else {
                 return .failure(assignUsage)
             }
             expressions.append(phrase.left)

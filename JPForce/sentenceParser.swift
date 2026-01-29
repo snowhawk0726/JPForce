@@ -55,6 +55,8 @@ extension Sentence {
     var terminality: SentenceTerminality {
         (self as? SentenceTerminalityProvider)?.terminality ?? .unknown
     }
+    var isTerminalConnector: Bool {token.isTerminalConnector}
+    var firstToken: Token? {token}
 }
 extension SimpleSentence : SentenceTerminalityProvider {
     var terminality: SentenceTerminality {
@@ -74,10 +76,29 @@ extension AssignmentSentence : SentenceTerminalityProvider {
     }
 }
 extension ExpressionStatement {
+    var firstToken: Token? {
+        guard let first = expressions.first else {return nil}
+        if let phrase = first as? PhraseExpression {
+            return phrase.left.token
+        }
+        return first.token
+    }
     var auxiliaryVerb: AuxiliaryVerb {.none}
     var leadingIdentifier: Identifier? {
         guard let phrase = expressions.first as? PhraseExpression else {return nil}
         return phrase.left as? Identifier
+    }
+    var isTerminalConnector: Bool {
+        firstToken?.isTerminalConnector == true
+    }
+    var baseString: String {
+        expressions.reduce("") {$0 + comma(between: $0, and: $1) + $1.string}
+    }
+    private func comma(between lhs: String, and rhs: Expression) -> String {
+        if !lhs.isEmpty && rhs.token.isConjunction {
+            return Token.Symbol.COMMA.rawValue
+        }
+        return ""
     }
 }
 // Expression(式)層
@@ -95,6 +116,24 @@ extension Expression {
     }
     func hasKeyword(_ k: Token.Keyword) -> Bool {false}
 }
+// Token(語)層
+extension Token {
+    /// 終止形に接続する語
+    var isTerminalConnector: Bool {
+        switch self {
+        case .keyword(.CASE), .keyword(.QUESTION), .keyword(.KOTO), .keyword(.OR), .keyword(.AND): return true
+        default : return false
+        }
+    }
+    /// 直前の句読点をキャンセルする語
+    var isPuncuationCanceler: Bool {
+        [.keyword(.CASE), .keyword(.QUESTION), .keyword(.NOT)].contains(self)
+    }
+    /// 直前の句読点を「、」にする語(接続詞)
+    var isConjunction: Bool {
+        [.keyword(.OR), .keyword(.AND)].contains(self)
+    }
+}
 extension PredicateExpression {
     var isPredicate: Bool {token.isPredicate}
     var isTerminalCandidate: Bool {token.isTerminalCandidate}
@@ -111,7 +150,7 @@ extension Identifier {
 extension PhraseExpression {
     var isPredicate: Bool {left.isPredicate}
     var isTerminalCandidate: Bool {isConjunctiveForm}
-    var isConjunctiveForm: Bool {token.isParticle(.TE)}
+    var isConjunctiveForm: Bool {hasParticle(.TE)}
     var auxiliaryVerb: AuxiliaryVerb {left.auxiliaryVerb}
     func hasKeyword(_ k: Token.Keyword) -> Bool {left.hasKeyword(k)}
     var sentenceToken: Token {left.sentenceToken}
@@ -125,6 +164,10 @@ extension ExpressionStatementParser {
     func parseSentecne(from es: ExpressionStatement) -> Statement? {
         defer {parser.leadingIdentifier = nil}
         parser.leadingIdentifier = es.leadingIdentifier // 文頭の識別子を記憶
+        // 式が空の場合は、終端のみの空文として扱う
+        if es.expressions.isEmpty {
+            return ExpressionStatement(token: es.token, expressions: [])
+        }
         let slices = splitIntoSentenceSlices(from: es)
         let sentences = slices.compactMap {buildSentence(from: $0.expressions)}
         guard sentences.count == slices.count else {
@@ -139,8 +182,10 @@ extension ExpressionStatementParser {
         if sentences.count == 1 {
             return sentences.first              // 単文
         }
+        // sentences が空になる可能性を考慮して安全に処理
+        guard let first = sentences.first else { return nil }
         return CompoundStatement(
-            token: sentences.first!.token,
+            token: first.token,
             sentences: sentences)               // 複文
     }
     /// スライスした expressions
@@ -179,7 +224,7 @@ extension ExpressionStatementParser {
     private func buildSentence(from slice: [Expression]) -> Sentence? {
         guard let last = slice.last else {return nil}
         var slice = slice
-        if last.isAssignment {
+        if last.isAssignment && !slice.hasImmutableLhs {
             return buildAssignmentSentence(
                 from: slice
             )
@@ -231,9 +276,10 @@ extension ExpressionStatementParser {
     }
     /// 文中制約チェック
     private func validateSentenceSequence(_ sentences: [Sentence]) {
-        for sentence in sentences.dropLast() {
-            if sentence.terminality == .terminal {
-                let identifierDetected = sentence.isIdentifierOnlySentence ? 
+        for (i, sentence) in sentences.dropLast().enumerated() {
+            let isNextTerminalConnector = i < sentences.count - 1 && sentences[i + 1].isTerminalConnector   // 次の語が終端(Terminal)に繋がる
+            if sentence.terminality == .terminal && !isNextTerminalConnector {
+                let identifierDetected = sentence.isIdentifierOnlySentence ?
                     "識別子「\(sentence.tokenLiteral)」は終止形の文として解析された。\n" : ""
                 error(message: identifierDetected + "終止形の文の後に、文を続けることはできない。", at: sentence.token)
                 return
@@ -250,7 +296,8 @@ extension ExpressionStatementParser {
         guard
             terminator.isExplicit,
             let sentence = sentences.last,
-            sentence.terminality == .conjunctive
+            sentence.terminality == .conjunctive,
+            !parser.isInCaseClause
         else {
             return
         }
