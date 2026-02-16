@@ -12,7 +12,14 @@ protocol Node : Evaluatable, Compilable {
     var tokenLiteral: String {get}
     var string: String {get}
 }
-protocol Statement : Node {}
+protocol Statement : Node {
+    var predicate: Expression? {get}
+    var arguments: [Expression] {get}
+    var expressionCount: Int {get}
+    var literal: Expression? {get}
+    var isTerminalCandidate: Bool {get}
+    var isConjunctiveForm: Bool {get}
+}
 
 protocol Expression : Node {
     var token: Token {get}
@@ -25,11 +32,13 @@ protocol Expression : Node {
     func hasParticle(_ p: Token.Particle) -> Bool
     var sentenceToken: Token {get}
     var sentenceParticle: Token.Particle? {get}
+    var isConjunction: Bool {get}
 }
 protocol Sentence : Statement {
     var token: Token {get}
     var firstToken: Token? {get}
     var auxiliaryVerb: AuxiliaryVerb {get}
+    var terminality: SentenceTerminality { get }
     var baseString: String {get}
     var isIdentifierOnlySentence: Bool {get}
     var isTerminalConnector: Bool {get}
@@ -44,12 +53,15 @@ protocol ValueExpression : Expression, Equatable {
 extension Node {
     var string: String {tokenLiteral}
 }
+extension Statement {
+    var predicate: Expression? {nil}
+    var arguments: [Expression] {[]}
+    var expressionCount: Int {0}
+    var literal: Expression? {nil}
+}
 extension Expression {
     var isPredicate: Bool {false}
     var isAssignment: Bool {hasKeyword(.ASSIGN)}
-    var isNominalized: Bool {hasKeyword(.MONO)}
-    var isTerminalCandidate: Bool {false}
-    var isConjunctiveForm: Bool {false}
     func hasParticle(_ p: Token.Particle) -> Bool {false}
     var sentenceParticle: Token.Particle? {nil}
 }
@@ -57,7 +69,6 @@ extension ValueExpression {
     var tokenLiteral: String {token.literal}
 }
 extension Sentence {
-    var isIdentifierOnlySentence: Bool {false}
     // 句読点(pretty-print用)
     var string: String {
         return baseString + punctuation
@@ -72,13 +83,13 @@ extension Sentence {
     }
 }
 private extension CompoundStatement {
-    func punctuation(for lhs: Sentence, and rhs: Sentence) -> String {
+    func punctuation(for lhs: Sentence, and rhs: Sentence?) -> String {
         // 句読点不要
-        if rhs.firstToken?.isPuncuationCanceler == true {
+        if rhs?.firstToken?.isPuncuationCanceler == true {
             return ""
         }
         // 読点必要
-        if rhs.firstToken?.isConjunction == true {
+        if rhs?.firstToken?.isConjunction == true {
             return Token.Symbol.COMMA.rawValue
         }
         // 文末による句読点
@@ -86,21 +97,45 @@ private extension CompoundStatement {
     }
 }
 extension Array where Element == Expression {
-    func toStringWithComma(
-        includeTrailingComma: Bool = false,
-        insertCommaAfter shouldInsert: (Expression) -> Bool
-    ) -> String {
-        guard !isEmpty else { return "" }
-        return enumerated().map { index, expr in
-            let isLast = index == count - 1
-            if shouldInsert(expr) && (includeTrailingComma || !isLast) {
-                return expr.string + "、"
-            }
-            return expr.string
-        }.joined()
-    }
     var toStringWithComma: String {
-        toStringWithComma {$0.isNominalized || $0 is (any ValueExpression)}
+        var s = ""
+        for (i, expr) in enumerated() {
+            s += expr.string
+            if i + 1 < count {
+                s += comma(between: expr, and: self[i + 1])
+            }
+        }
+        return s
+    }
+    private func comma(between lhs: Expression, and rhs: Expression) -> String {
+        return needsComma(between: lhs, and: rhs) ? Token.Symbol.COMMA.rawValue : ""
+    }
+    private func needsComma(between lhs: Expression, and rhs: Expression) -> Bool {
+        // 1) 直前が連用形(直後の「ない」は除く)
+        if lhs.isConjunctiveForm && !rhs.token.isKeyword(.NOT) { return true }
+        // 2) 直前が接続詞（読点必須）
+        if lhs.isConjunction { return true }
+        // 3) 「が」句の後に特定の構造が続く場合
+        if needsCommaAfterGa(lhs: lhs, rhs: rhs) { return true }
+        // 4) 「で」句の後に述語でないものが続く場合
+        if needsCommaAfterDe(lhs: lhs, rhs: rhs) { return true }
+        // 5) 次が接続詞（読点必須）
+        if rhs.isConjunction { return true }
+        return false
+    }
+    private func needsCommaAfterGa(lhs: Expression, rhs: Expression) -> Bool {
+        guard lhs.hasParticle(.GA) else { return false }
+        // 〜の場合（属格の右辺が CaseExpression）
+        if let genitive = rhs as? GenitiveExpression, genitive.right is CaseExpression {
+            return true
+        }
+        // 選択肢の「または」
+        if rhs is OrExpression { return true }
+        return false
+    }
+    private func needsCommaAfterDe(lhs: Expression, rhs: Expression) -> Bool {
+        // 「で」の後に述語でないものが続く場合は読点
+        return lhs.hasParticle(.DE) && !rhs.isPredicate
     }
 }
 // MARK: Program(プログラム)
@@ -115,11 +150,11 @@ final class Program : Statement {
 // MARK: Statement(文)
 // 値を返さないノード
 final class DefineStatement : Statement {
-    let token: Token                // とは、は、
+    let token: Token                // は、
     let name: Identifier            // 識別子
-    let value: ExpressionStatement  // 値(複数の式)
+    let value: Statement            // 値(計算式)
     var isExtended: Bool = false    // 拡張(多重)識別
-    init(token: Token, name: Identifier, value: ExpressionStatement, isExtended: Bool = false) {
+    init(token: Token, name: Identifier, value: Statement, isExtended: Bool = false) {
         self.token = token
         self.name = name
         self.value = value
@@ -128,13 +163,9 @@ final class DefineStatement : Statement {
     //
     var tokenLiteral: String {token.literal}
     var string: String {name.string + tokenLiteral + "、" + (isExtended ? (Self.further + "、") : "") +
-        value.expressions.reduce("") {$0 + $1.string} + (token.isParticle(.TOWA) ? "のこと。" : "。")}
+        value.string}
     static let wa = "は"
-    static let towa = "とは"
     static let further = "さらに"
-    static let koto = "こと"          //　省略可
-    static let dearu = "である"        // 省略可
-    static let desu = "です"          // 代替可
 }
 final class ExpressionStatement : Sentence {
     let token: Token                // 式の最後のトークン
@@ -147,17 +178,8 @@ final class ExpressionStatement : Sentence {
     }
     //
     var tokenLiteral: String {token.literal}
-    var string: String {
-        let s = expressions.reduce("") {$0 + $1.string + ($1 is PredicateExpression ? "、" : "")} + "。"
-        return s.replacingOccurrences(of: "。】", with: "】")
-            .replacingOccurrences(of: "、】", with: "】")
-            .replacingOccurrences(of: "、。", with: "。")
-            .replacingOccurrences(of: "が。", with: "が、")
-            .replacingOccurrences(of: "、場合", with: "場合")
-            .replacingOccurrences(of: "、する", with: "する")
-            .replacingOccurrences(of: "、し", with: "し")
-            .replacingOccurrences(of: "、ない", with: "ない")
-    }
+    var baseString: String {expressions.toStringWithComma}
+    //
     static let yousoga = "要素が、"
     static let yousowa = "要素は、"
     static let hontaiga = "本体が、"
@@ -210,8 +232,7 @@ final class CompoundStatement : Statement {
         var string = ""
         for (i, sentence) in sentences.enumerated() {
             string += sentence.baseString
-            guard i < sentences.count - 1 else {continue}
-            let next = sentences[i + 1]
+            let next = (i < sentences.count - 1) ? sentences[i + 1] : nil
             string += punctuation(for: sentence, and: next) // 句読点
         }
         return string
@@ -350,24 +371,77 @@ final class Boolean: ValueExpression {
     //
     var string: String {tokenLiteral.color(.magenta)}
 }
+/// 範囲
+extension Token {
+    var isLower: Bool { [Token(.GTEQUAL), Token(.KARA)].contains(self) }
+    var isUpper: Bool { [Token(.LTEQUAL), Token(.MADE), Token(.UNDER)].contains(self) }
+}
+final class BoundaryExpression : Expression {
+    let token: Token            // 以上、以下、未満、から、まで、のトークン
+    let sentence: Sentence      // 上下限式
+    init(token: Token, sentence: Sentence) {
+        self.token = token
+        self.sentence = sentence
+    }
+    var tokenLiteral: String { token.literal }
+    var string: String {
+        // 例: 1に1を足すから / 100で10を割るまで
+        sentence.string.withoutPunctuation + token.coloredLiteral
+    }
+}
 final class RangeLiteral : Expression {
     let token: Token                // 範囲トークン
     let lowerBound: ExpressionStatement?    // 下限式(例：1以上）
     let upperBound: ExpressionStatement?    // 上限式(例：100以下、100未満)
+    // 新形式（移行先）
+    let lowerBoundary: BoundaryExpression?
+    let upperBoundary: BoundaryExpression?
+    // 旧: 既存の init を残しつつ
     init(token: Token, lowerBound: ExpressionStatement? = nil, upperBound: ExpressionStatement? = nil) {
         self.token = token
         self.lowerBound = lowerBound
         self.upperBound = upperBound
+        self.lowerBoundary = nil
+        self.upperBoundary = nil
     }
-    //
-    var tokenLiteral: String {token.literal}
-    var string: String {token.coloredLiteral + "【" +
-        (lowerBound.map {string(of: $0)} ?? "") + comma +
-        (upperBound.map {string(of: $0)} ?? "") + "】"}
-    private func string(of es: ExpressionStatement) -> String {
-        es.expressions.reduce("") {$0 + $1.string} + es.tokenLiteral
+    // 新: 新形式用の init
+    init(token: Token, lower: BoundaryExpression? = nil, upper: BoundaryExpression? = nil) {
+        self.token = token
+        self.lowerBoundary = lower
+        self.upperBoundary = upper
+        self.lowerBound = nil
+        self.upperBound = nil
     }
-    private var comma: String {(lowerBound != nil && upperBound != nil) ? "、" : ""}
+    var tokenLiteral: String { token.literal }
+    // 新旧両対応の string
+    var string: String {
+        if lowerBoundary != nil || upperBoundary != nil {
+            // 新形式が設定されていれば新形式で表示
+            return token.coloredLiteral + "であって、【" + newFormatString + "】"
+        } else {
+            // フォールバック: 旧形式（従来の表示を維持）
+            return token.coloredLiteral + "【" +
+                (lowerBound.map { oldFormatString(of: $0) } ?? "") + oldComma +
+                (upperBound.map { oldFormatString(of: $0) } ?? "") + "】"
+        }
+    }
+    // 旧形式の表示（従来のまま）
+    private func oldFormatString(of es: ExpressionStatement) -> String {
+        es.expressions.reduce("") { $0 + $1.string } + es.tokenLiteral
+    }
+    private var oldComma: String { (lowerBound != nil && upperBound != nil) ? "、" : "" }
+    // 新形式の表示
+    private var newFormatString: String {
+        let lhs = lowerBoundary.map { boundaryString($0) } ?? ""
+        let rhs = upperBoundary.map { boundaryString($0) } ?? ""
+        let comma = (lowerBoundary != nil && upperBoundary != nil) ? "、" : ""
+        return lhs + comma + rhs
+    }
+    private func boundaryString(_ b: BoundaryExpression) -> String {
+        // 例: 1以上 / 10未満 / 3まで 等
+        // 式の末尾の句読点は避けたいので withoutPunctuation を活用
+        return b.sentence.string.withoutPunctuation + b.token.coloredLiteral
+    }
 }
 /// 句(式+助詞)。助詞(token)はToken.Particle
 final class PhraseExpression : Expression {
@@ -398,6 +472,7 @@ final class PredicateExpression : Expression {
     var tokenLiteral: String {token.literal}
     var string: String {token.coloredLiteral + (auxiliaryToken?.coloredLiteral ?? "")}
 }
+/// 選択肢の「または」
 final class OrExpression : Expression {
     let token: Token
     let left: Expression
@@ -416,8 +491,8 @@ final class GenitiveExpression : Expression {
     let token: Token                // 属格(genitive case)
     let left: Expression
     let right: Expression
-    let value: ExpressionStatement? // 値
-    init(token: Token, left: Expression, right: Expression, value: ExpressionStatement? = nil) {
+    let value: Statement?           // 値
+    init(token: Token, left: Expression, right: Expression, value: Statement? = nil) {
         self.token = token
         self.left = left
         self.right = right
@@ -428,6 +503,29 @@ final class GenitiveExpression : Expression {
     var string: String {
         left.string + tokenLiteral + right.string + (value.map {"、\($0.string)"} ?? "").withoutPeriod
     }
+}
+// 名詞句 (<形容詞、動詞節>か): 節全体を名詞化
+final class NominalizedExpression : Expression {
+    let token: Token        // か
+    let sentence: Sentence
+    init(token: Token, sentence: Sentence) {
+        self.token = token
+        self.sentence = sentence
+    }
+    //
+    var tokenLiteral: String {token.literal}
+    var string: String {sentence.baseString + token.coloredLiteral}
+}
+/// 属性を取得： その<属性名>
+final class PropertyExpression : Expression {
+    let token: Token    // その
+    let property: Token
+    init(token: Token, property: Token) {
+        self.token = token
+        self.property = property
+    }
+    var tokenLiteral: String {token.literal}
+    var string: String {token.coloredLiteral + property.literal}
 }
 /// 場合文１： <論理式>場合【<続文>】、それ以外は【<代文>】。
 /// 場合文２：<識別子>が<値１>の場合【<文１>】、<値２>の場合【<文２>】、…それ以外は【<代文>】。
@@ -486,9 +584,9 @@ final class LoopExpression : Expression {
     static let syoriwa = "処理は、"
     let token: Token                // .LOOPキーワード(反復)
     let parameters: [Identifier]    // カウンターまたは要素
-    let condition: [Expression]     // 条件式
+    let condition: Statement?       // 条件式
     let body: BlockStatement
-    init(token: Token, parameters: [Identifier], condition: [Expression], body: BlockStatement) {
+    init(token: Token, parameters: [Identifier], condition: Statement?, body: BlockStatement) {
         self.token = token
         self.parameters = parameters
         self.condition = condition
@@ -499,7 +597,7 @@ final class LoopExpression : Expression {
     var string: String {
         token.coloredLiteral + "【" +
         (parameters.isEmpty ? "" : "入力が、\(parameters.map {$0.string}.joined(separator: "と、"))であり、") +
-        (condition.isEmpty ? "" : "条件が、\(condition.map {$0.string}.joined(separator: "、"))間、") +
+        (condition.map {"条件が、\($0.string.withoutPeriod)間、"} ?? "") +
         "処理が、" + body.string + "】"
     }
 }

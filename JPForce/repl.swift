@@ -37,6 +37,7 @@ struct Repl {
             }
             let lexer = Lexer(line)
             let parser = Parser(lexer)
+            parser.options.useSentenceAST = true
             parser.options.enableSentenceShadowMode = true
             parser.options.verboseShadowLog = false
             guard let program = parser.parseProgram(), parser.errors.isEmpty else {

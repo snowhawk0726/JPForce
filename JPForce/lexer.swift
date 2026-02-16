@@ -46,14 +46,14 @@ final class Lexer {
         /// 識別子として使用不可:  助詞を含む文字列、記号・数値で始まる文字列、記号で終わる文字列、予約語「する」「こと」「また」「以上」「以下」「未満」で終わる文字列
         switch (token, nextToken, compoundToken) {
         case (.IDENT(_),.keyword(let keyword),_):       // 識別子 + 予約語 → 合成
-            guard ![.SURU,.KOTO,.MATA,.CASE].contains(keyword) else {return token}  // する、こと、また、場合を除く
+            if [.SURU,.KOTO,.MATA,.CASE,.QUESTION].contains(keyword) {return token}  // する、こと、また、場合、かを除く
             token = Token(word: token.literal + getNext().literal)
         case (_,_,.keyword(_)), (_,_,.particle(_)),
             (.IDENT(_),.IDENT(_),_), (.IDENT(_),.wrapped(.ident,_),_), (.IDENT(_),.INT(_),_),
             (.wrapped(.ident,_),.IDENT(_),_):
             token = Token(word: token.literal + getNext().literal)  // 識別子を合成
         case (.keyword(let keyword),.IDENT(_),_):
-            guard keyword != .ITS else {return token}
+            if [.ITS,.QUESTION].contains(keyword) {return token}
             token = Token(word: token.literal + getNext().literal)  // 識別子を合成
         case (.keyword(_),.keyword(let next),_):     // 予約語 + 予約語
             if next == .KOTO {                          

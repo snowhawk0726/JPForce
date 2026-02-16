@@ -8,6 +8,7 @@
 
 import Foundation
 
+// MARK: - Objectレベル・コンパイルヘルパー
 extension JpfObject {
     func emit(with c: Compiler) throws {throw JpfError("型「\(self.type)」の翻訳で、コードを出力する方法が未実装")}
     var isDefined: Bool {true}
@@ -96,7 +97,7 @@ extension JpfIdentifier {
     var isProperty: Bool {symbol?.scope == .PROPETRY}
     var isVariable: Bool {symbol?.isVariable ?? false}
 }
-// MARK: - JpfIdentifier 共通ヘルパー
+// JpfIdentifier 共通ヘルパー
 private extension JpfIdentifier {
     /// outer/ローカルの順序で名前解決を行い、連用形→終止形の変換も考慮して `value` と `symbol` を確定する。
     mutating func resolveSymbolAndNormalizeValue(with c: Compiler, isOuter: Bool) {
@@ -180,7 +181,7 @@ extension JpfDictionary {
 #endif
     }
 }
-// Token level emits
+// トークンレベル・コンパイルヘルパー
 extension Token {
     func emitConst(with c: Compiler, operand: Int) {
         _ = c.emit(op: opConst, operand: operand)
@@ -207,4 +208,3 @@ extension Token {
         }
     }
 }
-

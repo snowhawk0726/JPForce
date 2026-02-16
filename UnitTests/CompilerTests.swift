@@ -8,6 +8,7 @@
 import XCTest
 
 final class CompilerTests: XCTestCase {
+    var useSentenceAST = true
     typealias CompilerTestCase = (
         input: String,
         expectedConstants: [Any],
@@ -502,6 +503,52 @@ final class CompilerTests: XCTestCase {
                 make(op: .opConstant, operand: 5),          // 0041 30
                 make(op: .opConstant, operand: 6),          // 0044 3333
              ]),
+            (input: "真によって、10か20。",
+             expectedConstants: [10],
+             expectedInstructions: [
+                make(op: .opConstant, operand: 0),          // 0000 10
+             ]),
+            (input: "aは10。bは20。偽によって、aかb。",
+             expectedConstants: [10, 20],
+             expectedInstructions: [
+                make(op: .opConstant, operand: 0),          // 0000 10
+                make(op: .opSetGlobal, operand: 0),         // 0003 a
+                make(op: .opConstant, operand: 1),          // 0006 20
+                make(op: .opSetGlobal, operand: 1),         // 0009 b
+                make(op: .opGetGlobal, operand: 1),         // 0000 b
+             ]),
+            (input: "bは真。bによって、10か20。",
+             expectedConstants: [10, 20],
+             expectedInstructions: [
+                make(op: .opTrue),                          // 0000 真
+                make(op: .opSetGlobal, operand: 0),         // 0001 b
+                make(op: .opGetGlobal, operand: 0),         // 0004 b
+                make(op: .opJumpNotTruthy, operand: 16),    // 0007 によって
+                make(op: .opConstant, operand: 0),          // 0010 10
+                make(op: .opJump, operand: 19),             // 0013 か
+                make(op: .opConstant, operand: 1),          // 0016 20
+             ]),
+/* TODO: SimpleSentenceによるキャッシュコンパイルによって、定数計算ができない。
+            (input: "1が2より大きいかによって、10か20。",
+             expectedConstants: [20],
+             expectedInstructions: [
+                make(op: .opConstant, operand: 0),          // 0000 20
+             ]),
+ */
+            (input: "aは1。aが1であるかによって、10か20。",
+             expectedConstants: [1, (1,"で"), 10, 20],
+             expectedInstructions: [
+                make(op: .opConstant, operand: 0),          // 0000 1
+                make(op: .opSetGlobal, operand: 0),         // 0003 a
+                make(op: .opGetGlobal, operand: 0),         // 0006 a
+                make(op: .opPhrase, operand: 1),            // 0009 が
+                make(op: .opConstant, operand: 1),          // 0011 1で
+                make(predicate: .BE),                       // 0014 ある
+                make(op: .opJumpNotTruthy, operand: 25),    // 0016 によって
+                make(op: .opConstant, operand: 2),          // 0019 10
+                make(op: .opJump, operand: 28),             // 0022 か
+                make(op: .opConstant, operand: 3),          // 0025 20
+             ]),
         ]
         try runCompilerTests(testPatterns)
     }
@@ -976,7 +1023,7 @@ final class CompilerTests: XCTestCase {
     private func runCompilerTests(_ tests: [CompilerTestCase]) throws {
         for t in tests {
             print("テスト開始：「\(t.input)」")
-            let program = parseProgram(with: t.input)!
+            let program = parseProgram(with: t.input, useSentenceAST: useSentenceAST)!
             let compiler = Compiler(from: program)
             XCTAssertNil(compiler.compile())
             let bytecode = compiler.bytecode

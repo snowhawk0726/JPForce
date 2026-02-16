@@ -44,6 +44,11 @@ final class CommonTests: XCTestCase {
             ("xは１。xを負数にして代入。x。", -1),
             ("1、aに代入。a", 1),
             ("aは100。関数【aは1。外部「a」に0を代入】を実行。a。", 0),
+            ("配列【1,2,3】。その型", "配列"),
+            ("配列【1,2,3】。その数", 3),
+            ("甲は、1が2より大きいかによって、10か20。甲。", 20),
+            ("条件は、1が2より小さい。甲は、条件によって、10か20。甲。", 10),
+            // エラー
             ("aに1個代入。a", assignUsage.message),  // エラー(「個」)
             ("xを負数にして代入。x。", undefinedIdentifier("x").message), // 未定義エラー
             ("aに1を足して代入。a。", undefinedIdentifier("a").message), // 未定義エラー
@@ -81,19 +86,9 @@ final class CommonTests: XCTestCase {
     let syntaxError: Error = CommonTestError.syntax
     //
     private func parseSentenses(with parser: Parser) throws -> [Statement] {
+        parser.options.useSentenceAST = true
         let program = try XCTUnwrap(parser.parseProgram())
-        var statements: [Statement] = []
-        for statement in program.statements {
-            guard let es = statement as? ExpressionStatement else {
-                statements.append(statement)
-                continue
-            }
-            guard let stmt = ExpressionStatementParser(parser).parseSentecne(from: es) else {
-                throw syntaxError
-            }
-            statements.append(stmt)
-        }
-        return statements
+        return program.statements
     }
     private func compileAndRun(_ statements: [Statement]) -> JpfObject? {
         let compiler = Compiler(from: Program(statements: statements))

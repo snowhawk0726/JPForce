@@ -8,6 +8,7 @@
 import XCTest
 
 final class ParserTests: XCTestCase {
+    var useSentenceAST = true
     override func setUpWithError() throws {
     }
     override func tearDownWithError() throws {
@@ -27,17 +28,59 @@ final class ParserTests: XCTestCase {
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let program = try XCTUnwrap(parseProgram(with: test.input))
+            let program = try XCTUnwrap(parseProgram(with: test.input, useSentenceAST: useSentenceAST))
             XCTAssertEqual(program.statements.count, test.count)
             for i in 0..<program.statements.count {
-                try testDefStatement(
+                try testDefineStatement(
                     program.statements[i],
-                    name: test.expectedIdentifier,
-                    "は",
+                    target: test.expectedIdentifier,
                     with: test.expectedValues[i],
                     flag: test.isExtended)
             }
-            print("テスト(\(program.string))終了")
+            print("テスト終了：\(program.string) (rhs = \(valueType(in: program)))")
+        }
+    }
+    private func valueType(in program: Program) -> String {
+        let rhsLiterals = program.statements.compactMap { ($0 as? DefineStatement)?.rhsLiteral }
+        guard rhsLiterals.count == program.statements.count else { return "?" }
+        let types = rhsLiterals.map { String(describing: type(of: $0)) }
+        return types.joined(separator: ",")
+    }
+    func testRhsStatement() throws {
+        let testPatterns: [(input: String, type: String?)] = [
+            ("aは、1。", "ExpressionStatement"),
+            ("aは、1と2を足す。", "SimpleSentence"),
+            ("aは、1と2を足したもの。", "ExpressionStatement"),
+            ("aは、1と2を足し、3で割る", "CompoundStatement"),
+            ("aは、1と2を足し、bに代入", nil),
+            ("aは、1と2を足し、bに代入したもの。", "CompoundStatement"), // TODO: - ModifiedNounExpression導入時に、エラーにする
+            ("aのbは、1。", "ExpressionStatement"),
+            ("aのbは、1と2を足す。", "SimpleSentence"),
+            ("aのbは、1と2を足したもの。", "ExpressionStatement"),
+            ("aのbは、1と2を足し、3で割る", "CompoundStatement"),
+            ("aのbは、cに代入する。", nil),
+            ("aのbは、1と2を足し、bに代入したもの。", "CompoundStatement"), // TODO: - ModifiedNounExpression導入時に、エラーにする
+        ]
+        for test in testPatterns {
+            print("テストパターン: \(test.input)")
+            guard let program = parseProgram(with: test.input, useSentenceAST: true) else {
+                XCTAssertNil(test.type)
+                print("テスト終了：rhs = エラー")
+                continue
+            }
+            var rhs: Statement?
+            if let define = program.statements.first as? DefineStatement {
+                rhs = define.value
+            } else
+            if let es = program.statements.first as? ExpressionStatement,
+               let genitive = es.expressions.first as? GenitiveExpression {
+                rhs = genitive.value
+            } else {
+                XCTFail("右辺が存在しない型：\(String(describing: type(of: program.statements.first!)))")
+            }
+            let typeString = String(describing: type(of: try XCTUnwrap(rhs)))
+            XCTAssertEqual(typeString, test.type!)
+            print("テスト終了：rhs = \(rhs?.string ?? "<nil>")(\(typeString))")
         }
     }
     func testReturnExpressions() throws {
@@ -48,12 +91,12 @@ final class ParserTests: XCTestCase {
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let program = try XCTUnwrap(parseProgram(with: test.input))
+            let program = try XCTUnwrap(parseProgram(with: test.input, useSentenceAST: useSentenceAST))
             XCTAssertEqual(program.statements.count, 1)
-            let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
-            try testPhraseExpression(statement.expressions[0], with: test.expectedValue, "を")
-            try testKeyword(statement.expressions[1], .RETURN)
-            print("テスト終了: \(statement.string)")
+            let statement = try XCTUnwrap(program.statements.first)
+            try testPhraseExpression(statement.arguments[0], with: test.expectedValue, "を")
+            try testKeyword(statement.predicate, .RETURN)
+            print("テスト終了: \(statement.string)(\(type(of: statement)))")
         }
     }
     func testIdentifierExpressions() throws {
@@ -61,24 +104,25 @@ final class ParserTests: XCTestCase {
             // 入力, 識別子名, リテラル
             ("識別。", "識別", "識別"),
             ("加え、", "加え", "加え"),
+            ("加える。", "加える", "加える"),
             ("二倍し、", "二倍", "二倍"),
             ("『足した数』", "足した数", "足した数"),
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let program = try XCTUnwrap(parseProgram(with: test.input))
+            let program = try XCTUnwrap(parseProgram(with: test.input, useSentenceAST: useSentenceAST))
             XCTAssertEqual(program.statements.count, 1)
-            let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
-            let ident = try XCTUnwrap(statement.expressions.first as? Identifier)
+            let statement = try XCTUnwrap(program.statements.first)
+            let ident = try XCTUnwrap(statement.literal as? Identifier)
             XCTAssertEqual(ident.value, test.value)
             XCTAssertEqual(ident.tokenLiteral, test.literal)
-            print("テスト終了: \(ident)")
+            print("テスト終了: \(ident.value) (in \(type(of: statement)))")
         }
     }
     func testStringLiteralExpression() throws {
         let input = "「みなさん、こんにちは。」"
         print("テストパターン: \(input)")
-        let program = try XCTUnwrap(parseProgram(with: input))
+        let program = try XCTUnwrap(parseProgram(with: input, useSentenceAST: useSentenceAST))
         XCTAssertEqual(program.statements.count, 1)
         let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
         let literal = try XCTUnwrap(statement.expressions.first as? StringLiteral)
@@ -89,7 +133,7 @@ final class ParserTests: XCTestCase {
     func testIntegerLiteralExpression() throws {
         let input = "-5。"
         print("テストパターン: \(input)")
-        let program = try XCTUnwrap(parseProgram(with: input))
+        let program = try XCTUnwrap(parseProgram(with: input, useSentenceAST: useSentenceAST))
         XCTAssertEqual(program.statements.count, 1)
         let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
         let literal = try XCTUnwrap(statement.expressions.first as? IntegerLiteral)
@@ -111,46 +155,65 @@ final class ParserTests: XCTestCase {
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let program = try XCTUnwrap(parseProgram(with: test.input))
+            let program = try XCTUnwrap(parseProgram(with: test.input, useSentenceAST: useSentenceAST))
             XCTAssertEqual(program.statements.count, 1)
-            let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
-            for (i, clause) in zip(0..<test.clauses.count, test.clauses) {
-                let particle = try XCTUnwrap(statement.expressions[i] as? PhraseExpression)
-                try testLiteralExpression(particle.left, with: clause.value)
-                XCTAssertEqual(particle.tokenLiteral, clause.particle)
+            let statement = try XCTUnwrap(program.statements.first)
+            for (i, clause) in test.clauses.enumerated() {
+                let phrase = try XCTUnwrap(statement.arguments[i] as? PhraseExpression)
+                try testLiteralExpression(phrase.left, with: clause.value)
+                XCTAssertEqual(phrase.tokenLiteral, clause.particle)
             }
-            let keyword = try XCTUnwrap(statement.expressions[2] as? PredicateExpression)
-            XCTAssertEqual(keyword.string, test.keyword)
-            print("テスト終了: \(statement.string)")
+            let predicate = try XCTUnwrap(statement.predicate)
+            try testKeywordLiteral(predicate, test.keyword)
+            print("テスト終了: \(statement.string)(\(type(of: statement)))")
         }
     }
     func testParsingNotExpressions() throws {
-        let testPatterns: [(input: String, keyword: Token, not: String)] = [
-            ("等しくない。", Token(.EQUAL), "ない"),
-            ("小さくない。", Token(.LT), "ない"),
-            ("大きくない。", Token(.GT), "ない"),
-            ("なくない。", Token(.NOT), "ない"),
-            ("等しくなく、", Token(.EQUAL), "なく"),
-            ("真でない。", Token(.TRUE), "ない"),
-            ("偽でなく、", Token(.FALSE), "なく"),
+        let testPatterns: [(input: String, keyword: Token.Keyword, literal: String)] = [
+            ("等しくない。", .EQUAL, "ない"),
+            ("小さくない。", .LT, "ない"),
+            ("大きくない。", .GT, "ない"),
+            ("なくない。", .NOT, "ない"),
+            ("等しくなく、", .EQUAL, "なく"),
+            ("真でない。", .TRUE, "ない"),
+            ("偽でなく、", .FALSE, "なく"),
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let program = try XCTUnwrap(parseProgram(with: test.input))
+            let program = try XCTUnwrap(parseProgram(with: test.input, useSentenceAST: useSentenceAST))
             XCTAssertEqual(program.statements.count, 1)
-            let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
-            XCTAssertEqual(statement.expressions.count, 2)
-            if let particle = statement.expressions[0] as? PhraseExpression { // 助詞「で」
-                let boolean = try XCTUnwrap(particle.left as? Boolean)
-                XCTAssertEqual(boolean.token.type, test.keyword.type)           // 真偽のチェック
+            if useSentenceAST {
+                if let cs = program.statements.first as? CompoundStatement {
+                    let predicate = try XCTUnwrap((cs.sentences.first as? SimpleSentence)?.predicate)
+                    try testKeyword(predicate, test.keyword)
+                    let literal = try XCTUnwrap((cs.sentences.last as? SimpleSentence)?.predicate?.tokenLiteral)
+                    XCTAssertEqual(literal, test.literal)
+                } else
+                if let ss = program.statements.first as? SimpleSentence {
+                    let phrase = try XCTUnwrap(ss.arguments[0] as? PhraseExpression)
+                    let boolean = try XCTUnwrap(phrase.left as? Boolean)
+                    XCTAssertEqual(boolean.token.keyword, test.keyword)
+                    let literal = try XCTUnwrap(ss.predicate?.tokenLiteral)
+                    XCTAssertEqual(literal, test.literal)
+                } else {
+                    XCTFail()
+                }
             } else {
-                let keyword = try XCTUnwrap(statement.expressions[0] as? PredicateExpression)
-                XCTAssertEqual(keyword.token.type, test.keyword.type)           // キーワードのチェック
+                let es = try XCTUnwrap(program.statements.first as? ExpressionStatement)
+                XCTAssertEqual(es.expressions.count, 2)
+                if let predicate = es.expressions[0] as? PredicateExpression {
+                    try testKeyword(predicate, test.keyword)
+                } else
+                if let phrase = es.arguments[0] as? PhraseExpression {
+                    let boolean = try XCTUnwrap(phrase.left as? Boolean)
+                    XCTAssertEqual(boolean.token.keyword, test.keyword) // 真偽値のチェック
+                } else {
+                    XCTFail()
+                }
+                let negation = try XCTUnwrap(es.expressions[1] as? PredicateExpression)
+                XCTAssertEqual(negation.tokenLiteral, test.literal)
             }
-            let not = try XCTUnwrap(statement.expressions[1] as? PredicateExpression)
-            XCTAssertEqual(not.token.type, Token(.NOT).type)                    // 「ない」のチェック
-            XCTAssertEqual(not.tokenLiteral, test.not)
-            print("テスト終了: \(statement.string)")
+            print("テスト終了: \(program.string)(\(type(of: program.statements.first!)))")
         }
     }
     func testBooleanExpressions() throws {
@@ -159,11 +222,10 @@ final class ParserTests: XCTestCase {
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let program = try XCTUnwrap(parseProgram(with: test.input))
+            let program = try XCTUnwrap(parseProgram(with: test.input, useSentenceAST: useSentenceAST))
             XCTAssertEqual(program.statements.count, 1)
             let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
-            let bool = try XCTUnwrap(statement.expressions.first as? Boolean)
-            XCTAssertEqual(bool.value, test.exprected)
+            try testBooleanLiteral(statement.literal, value: test.exprected)
             print("テスト終了: \(statement.string)")
         }
     }
@@ -177,47 +239,82 @@ final class ParserTests: XCTestCase {
         ]
         for input in testPatterns {
             print("テストパターン: \(input)")
-            let program = try XCTUnwrap(parseProgram(with: input))
+            let program = try XCTUnwrap(parseProgram(with: input, useSentenceAST: useSentenceAST))
             XCTAssertEqual(program.statements.count, 1, "program.statements.count")
-            let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
-            XCTAssertEqual(statement.expressions.count, 4, "statement.expressions.count")
-            try testPhraseExpression(statement.expressions[0], with: "甲", "が")
-            try testPhraseExpression(statement.expressions[1], with: "乙", "より")
-            try testKeywordLiteral(statement.expressions[2], "小さい")
-            let caseExpression = try XCTUnwrap(statement.expressions[3] as? CaseExpression) // 場合、
-            XCTAssertEqual(caseExpression.consequence.statements.count, 1, "caseExpression.consequence.statements.count")
-            let consequence = try XCTUnwrap(caseExpression.consequence.statements.first as? ExpressionStatement)
-            XCTAssertEqual(consequence.expressions.count, 2, "consequence.expressions.count")
-            try testPhraseExpression(consequence.expressions[0], with: "甲", "を")
-            try testKeywordLiteral(consequence.expressions[1], "表示する")
-            XCTAssertNil(caseExpression.alternative, "caseExpression.alternative")
-            print("テスト終了: \(statement.string)")
+            if useSentenceAST {
+                let statement = try XCTUnwrap(program.statements.first as? CompoundStatement)
+                XCTAssertEqual(statement.sentences.count, 2, "statement.sentences.count")
+                try testSimpleSentence(statement.sentences[0], predicate: "小さい", phrases: "甲が", "乙より")
+                let caseExpression = try XCTUnwrap(statement.sentences[1].literal as? CaseExpression) // 場合、
+                let sentence = try XCTUnwrap(caseExpression.consequence.statements.first as? SimpleSentence)
+                try testSimpleSentence(sentence, predicate: "表示する", phrases: "甲を")
+                XCTAssertNil(caseExpression.alternative, "caseExpression.alternative")
+                print("テスト終了: \(statement.string)(\(type(of: statement)))")
+            } else {
+                let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
+                XCTAssertEqual(statement.expressions.count, 4, "statement.expressions.count")
+                try testPhraseExpression(statement.expressions[0], with: "甲が")
+                try testPhraseExpression(statement.expressions[1], with: "乙より")
+                try testKeywordLiteral(statement.expressions[2], "小さい")
+                let caseExpression = try XCTUnwrap(statement.expressions[3] as? CaseExpression) // 場合、
+                XCTAssertEqual(caseExpression.consequence.statements.count, 1, "caseExpression.consequence.statements.count")
+                let consequence = try XCTUnwrap(caseExpression.consequence.statements.first as? ExpressionStatement)
+                XCTAssertEqual(consequence.expressions.count, 2, "consequence.expressions.count")
+                try testPhraseExpression(consequence.expressions[0], with: "甲を")
+                try testKeywordLiteral(consequence.expressions[1], "表示する")
+                XCTAssertNil(caseExpression.alternative, "caseExpression.alternative")
+                print("テスト終了: \(statement.string)(\(type(of: statement)))")
+            }
         }
     }
     func testSwitchCaseExpression() throws {
         let input = "3が、1の場合【甲を表示し】、2の場合【乙を表示し】、それ以外は【丙を表示する】。"
         print("テストパターン: \(input)")
-        let expected: [(value: Int, ident: String, predicate: String)] = [
-            (1, "甲", "表示し"), (2, "乙", "表示し"), (3, "丙", "表示する"),
+        let expected: [(value: Int?, string: String)] = [
+            (1, "甲を表示し"), (2, "乙を表示し"), (nil, "丙を表示する"),
         ]
         //
-        let program = try XCTUnwrap(parseProgram(with: input))
+        let program = try XCTUnwrap(parseProgram(with: input, useSentenceAST: useSentenceAST))
         XCTAssertEqual(program.statements.count, 1, "program.statements.count")
+        if useSentenceAST {
+            let cs = try XCTUnwrap(program.statements.first as? CompoundStatement)
+            let es1 = try XCTUnwrap(cs.sentences[0] as? ExpressionStatement)
+            let es2 = try XCTUnwrap(cs.sentences[1] as? ExpressionStatement)
+            try testPhraseExpression(es1.expressions[0], with: "3が")
+            for i in 0..<expected.count {
+                let pattern = expected[i].value.map {String($0)}
+                let body = expected[i].string
+                if i == 0 {
+                    try testGenitiveCase(es1.expressions[1], lhs: pattern, rhs: body)
+                    continue
+                }
+                try testGenitiveCase(es2.expressions[0], lhs: pattern, rhs: body)
+            }
+            print("テスト終了: \(cs.string)(\(type(of: cs)))")
+            return
+        }
         let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
         XCTAssertEqual(statement.expressions.count, 3, "statement.expressions.count")
-        try testPhraseExpression(statement.expressions[0], with: 3, "が")
-        for i in 0...1 {
-            let expression = try XCTUnwrap(statement.expressions[i+1] as? GenitiveExpression)
-            let value = try XCTUnwrap(expression.left as? IntegerLiteral)
-            XCTAssertEqual(value.value, expected[i].value)
-            let caseExpression = try XCTUnwrap(expression.right as? CaseExpression)
-            let consequence = try XCTUnwrap(caseExpression.consequence.statements.first as? ExpressionStatement)
-            try testCaseExpressions(consequence.expressions, with: expected[i].ident, predicate: expected[i].predicate)
-            if let alternative = caseExpression.alternative?.statements.first as? ExpressionStatement {
-                try testCaseExpressions(alternative.expressions, with: expected[2].ident, predicate: expected[2].predicate)
+        try testPhraseExpression(statement.expressions[0], with: "3が")
+        for i in 0..<expected.count {
+            let pattern = expected[i].value.map {String($0)}
+            let body = expected[i].string
+            if i == 0 {
+                try testGenitiveCase(statement.expressions[1], lhs: pattern, rhs: body)
+                continue
             }
+            try testGenitiveCase(statement.expressions[2], lhs: pattern, rhs: body)
         }
-        print("テスト終了: \(statement.string)")
+        print("テスト終了: \(statement.string)(\(type(of: statement)))")
+    }
+    private func testGenitiveCase(_ exp: Expression?, lhs: String?, rhs: String, isConsequence: Bool = true) throws {
+        let ge = try XCTUnwrap(exp as? GenitiveExpression)
+        if let lhs {
+            XCTAssertEqual(ge.left.string, lhs)
+            try testCaseConsequence(ge.right, with: rhs)
+        } else {
+            try testCaseAlternative(ge.right, with: rhs)
+        }
     }
     func testBlockStatementParsings() throws {
         let testPatterns: [(input: String, statements: Int, expressions: Int, consequences: Int)] = [
@@ -232,21 +329,29 @@ final class ParserTests: XCTestCase {
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let program = try XCTUnwrap(parseProgram(with: test.input))
+            let program = try XCTUnwrap(parseProgram(with: test.input, useSentenceAST: useSentenceAST))
             XCTAssertEqual(program.statements.count, test.statements, "program.statements.count")
+            if useSentenceAST {
+                let cs = try XCTUnwrap(program.statements.first as? CompoundStatement)
+                let es = try XCTUnwrap(cs.sentences[1] as? ExpressionStatement)
+                let caseExpression = try XCTUnwrap(es.expressions[0] as? CaseExpression)
+                XCTAssertEqual(caseExpression.consequence.statements.count, test.consequences, "caseExpression.consequence.statements.count")
+                print("テスト終了: \(cs.string)(\(type(of: cs)))")
+                continue
+            }
             let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
             XCTAssertEqual(statement.expressions.count, test.expressions, "statement.expressions.count")
             let caseExpression = try XCTUnwrap(statement.expressions[3] as? CaseExpression)
-            XCTAssertEqual(caseExpression.consequence.statements.count, test.consequences, "caseExpression.consequence.consequence.statements.count")
-            print("テスト終了: \(statement.string)")
+            XCTAssertEqual(caseExpression.consequence.statements.count, test.consequences, "caseExpression.consequence.statements.count")
+            print("テスト終了: \(statement.string)(\(type(of: statement)))")
         }
     }
     func testFunctionLiteralWithName() throws {
         let input = "myFunctionは、関数であって、【】。"
-        let program = try XCTUnwrap(parseProgram(with: input))
+        let program = try XCTUnwrap(parseProgram(with: input, useSentenceAST: useSentenceAST))
         XCTAssertEqual(program.statements.count, 1)
         let define = try XCTUnwrap(program.statements.first as? DefineStatement)
-        let function = try XCTUnwrap(define.value.expressions.first as? FunctionLiteral)
+        let function = try XCTUnwrap(define.rhsLiteral as? FunctionLiteral)
         XCTAssertEqual(function.name, "myFunction")
     }
     func testFunctionLiteralParsings() throws {
@@ -257,22 +362,30 @@ final class ParserTests: XCTestCase {
         ]
         for input in testPatterns {
             print("テストパターン: \(input)")
-            let program = try XCTUnwrap(parseProgram(with: input))
+            let program = try XCTUnwrap(parseProgram(with: input, useSentenceAST: useSentenceAST))
             XCTAssertEqual(program.statements.count, 1, "program.statements.count")
-            let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
-            XCTAssertEqual(statement.expressions.count, 1, "statement.expressions.count")
-            let function = try XCTUnwrap(statement.expressions.first as? FunctionLiteral)   // 関数であって、
+            let statement = try XCTUnwrap(program.statements.first)
+            XCTAssertEqual(statement.expressionCount, 1, "statement.expressions.count")
+            let function = try XCTUnwrap(statement.literal as? FunctionLiteral)   // 関数であって、
             let functionBlock = function.function
             XCTAssertEqual(functionBlock.parameters.count, 2, "function.parameters.count")
             try testLiteralExpression(functionBlock.parameters[0], with: "x")
             try testLiteralExpression(functionBlock.parameters[1], with: "y")
             XCTAssertEqual(functionBlock.body?.statements.count, 1)
-            let bodyStatement = try XCTUnwrap(functionBlock.body?.statements.first as? ExpressionStatement)
-            XCTAssertEqual(bodyStatement.expressions.count, 4)
-            try testPhraseExpression(bodyStatement.expressions[0], with: "x", "に")
-            try testPhraseExpression(bodyStatement.expressions[1], with: "y", "を")
-            try testParticleLiteral(bodyStatement.expressions[2], "足して")
-            try testKeywordLiteral(bodyStatement.expressions[3],  "返す")
+            if useSentenceAST {
+                let body = try XCTUnwrap(functionBlock.body?.statements.first as? CompoundStatement)
+                try testPhraseExpression(body.sentences[0].arguments[0], with: "xに")
+                try testPhraseExpression(body.sentences[0].arguments[1], with: "yを")
+                try testKeywordLiteral(body.sentences[0].predicate, "足し")
+                try testKeywordLiteral(body.sentences[1].predicate, "返す")
+                print("テスト終了: \(statement.string)")
+                continue
+            }
+            let body = try XCTUnwrap(functionBlock.body?.statements.first as? ExpressionStatement)
+            try testPhraseExpression(body.expressions[0], with: "x", "に")
+            try testPhraseExpression(body.expressions[1], with: "y", "を")
+            try testParticleLiteral(body.expressions[2], "足して")
+            try testKeywordLiteral(body.expressions[3],  "返す")
             print("テスト終了: \(statement.string)")
         }
     }
@@ -284,7 +397,7 @@ final class ParserTests: XCTestCase {
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let program = try XCTUnwrap(parseProgram(with: test.input))
+            let program = try XCTUnwrap(parseProgram(with: test.input, useSentenceAST: useSentenceAST))
             XCTAssertEqual(program.statements.count, 1, "program.statements.count")
             let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
             XCTAssertEqual(statement.expressions.count, 1, "statement.expressions.count")
@@ -306,7 +419,7 @@ final class ParserTests: XCTestCase {
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let program = try XCTUnwrap(parseProgram(with: test.input))
+            let program = try XCTUnwrap(parseProgram(with: test.input, useSentenceAST: useSentenceAST))
             XCTAssertEqual(program.statements.count, 1, "program.statements.count")
             let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
             XCTAssertEqual(statement.expressions.count, 1, "statement.expressions.count")
@@ -331,7 +444,7 @@ final class ParserTests: XCTestCase {
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let program = try XCTUnwrap(parseProgram(with: test.input))
+            let program = try XCTUnwrap(parseProgram(with: test.input, useSentenceAST: useSentenceAST))
             XCTAssertEqual(program.statements.count, 1, "program.statements.count")
             let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
             XCTAssertEqual(statement.expressions.count, 1, "statement.expressions.count")
@@ -361,7 +474,7 @@ final class ParserTests: XCTestCase {
         ]
         for input in testPatterns {
             print("テストパターン: \(input)")
-            let program = try XCTUnwrap(parseProgram(with: input))
+            let program = try XCTUnwrap(parseProgram(with: input, useSentenceAST: useSentenceAST))
             XCTAssertEqual(program.statements.count, 1, "program.statements.count")
             let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
             XCTAssertEqual(statement.expressions.count, 1, "statement.expressions.count")
@@ -383,7 +496,7 @@ final class ParserTests: XCTestCase {
         ]
         for input in testPatterns {
             print("テストパターン: \(input)")
-            let program = try XCTUnwrap(parseProgram(with: input))
+            let program = try XCTUnwrap(parseProgram(with: input, useSentenceAST: useSentenceAST))
             XCTAssertEqual(program.statements.count, 1, "program.statements.count")
             let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
             XCTAssertEqual(statement.expressions.count, 1, "statement.expressions.count")
@@ -397,13 +510,13 @@ final class ParserTests: XCTestCase {
     }
     func testTypeLiteralParsings() throws {
         let testPatterns = [
-            "型であって、【初期化は、【入力が、xとyであり、xにyを足し「z」に代入する】。本体が、aは１。】",
-            "型であり、初期化は、【入力が、xとyで、xにyを足し「z」に代入する】。本体が、aは１。",
-            "型【初期化【入力がxとyで、xにyを足し「z」に代入する】。aは１】",
+            "型であって、【初期化は、【入力が、xとyであり、xにyを足し、zに代入する】。本体が、aは１。】",
+            "型であり、初期化は、【入力が、xとyで、xにyを足し、zに代入する】。本体が、aは１。",
+            "型【初期化【入力がxとyで、xにyを足し、zに代入する】。aは１】",
         ]
         for input in testPatterns {
             print("テストパターン: \(input)")
-            let program = try XCTUnwrap(parseProgram(with: input))
+            let program = try XCTUnwrap(parseProgram(with: input, isShadowMode: false, useSentenceAST: useSentenceAST))
             XCTAssertEqual(program.statements.count, 1, "program.statements.count")
             let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
             XCTAssertEqual(statement.expressions.count, 1, "statement.expressions.count")
@@ -414,24 +527,36 @@ final class ParserTests: XCTestCase {
             try testLiteralExpression(params[1], with: "y")
             let body = try XCTUnwrap(typeLiteral.initializers.single?.body)
             XCTAssertEqual(body.statements.count, 1)
+            if useSentenceAST {
+                let initStmt = try XCTUnwrap(body.statements.first as? CompoundStatement)
+                XCTAssertEqual(initStmt.sentences.count, 2)
+                try testPhraseExpression(initStmt.sentences[0].arguments[0], with: "xに")
+                try testPhraseExpression(initStmt.sentences[0].arguments[1], with: "yを")
+                try testKeywordLiteral(initStmt.sentences[0].predicate, "足し")
+                let assignment = try XCTUnwrap(initStmt.sentences[1] as? AssignmentSentence)
+                try testIdentifier(assignment.target, value: "z")
+                try testDefineStatement(typeLiteral.body?.statements.first, target: "a", with: 1)
+                print("テスト修了：\(statement.string)")
+                continue
+            }
             let initStatement = try XCTUnwrap(body.statements.first as? ExpressionStatement)
             XCTAssertEqual(initStatement.expressions.count, 5)
             try testPhraseExpression(initStatement.expressions[0], with: "x", "に")
             try testPhraseExpression(initStatement.expressions[1], with: "y", "を")
             try testKeywordLiteral(initStatement.expressions[2], "足し")
-            try testPhraseExpression(initStatement.expressions[3], with: "「z」", "に")
+            try testPhraseExpression(initStatement.expressions[3], with: "z", "に")
             try testKeywordLiteral(initStatement.expressions[4], "代入する")
             XCTAssertNotNil(typeLiteral.body)
             XCTAssertEqual(typeLiteral.body!.statements.count, 1)
             let bodyStatement = try XCTUnwrap(typeLiteral.body!.statements.first as? DefineStatement)
-            try testDefStatement(bodyStatement, name: "a", "は", with: 1)
+            try testDefineStatement(bodyStatement, target: "a", with: 1)
             print("テスト終了: \(statement.string)")
         }
     }
     func testProtocolComformingProtocols() throws {
         let input = "規約であって、準拠する規約が、甲と、乙と、丙。条項が、丁は「数値」。"
         print("テストパターン: \(input)")
-        let program = try XCTUnwrap(parseProgram(with: input))
+        let program = try XCTUnwrap(parseProgram(with: input, useSentenceAST: useSentenceAST))
         XCTAssertEqual(program.statements.count, 1, "program.statements.count")
         let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
         XCTAssertEqual(statement.expressions.count, 1, "statement.expressions.count")
@@ -453,7 +578,7 @@ final class ParserTests: XCTestCase {
         ]
         for input in testPatterns {
             print("テストパターン: \(input)")
-            let program = try XCTUnwrap(parseProgram(with: input))
+            let program = try XCTUnwrap(parseProgram(with: input, useSentenceAST: useSentenceAST))
             XCTAssertEqual(program.statements.count, 1, "program.statements.count")
             let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
             XCTAssertEqual(statement.expressions.count, 1, "statement.expressions.count")
@@ -473,10 +598,10 @@ final class ParserTests: XCTestCase {
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let program = try XCTUnwrap(parseProgram(with: test.input))
+            let program = try XCTUnwrap(parseProgram(with: test.input, useSentenceAST: useSentenceAST))
             let define = try XCTUnwrap(program.statements[0] as? DefineStatement)
             XCTAssertEqual(define.name.value, "列挙子")
-            let enumerator = try XCTUnwrap(define.value.expressions[0] as? EnumeratorLiteral)
+            let enumerator = try XCTUnwrap(define.rhsLiteral as? EnumeratorLiteral)
             XCTAssertEqual(enumerator.type, test.type)
             XCTAssertEqual(enumerator.name, test.name)
             print("テスト終了: \(enumerator.string)")
@@ -485,7 +610,7 @@ final class ParserTests: XCTestCase {
     func testArrayLiterals() throws {
         let input = "配列であって、【要素が、１と、2に２を掛けたものと、3に３を足したもの】。"
         print("テストパターン: \(input)")
-        let program = try XCTUnwrap(parseProgram(with: input))
+        let program = try XCTUnwrap(parseProgram(with: input, useSentenceAST: useSentenceAST))
         let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
         let array = try XCTUnwrap(statement.expressions.first as? ArrayLiteral)
         XCTAssertEqual(array.elements.count, 3)
@@ -503,7 +628,7 @@ final class ParserTests: XCTestCase {
     func testParsingDictionaryLiteralsStringKeys() throws {
         let input = "辞書【「一」が1、「二」が2、「三」が3】"
         print("テストパターン: \(input)")
-        let program = try XCTUnwrap(parseProgram(with: input))
+        let program = try XCTUnwrap(parseProgram(with: input, useSentenceAST: useSentenceAST))
         let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
         let dictionary = try XCTUnwrap(statement.expressions.first as? DictionaryLiteral)
         XCTAssertEqual(dictionary.pairs.count, 3)
@@ -519,7 +644,7 @@ final class ParserTests: XCTestCase {
         let inputs = ["辞書【】", "辞書。"]
         for input in inputs {
             print("テストパターン: \(input)")
-            let program = try XCTUnwrap(parseProgram(with: input))
+            let program = try XCTUnwrap(parseProgram(with: input, useSentenceAST: useSentenceAST))
             let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
             let dictionary = try XCTUnwrap(statement.expressions.first as? DictionaryLiteral)
             XCTAssertEqual(dictionary.pairs.count, 0)
@@ -529,7 +654,7 @@ final class ParserTests: XCTestCase {
     func testParsingDictionaryLiteralWithExpressions() throws {
         let input = "辞書【「一」が0と1を足す、「二」が10から8を引く、「三」が15を5で割る】"
         print("テストパターン: \(input)")
-        let program = try XCTUnwrap(parseProgram(with: input))
+        let program = try XCTUnwrap(parseProgram(with: input, useSentenceAST: useSentenceAST))
         let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
         let dictionary = try XCTUnwrap(statement.expressions.first as? DictionaryLiteral)
         XCTAssertEqual(dictionary.pairs.count, 3)
@@ -561,28 +686,28 @@ final class ParserTests: XCTestCase {
         let input = "「一」または「二」または「三」または「四」"
         print("テストパターン: \(input)")
         let expected = "「一」、または、「二」、または、「三」、または、「四」。"
-        let program = try XCTUnwrap(parseProgram(with: input))
+        let program = try XCTUnwrap(parseProgram(with: input, useSentenceAST: useSentenceAST))
         let statement = try XCTUnwrap(program.statements.first)
         XCTAssertEqual(statement.string, expected)
         print("テスト(\(program.string))終了")
     }
     func testGenitiveExpressions() throws {
         let testPatterns: [(input: String, expected: String)] = [
-            ("甲の乙の「一」の１", "甲の乙の「一」の1。"),
-            ("甲の乙は、１", "甲の乙は、1。"),
-            ("甲の１番目は、１と２を足す", "甲の1は、1と2を足す。"),
-            ("甲の。", "甲の。"),
+            ("甲の乙の「一」の１", "甲の乙の「一」の1"),
+            ("甲の乙は、１", "甲の乙は、1"),
+            ("甲の１番目は、１と２を足す", "甲の1は、1と2を足す"),
+            ("甲の。", "甲の"),
             ("""
              甲の
              1。
-             """, "甲の。"),
-            ("甲の", "甲の。"),
+             """, "甲の"),
+            ("甲の", "甲の"),
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let program = try XCTUnwrap(parseProgram(with: test.input))
+            let program = try XCTUnwrap(parseProgram(with: test.input, useSentenceAST: useSentenceAST))
             let statement = try XCTUnwrap(program.statements.first)
-            XCTAssertEqual(statement.string, test.expected)
+            XCTAssertEqual(statement.string.withoutPeriod, test.expected)
             print("テスト(\(statement.string))終了")
         }
     }
@@ -595,8 +720,17 @@ final class ParserTests: XCTestCase {
         
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let program = try XCTUnwrap(parseProgram(with: test.input))
+            let program = try XCTUnwrap(parseProgram(with: test.input, useSentenceAST: useSentenceAST))
             XCTAssertEqual(program.statements.count, 1, "program.statements.count")
+            if useSentenceAST {
+                let cs = try XCTUnwrap(program.statements.first as? CompoundStatement)
+                XCTAssertEqual(cs.sentences[0].string, "甲が乙より小さい。")
+                let le = try XCTUnwrap((cs.sentences[1] as? ExpressionStatement)?.expressions.first as? LogicalExpression)
+                XCTAssertEqual(le.tokenLiteral, test.expected)
+                XCTAssertEqual(le.right.statements.first?.string, "甲が1に等しい。")
+                print("テスト終了: \(cs.string)(\(type(of: cs)))")
+                continue
+            }
             let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
             XCTAssertEqual(statement.expressions.count, 4, "statement.expressions.count")
             try testPhraseExpression(statement.expressions[0], with: "甲", "が")
@@ -621,9 +755,7 @@ final class ParserTests: XCTestCase {
                 let loop = try XCTUnwrap(expressions[2] as? LoopExpression)
                 XCTAssertEqual(loop.token, .keyword(.LOOP))
                 try self.testIdentifier(loop.parameters.first, value: "数字")
-                let body = try XCTUnwrap(loop.body.statements.first as? ExpressionStatement)
-                try self.testPhraseExpression(body.expressions[0], with: "数字", "を")
-                try self.testKeywordLiteral(body.expressions[1], "表示する")
+                XCTAssertEqual(loop.body.statements.first?.string, "数字を表示する。")
             }),
             ("1000から1まで-1ずつ反復【入力が数字で、数字を表示する】。", { expressions in
                 try self.testPhraseExpression(expressions[0], with: 1000, "から")
@@ -632,10 +764,8 @@ final class ParserTests: XCTestCase {
                 let loop = try XCTUnwrap(expressions[3] as? LoopExpression)
                 XCTAssertEqual(loop.token, .keyword(.LOOP))
                 try self.testIdentifier(loop.parameters.first, value: "数字")
-                XCTAssertTrue(loop.condition.isEmpty)
-                let body = try XCTUnwrap(loop.body.statements.first as? ExpressionStatement)
-                try self.testPhraseExpression(body.expressions[0], with: "数字", "を")
-                try self.testKeywordLiteral(body.expressions[1], "表示する")
+                XCTAssertNil(loop.condition)
+                XCTAssertEqual(loop.body.statements.first?.string, "数字を表示する。")
             }),
             ("配列【１、２、３】を反復【入力が数字で、数字を表示する】。", { expressions in
                 let phrase = try XCTUnwrap(expressions[0] as? PhraseExpression)
@@ -644,42 +774,29 @@ final class ParserTests: XCTestCase {
                 let loop = try XCTUnwrap(expressions[1] as? LoopExpression)
                 XCTAssertEqual(loop.token, .keyword(.LOOP))
                 try self.testIdentifier(loop.parameters.first, value: "数字")
-                XCTAssertTrue(loop.condition.isEmpty)
-                let body = try XCTUnwrap(loop.body.statements.first as? ExpressionStatement)
-                try self.testPhraseExpression(body.expressions[0], with: "数字", "を")
-                try self.testKeywordLiteral(body.expressions[1], "表示する")
+                XCTAssertNil(loop.condition)
+                XCTAssertEqual(loop.body.statements.first?.string, "数字を表示する。")
             }),
             ("１から反復【1を足し、100より大きい場合、【中止する】】。", { expressions in
                 try self.testPhraseExpression(expressions[0], with: 1, "から")
                 let loop = try XCTUnwrap(expressions[1] as? LoopExpression)
                 XCTAssertEqual(loop.token, .keyword(.LOOP))
                 XCTAssertTrue(loop.parameters.isEmpty)
-                XCTAssertTrue(loop.condition.isEmpty)
-                let body = try XCTUnwrap(loop.body.statements.first as? ExpressionStatement)
-                try self.testPhraseExpression(body.expressions[0], with: 1, "を")
-                try self.testKeywordLiteral(body.expressions[1], "足し")
-                try self.testPhraseExpression(body.expressions[2], with: 100, "より")
-                try self.testKeywordLiteral(body.expressions[3], "大きい")
-                let caseExpression = try XCTUnwrap(body.expressions[4] as? CaseExpression)
-                let consequece = try XCTUnwrap(caseExpression.consequence.statements.first as? ExpressionStatement)
-                try self.testKeywordLiteral(consequece.expressions[0], "中止する")
+                XCTAssertNil(loop.condition)
+                XCTAssertEqual(loop.body.statements.first?.string, "1を足し、100より大きい場合、【中止する】。")
             }),
             ("１から反復【条件が、100より小さい間、1を足す】。", { expressions in
                 try self.testPhraseExpression(expressions[0], with: 1, "から")
                 let loop = try XCTUnwrap(expressions[1] as? LoopExpression)
                 XCTAssertEqual(loop.token, .keyword(.LOOP))
                 XCTAssertTrue(loop.parameters.isEmpty)
-                let expressions = loop.condition
-                try self.testPhraseExpression(expressions[0], with: 100, "より")
-                try self.testKeywordLiteral(expressions[1], "小さい")
-                let body = try XCTUnwrap(loop.body.statements.first as? ExpressionStatement)
-                try self.testPhraseExpression(body.expressions[0], with: 1, "を")
-                try self.testKeywordLiteral(body.expressions[1], "足す")
+                XCTAssertEqual(loop.condition?.string, "100より小さい。")
+                XCTAssertEqual(loop.body.statements.first?.string, "1を足す。")
             }),
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let program = try XCTUnwrap(parseProgram(with: test.input))
+            let program = try XCTUnwrap(parseProgram(with: test.input, useSentenceAST: useSentenceAST))
             XCTAssertEqual(program.statements.count, 1, "program.statements.count")
             let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
             try test.testFunc(statement.expressions)
@@ -702,7 +819,7 @@ final class ParserTests: XCTestCase {
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let program = try XCTUnwrap(parseProgram(with: test.input))
+            let program = try XCTUnwrap(parseProgram(with: test.input, useSentenceAST: useSentenceAST))
             let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
             let range = try XCTUnwrap(statement.expressions.first as? RangeLiteral)
             if let lowerBound = range.lowerBound {
@@ -767,7 +884,7 @@ final class ParserTests: XCTestCase {
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let program = try XCTUnwrap(parseProgram(with: test.input))
+            let program = try XCTUnwrap(parseProgram(with: test.input, useSentenceAST: useSentenceAST))
             let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
             let range = try XCTUnwrap(statement.expressions.first as? RangeLiteral)
             try test.testFunc(range.lowerBound, range.upperBound)
@@ -787,7 +904,7 @@ final class ParserTests: XCTestCase {
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let program = try XCTUnwrap(parseProgram(with: test.input))
+            let program = try XCTUnwrap(parseProgram(with: test.input, useSentenceAST: useSentenceAST))
             let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
             let function = try XCTUnwrap(statement.expressions.first as? FunctionLiteral)
             let functionBlock = function.function
@@ -806,7 +923,7 @@ final class ParserTests: XCTestCase {
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let program = try XCTUnwrap(parseProgram(with: test.input))
+            let program = try XCTUnwrap(parseProgram(with: test.input, useSentenceAST: useSentenceAST))
             let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
             let label = try XCTUnwrap(statement.expressions.first as? Label)
             XCTAssertEqual(label.tokenLiteral, test.label)
@@ -866,10 +983,10 @@ final class ParserTests: XCTestCase {
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let program = try XCTUnwrap(parseProgram(with: test.input))
+            let program = try XCTUnwrap(parseProgram(with: test.input, useSentenceAST: useSentenceAST))
             XCTAssertEqual(program.statements.count, test.statements, "program.statements.count")
-            if let statement = program.statements.first as? DefineStatement {
-                XCTAssertEqual(statement.value.expressions.count, test.expressions, "statement.expressions.count")
+            if let define = program.statements.first as? DefineStatement {
+                XCTAssertEqual(define.rhsCount, test.expressions, "statement.expressions.count")
             } else
             if let statement = program.statements.first as? ExpressionStatement {
                 XCTAssertEqual(statement.expressions.count, test.expressions, "statement.expressions.count")
@@ -880,7 +997,7 @@ final class ParserTests: XCTestCase {
     }
     /// 「その」に続く属性チェック
     func testItsParsings() throws {
-        let testPatterns: [(input: String, expected: String, type: Token.TokenType)] = [
+        let testPatterns: [(input: String, literal: String, type: Token.TokenType)] = [
             ("その数", "数", Token.TokenType.ident),
             ("その型", "型", Token.TokenType.keyword(.TYPE)),
             ("そのもの", "エラー", Token.TokenType.keyword(.MONO)),
@@ -891,16 +1008,17 @@ final class ParserTests: XCTestCase {
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            if let program = parseProgram(with: test.input) {
-                let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
-                let literal = try XCTUnwrap(statement.expressions[1].tokenLiteral)
-                XCTAssertEqual(literal, test.expected)
+            let parser = Parser(input: test.input)
+            let nextToken = parser.nextToken
+            if let es = ExpressionStatementParser(parser).parse() as? ExpressionStatement,
+               let expr = es.expressions[0] as? PropertyExpression {
+                XCTAssertEqual(expr.token.keyword, .ITS)
+                XCTAssertEqual(expr.property.literal, test.literal)
             } else {
-                XCTAssertEqual("エラー", test.expected)
+                XCTAssertEqual("エラー", test.literal)
             }
-            let token = Parser(input: test.input).nextToken
-            XCTAssertEqual(token.type, test.type)
-            print("テスト(\(test.expected): \(token.type))終了")
+            XCTAssertEqual(nextToken.type, test.type)
+            print("テスト終了: \(test.literal) → \(nextToken.type)")
         }
     }
     func testParseSentences() throws {
@@ -946,6 +1064,7 @@ final class ParserTests: XCTestCase {
             ("aに１を足して代入し、bに１を代入する。", nil),
             ("aに１を代入し、bに１を足して代入する。", nil),
             ("aと1を足し、代入する。", nil),
+            ("真かによって、1か2。", nil),
         ]
         for test in testPatterns {
             print("テストパターン： \(test.input)")
@@ -978,7 +1097,7 @@ final class ParserTests: XCTestCase {
         }
     }
     func testSentenceTreminators() throws {
-        let testPatterns: [(input: String, numberOfSentences: SentenceTerminator?)] = [
+        let testPatterns: [(input: String, SentenceTerminator: SentenceTerminator?)] = [
             ("1と2を足す。", .period),
             ("1と2を足し。", .period),
             ("1と2を足す】", .rbbracket),
@@ -986,7 +1105,7 @@ final class ParserTests: XCTestCase {
             ("1と2を足し。】", .period),
             ("1と2を足し】。", .rbbracket),
             ("1と2を足し、", .eof),
-            ("1と2を足し、", .eof),
+            ("1と2を足し", .eof),
             ("1と2を足す、", .eof),
             ("1と2を足す", .eof),
             ("""
@@ -999,24 +1118,26 @@ final class ParserTests: XCTestCase {
         for test in testPatterns {
             print("テストパターン： \(test.input)")
             var terminator: SentenceTerminator? = nil
-            if let program = parseProgram(with: test.input) {
-                let es = try XCTUnwrap(program.statements.first as? ExpressionStatement)
+            let parser = Parser(input: test.input)
+            parser.options.useSentenceAST = false
+            var string = ""
+            if let es = ExpressionStatementParser(parser).parse() as? ExpressionStatement {
                 terminator = es.terminator
+                string = es.string
             }
-            XCTAssertEqual(terminator, test.numberOfSentences)
-            let symbol = (terminator?.rawValue ?? "構文エラー")
+            XCTAssertEqual(terminator, test.SentenceTerminator)
+            let symbol = (terminator?.rawValue ?? "nil(エラー)")
                 .replacingOccurrences(of: "\n", with: "EOL")
                 .replacingOccurrences(of: "\0", with: "EOF")
-            print("テスト終了： 終端記号 ＝ \(symbol)")
+            print("テスト終了： 終端記号 ＝ \(symbol)(\(string))")
         }
     }
     // MARK: - ヘルパー
-    private func testDefStatement(_ statement: Statement?, name: String, _ string: String, with value: Any, flag: Bool = false) throws {
+    private func testDefineStatement(_ statement: Statement?, target: String, with value: Any, flag: Bool = false) throws {
         let defStatement = try XCTUnwrap(statement as? DefineStatement)
-        XCTAssertEqual(defStatement.token.literal, string)
-        XCTAssertEqual(defStatement.name.value, name)
-        XCTAssertEqual(defStatement.name.tokenLiteral, name)
-        try testLiteralExpression(defStatement.value.expressions.first!, with: value)
+        XCTAssertEqual(defStatement.name.value, target)
+        XCTAssertEqual(defStatement.name.tokenLiteral, target)
+        try testLiteralExpression(defStatement.rhsLiteral, with: value)
         XCTAssertEqual(defStatement.isExtended, flag)
     }
     private func testPhraseExpression(_ expression: Expression,  with expected: Any, _ particle: String) throws {
@@ -1024,18 +1145,21 @@ final class ParserTests: XCTestCase {
         XCTAssertEqual(p.tokenLiteral, particle)
         try testLiteralExpression(p.left, with: expected)
     }
+    private func testPhraseExpression(_ expression: Expression,  with expected: String) throws {
+        let p = try XCTUnwrap(expression as? PhraseExpression)
+        XCTAssertEqual(p.string, expected)
+    }
     private func testParticleLiteral(_ expression: Expression, _ particle: String) throws {
         let p = try XCTUnwrap(expression as? PhraseExpression)
         XCTAssertEqual(p.string, particle)
     }
-    private func testKeywordLiteral(_ expression: Expression, _ keyword: String) throws {
-        let k = try XCTUnwrap(expression as? PredicateExpression)
-        XCTAssertEqual(k.string, keyword)
+    private func testKeywordLiteral(_ expression: Expression?, _ keyword: String) throws {
+        let predicate = try XCTUnwrap(expression as? PredicateExpression)
+        XCTAssertEqual(predicate.string, keyword)
     }
-    private func testKeyword(_ expression: Expression, _ keyword: Token.Keyword) throws {
-        let k = try XCTUnwrap(expression as? PredicateExpression)
-        let type = Token.TokenType.keyword(keyword)
-        XCTAssertEqual(k.token.type, type)
+    private func testKeyword(_ expression: Expression?, _ keyword: Token.Keyword) throws {
+        let predicate = try XCTUnwrap(expression as? PredicateExpression)
+        XCTAssertNotNil(predicate.token.isKeyword(keyword))
     }
     private func testLiteralExpression(_ expression: Expression?, with expected: Any?) throws {
         switch expected {
@@ -1066,9 +1190,29 @@ final class ParserTests: XCTestCase {
         XCTAssertEqual(boolean.value, value)
         XCTAssertEqual(boolean.tokenLiteral, value ? "真" : "偽")
     }
-    private func testCaseExpressions(_ expressions: [Expression], with ident: String, predicate: String) throws {
-        XCTAssertEqual(expressions.count, 2, "expressions.count")
-        try testPhraseExpression(expressions[0], with: ident, "を")
-        try testKeywordLiteral(expressions[1], predicate)
+    private func testSimpleStatement(_ statement: Statement, predicate: String, phrases: String...) throws {
+        let s = try XCTUnwrap(statement as? Sentence)
+        XCTAssertEqual(s.arguments.count, phrases.count, "phrases.count")
+        for (argument, phrase) in zip(s.arguments, phrases) {
+            XCTAssertEqual(argument.string, phrase)
+        }
+    }
+    private func testSimpleSentence(_ ss: Sentence?, predicate: String, phrases: String...) throws {
+        let s = try XCTUnwrap(ss as? SimpleSentence)
+        XCTAssertEqual(s.predicate?.string, predicate)
+        XCTAssertEqual(s.arguments.count, phrases.count, "phrases.count")
+        for (argument, phrase) in zip(s.arguments, phrases) {
+            XCTAssertEqual(argument.string, phrase)
+        }
+    }
+    private func testCaseConsequence(_ exp: Expression, with str: String) throws {
+        let ce = try XCTUnwrap(exp as? CaseExpression)
+        let consequence = try XCTUnwrap(ce.consequence.statements.first)
+        XCTAssertEqual(consequence.string.withoutComma.withoutPeriod, str)
+    }
+    private func testCaseAlternative(_ exp: Expression, with str: String) throws {
+        let ce = try XCTUnwrap(exp as? CaseExpression)
+        let alternative = try XCTUnwrap(ce.alternative?.statements.first)
+        XCTAssertEqual(alternative.string.withoutPeriod, str)
     }
 }

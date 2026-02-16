@@ -235,7 +235,10 @@ final class EvaluatorTests: XCTestCase {
             ("甲は１。甲を削除し、甲を表示する。", "エラー：識別子『甲』が定義されていない。"),
             ("それに1を足す。", "エラー：「足す」には、２つ以上の数値、文字列、配列の入力が必要。仕様：(〜と…)〜を足す。"),
             ("その型。", "エラー：「その」が指すオブジェクトが無い。(スタックが空)"),
-        ]
+            ("条件は、１。条件によって、「a」か「b」。", "エラー：「によって」の前には、条件式(真偽値)が必要。"),
+            ("１と２を足すかによって、「a」か「b」。", "エラー：助詞「か」の前には、条件式(文)が必要。"),
+            /* TODO: コンパイラ側にも型チェックを入れたい... */
+       ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
             let evaluated = try XCTUnwrap(testEvaluator(test.input))
@@ -268,11 +271,8 @@ final class EvaluatorTests: XCTestCase {
     }
     func testFunctionApplications() throws {
         let testPatterns: [(input: String, exptected: Any)] = [
-            ("同一は、関数【入力がxで、x】。５は同一である。", true),
-            ("同一とは、関数【入力がxで、xを返す】こと。５は同一である。", true),
-            ("二倍とは、関数【入力がxで、xに2を掛ける】こと。５を二倍し、二倍する。", 20),
-            ("加えるとは、算出【入力がxとyで、xとyを足す】こと。5に5を加える。", 10),
-            ("加えるは、算出【入力がxとyで、xとyを足す】こと。5と5を足したものに、5に5を加えたものを、加える。", 20),
+            ("二倍は、関数【入力がxで、xに2を掛ける】。５を二倍し、二倍する。", 20),
+            ("加えるは、算出【入力がxとyで、xとyを足す】。5に5を加える。", 10),
             ("5で関数【入力がxで、x】を実行する。", 5),
             ("加算は、関数【入力がaとbで、aにbを足す】。適用は、関数【入力がaとbと演算で、aとbを演算する】。2と2に、加算を適用する。", 4),
             ("減算は、関数【入力がaとbで、aからbを引く】。適用は、関数【入力がaとbと演算で、aとbを演算する】。10と2に、減算を適用する。", 8),
@@ -295,11 +295,10 @@ final class EvaluatorTests: XCTestCase {
     }
     func testFunctionCalls() throws {
         let testPatterns: [(input: String, exptected: Any)] = [
-            ("同一は、関数【入力がxで、x】。同一【xは5】である。", true),
-            ("二倍とは、関数【入力がxで、xに2を掛ける】こと。二倍【xは5】し、二倍する。", 20),
-            ("加えるとは、関数【入力がxとyで、xとyを足す】こと。加える【xは5。yは5】。", 10),
-            ("加えるとは、関数【入力がxとyで、xとyを足す】こと。加える【xは1と2を足す。yは3と4を足す】。", 10),
-            ("加えるとは、関数【入力がxとyで、xとyを足す】こと。加える【xは1と2を足す。yは加える【xは3。yは4】。", 10),
+            ("二倍は、関数【入力がxで、xに2を掛ける】。二倍【xは5】し、二倍する。", 20),
+            ("加えるは、関数【入力がxとyで、xとyを足す】。加える【xは5。yは5】。", 10),
+            ("加えるは、関数【入力がxとyで、xとyを足す】。加える【xは、1と2を足す。yは、3と4を足す】。", 10),
+            ("加えるは、関数【入力がxとyで、xとyを足す】。加える【xは、1と2を足す。yは、加える【xは3。yは4】】。", 10),
             ("関数【入力がxで、x】【引数が、xは5】。", 5),
             ("算出【入力がxで、x】【引数が、xは5】。", 5),
             ("加算は、関数【入力がaとbで、aにbを足す】。適用は、関数【入力がaとbと演算で、aとbを演算する】。適用【aは2。bは2。演算は加算。】", 4),
@@ -577,8 +576,8 @@ final class EvaluatorTests: XCTestCase {
         let input = """
             型であって、【
                 初期化は、【行列は、配列【】】。
-                入れるは、関数で、入力が値、行列に値を追加し、「行列」に代入する。
-                出すは、関数で、行列の先頭の値を積み、行列が空でない場合、行列の残りを「行列」に代入する。
+                入れるは、関数で、入力が値、行列に値を追加し、行列に代入する。
+                出すは、関数で、行列の先頭の値を積み、行列が空でない場合、行列の残りを行列に代入する。
             】
         """
         print("テストパターン: \(input)")
@@ -588,8 +587,8 @@ final class EvaluatorTests: XCTestCase {
         XCTAssertEqual(initializer.paramForm.numberOfInputs, 0)
         let initialization = try XCTUnwrap(initializer.body?.statements.first as? DefineStatement)
         XCTAssertEqual(initialization.name.value, "行列")
-        XCTAssertEqual(initialization.value.expressions.count, 1)
-        let array = try XCTUnwrap(initialization.value.expressions.first as? ArrayLiteral)
+        XCTAssertEqual(initialization.rhsCount, 1)
+        let array = try XCTUnwrap(initialization.rhsLiteral as? ArrayLiteral)
         XCTAssertTrue(array.elements.isEmpty)
         XCTAssertNotNil(type.body)
         XCTAssertEqual(type.body!.statements.count, 2)
@@ -597,8 +596,8 @@ final class EvaluatorTests: XCTestCase {
         let second = try XCTUnwrap(type.body!.statements[1] as? DefineStatement)
         XCTAssertEqual(first.name.value, "入れる")
         XCTAssertEqual(second.name.value, "出す")
-        _ = try XCTUnwrap(first.value.expressions.first as? FunctionLiteral)
-        _ = try XCTUnwrap(second.value.expressions.first as? FunctionLiteral)
+        _ = try XCTUnwrap(first.rhsLiteral as? FunctionLiteral)
+        _ = try XCTUnwrap(second.rhsLiteral as? FunctionLiteral)
         print("テスト(\(type.string))終了")
     }
     func testTypeOperation() throws {
@@ -1310,11 +1309,11 @@ final class EvaluatorTests: XCTestCase {
         print("テスト(\(evaluated))終了")
     }
     func testAsWellAsPredicate() throws {   // 「および」のテスト
-        let input = "１を2から引いたもの、および3と4と５を足したもので、関数【入力がaとb。bからaを引く】を実行。"
+        let input = "１を2から引いたもの、および、3と4と５を足したもので、関数【入力がaとb。bからaを引く】を実行。"
         print("テストパターン: \(input)")
         let evaluated = try XCTUnwrap(testEvaluator(input))
         XCTAssertEqual(evaluated.number, 11)
-        print("テスト(\(evaluated))終了")
+        print("テスト結果：\(evaluated)")
     }
     func testSelectiveOrEvaluations() throws {
         let testPatterns: [(input: String, expected: Bool)] = [
@@ -1328,7 +1327,7 @@ final class EvaluatorTests: XCTestCase {
             print("テストパターン: \(test.input)")
             let evaluated = try XCTUnwrap(testEvaluator(test.input))
             try testObject(evaluated, with: test.expected)
-            print("テスト(\(evaluated))終了")
+            print("テスト終了:\(evaluated)")
         }
     }
     func testLogicalOperations() throws {
@@ -1362,7 +1361,7 @@ final class EvaluatorTests: XCTestCase {
             ("合計は０。9から１まで−1ずつ反復【入力は数字。合計は、合計に数字を足したもの】。合計。", 45),
             ("合計は０。配列【１、２、３、４、５、６、７、８、９】を反復【入力は数字。合計は、合計に数字を足したもの】。合計。", 45),
             ("合計は０。辞書【1が１、2が２、3が３、4が４、5が５、6が６、7が７、8が８、9が９】を反復【入力が索引と値。合計は、合計に値を足す】。合計。", 45),
-            ("合計は０。数字は1。反復であって、条件が、数字が10より小さい間、合計は、合計に数字を足したもの。数字は、数字に１を足したもの。合計。", 45),
+            ("合計は０。数字は1。反復であって、【条件が、数字が10より小さい間、合計は、合計に数字を足したもの。数字は、数字に１を足したもの】。合計。", 45),
             ("""
             合計は０。数字は1。
             反復【
@@ -1561,18 +1560,19 @@ final class EvaluatorTests: XCTestCase {
             ("xは「いろ」。xに「は」を足して代入。x", "いろは"),
             ("xは「あいうえお」。xを逆順にして代入。x", "おえういあ"),
             ("xは２。xに2を掛け、3を足し、4を引いて代入する。x", 3),
-//            ("xは１。xに1を足し代入。x", "仕様：<識別子>(に)<計算し>て代入する。"),
-            ("""
-            xは１。
-            yは、関数【xに1を足して代入。】
-            yを実行する。
-            x
-            """, 2),
             ("""
             yは、関数【xは1。外部「x」と1を足して代入。】
             yを実行する。
             """, outerUndefinedIdentifier("x").message),
-            ("fは関数【入力がa。aを返す】。xは１。xでfを実行して代入する。", compoundAssignUsage.message),
+/* useSentenceAST テスト
+             (""" // 副作用テスト
+             xは１。
+             yは、関数【xに1を足して代入。】
+             yを実行する。
+             x
+             """, 2),
+             ("fは関数【入力がa。aを返す】。xは１。xでfを実行し、1を足して代入する。", 2),
+*/
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")

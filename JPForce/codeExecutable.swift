@@ -22,7 +22,7 @@ extension CodeExecutable {
     var callingFunctionNotFound: JpfError   {JpfError("呼び出し先の関数が無い。")}
     var returnValueNotFound: JpfError       {JpfError("返すべき値が無い。")}
     var propertyNotFound: JpfError          {JpfError("指定した属性が見つからない。")}
-    var objectNotFound: JpfError            {JpfError("対象のオブジェクトが見つからない。")}
+    var objectNotFound: JpfError            {JpfError("対象のオブジェクトが見つからない。(スタックが空)")}
     var failedToGetProperty: JpfError       {JpfError("属性の取得に失敗した。")}
     var failedToGetFunction: JpfError       {JpfError("翻訳済み関数の取得に失敗した。")}
     var failedToGetClosure: JpfError        {JpfError("クロージャの取得に失敗した。")}

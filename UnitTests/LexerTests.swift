@@ -47,7 +47,7 @@ final class LexerTests: XCTestCase {
         }
     }
     func testNextParticle() throws {
-        let input = "は、が、の、に、を、と、とは、から、より、で、だ。た、て、では。"
+        let input = "は、が、の、に、を、と、から、より、で、だ。た、て、では。"
         print("テストパターン: \(input)")
         let testPatterns: [(expectedType: Token.TokenType, expectedLiteral: String)] = [
             (.particle(.WA), "は"), (.symbol(.COMMA), "、"),
@@ -56,7 +56,6 @@ final class LexerTests: XCTestCase {
             (.particle(.NI), "に"), (.symbol(.COMMA), "、"),
             (.particle(.WO), "を"), (.symbol(.COMMA), "、"),
             (.particle(.TO), "と"), (.symbol(.COMMA), "、"),
-            (.particle(.TOWA), "とは"), (.symbol(.COMMA), "、"),
             (.particle(.KARA), "から"), (.symbol(.COMMA), "、"),
             (.particle(.YORI), "より"), (.symbol(.COMMA), "、"),
             (.particle(.DE), "で"), (.symbol(.COMMA), "、"),
@@ -83,7 +82,6 @@ final class LexerTests: XCTestCase {
             10から3を引く。
             最低温度（「括弧内」はコメント）は、５度。※ ５は全角
             気温が、最低気温以上、最高気温以下の場合、
-            二倍とは、２を掛けること。※ 米印から行末までコメント。２は全角。ふぉーすでは、エラーになる文
             2を二倍し、3で割る。
             絶対防空圏内（３語以上の合成識別子を確認する。）
             「こんにちは 」
@@ -113,7 +111,6 @@ final class LexerTests: XCTestCase {
             (.INT(),"10"),(Token(.KARA),"から"),(.INT(),"3"),(Token(.WO),"を"),(Token(.SUBSTRACT),"引く"),(Token(.PERIOD),"。"),(Token(.EOL),"\n"),
             (.IDENT(), "最低温度"),(Token(.WA),"は"),(Token(.COMMA),"、"),(.INT(),"5"),(Token(.PERIOD),"。"),(Token(.EOL),"\n"),
             (.IDENT(), "気温"),(Token(.GA),"が"),(Token(.COMMA),"、"),(.IDENT(),"最低気温"),(Token(.GTEQUAL),"以上"),(Token(.COMMA),"、"),(.IDENT(),"最高気温"),(Token(.LTEQUAL),"以下"),(Token(.NO),"の"),(Token(.CASE),"場合"),(Token(.COMMA),"、"),(Token(.EOL),"\n"),
-            (.IDENT(),"二倍"),(Token(.TOWA),"とは"),(Token(.COMMA),"、"),(.INT(),"2"),(Token(.WO),"を"),(Token(.MULTIPLY),"掛ける"),/*(Token(.KOTO),"こと"),*/(Token(.PERIOD),"。"),(Token(.EOL),"\n"),
             (.INT(),"2"),(Token(.WO),"を"),(.IDENT(),"二倍"),(Token(.SURU),"し"),(Token(.COMMA),"、"),(.INT(),"3"),(Token(.DE),"で"),(Token(.DIVIDE),"割る"),(Token(.PERIOD),"。"),(Token(.EOL),"\n"),
             (.IDENT(),"絶対防空圏内"),(Token(.EOL),"\n"),
             (.STRING(),"こんにちは "),(Token(.EOL),"\n"), (.STRING(),"今日は、みなさん。"),(Token(.EOL),"\n"),            (Token(.INPUT),"入力"),(Token(.GA),"が"),(Token(.COMMA),"、"),(.INT(),"10"),(Token(.UNDER),"未満"),(Token(.NO),"の"),(Token(.CASE),"場合"),(Token(.COMMA),"、"),(Token(.TRUE),"真"),(Token(.WO),"を"),(Token(keyword: .RETURN),"返し"),(Token(.COMMA),"、"),(.IDENT(),"それ以外"),(Token(.WA),"は"),(Token(.COMMA),"、"),(Token(.FALSE),"偽"),(Token(.WO),"を"),(Token(keyword: .RETURN),"返す"),(Token(.PERIOD),"。"),(Token(.EOL),"\n"),

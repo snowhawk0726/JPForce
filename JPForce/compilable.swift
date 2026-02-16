@@ -14,7 +14,8 @@ protocol Compilable {
     /// - Returns:
     ///   翻訳済みの場合、nilを返す。
     ///   エラーを検出した場合、JpfErrorを返す。
-    ///   キャッシュによる演算が継続可能な場合、値(JpfObject)を出力する。
+    ///   キャッシュによる演算が継続可能な場合、値(JpfObject)を出力する、
+    ///   または、スタック(c.emvirionment.stack)に値をpushする。
     func compile(with c: Compiler) -> JpfObject?
 }
 // MARK: - implementations for ast mode compiler
@@ -462,6 +463,85 @@ private extension GenitiveExpression {
         default:
             return (params[params.count-2].value, params[params.count-1].value)
         }
+    }
+}
+extension ConditionalOperation : Compilable {
+    func compile(with c: Compiler) -> JpfObject? {
+        do {
+            if let bool = c.environment.unwrappedPeek, bool is JpfBoolean {   // 条件が真偽値ならば、評価を継続
+                if let result = evaluate(with: c.environment), !result.isError {
+                    return result
+                }
+                // フォールバック
+                guard let value = bool.isTrue ?
+                        consequence.compile(with: c) :
+                        alternative.compile(with: c) else {
+                    return nil
+                }
+                try emitValue(value, with: c)
+                return nil
+            }
+            if let value = c.environment.unwrappedPeek  {   // 条件をemit
+                try emitValue(value, with: c)
+                c.environment.drop()
+            } else {
+                _ = c.removeLastOpPhrase(particle: .NI)
+            }
+            let opJumpNotTruthyPosition = c.emit(op: .opJumpNotTruthy, operand: 9999)
+            if let value = consequence.compile(with: c) {
+                try emitValue(value, with: c)
+            }
+            let opJumpPosition = c.emit(op: .opJump, operand: 9999)
+            c.changeOperand(at: opJumpNotTruthyPosition, operand: c.nextPosition)
+            if let value = alternative.compile(with: c) {
+                try emitValue(value, with: c)
+            }
+            c.changeOperand(at: opJumpPosition, operand: c.nextPosition)
+        } catch {
+            return jpfError(from: error)
+        }
+        return nil
+    }
+    private func emitValue(_ value: JpfObject, with c: Compiler) throws {
+        if let err = value as? JpfError {
+            throw err
+        }
+        try value.emit(with: c)
+    }
+}
+extension NominalizedExpression : Compilable {
+    func compile(with c: Compiler) -> JpfObject? {
+        guard c.isEmpty else {
+            return evaluate(with: c.environment)
+        }
+        guard token.isKeyword(.QUESTION) else {
+            return unsupportedNominalizer(token.literal)
+        }
+        switch sentence.compile(with: c) {
+        case let err as JpfError:
+            return err
+        case let chashe?:
+            guard chashe is JpfBoolean else {
+                return conditionalSentenceNeeded
+            }
+            return chashe
+        default:
+            if c.isEmpty {return nil}
+            guard c.environment.peek is JpfBoolean else {
+                return conditionalSentenceNeeded
+            }
+            return c.environment.pull()
+        }
+    }
+}
+extension PropertyExpression : Compilable {
+    func compile(with c: Compiler) -> JpfObject? {
+        guard c.isEmpty else {return evaluate(with: c.environment)}
+        do {try c.emitGetProperty(name: property.literal)}
+        catch {
+            return jpfError(from: error)
+        }
+        return nil
     }
 }
 extension IntegerLiteral : Compilable {

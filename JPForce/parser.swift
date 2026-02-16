@@ -110,9 +110,10 @@ final class Parser {
     }
 }
 // MARK: - Helpers for Unit Test
-func parseProgram(with input: String, isShadowMode: Bool = true, verboseMode: Bool = false) -> Program? {
+func parseProgram(with input: String, isShadowMode: Bool = true, verboseMode: Bool = false, useSentenceAST: Bool = false) -> Program? {
     let lexer = Lexer(input)
     let parser = Parser(lexer)
+    parser.options.useSentenceAST = useSentenceAST
     parser.options.enableSentenceShadowMode = isShadowMode
     parser.options.verboseShadowLog = verboseMode
     let program = parser.parseProgram()

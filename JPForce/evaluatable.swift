@@ -24,7 +24,9 @@ extension Node {
     var phaseValueNotFound: JpfError        {JpfError("句の値が無かった。(例：関数の返り値が無い。)")}
     var predicateNotSupported: JpfError     {JpfError("述語に対応する定義が見つからなかった。")}
     var caseConditionError: JpfError        {JpfError("「場合」の条件(真偽値)が見つからなかった。")}
-    var conditionalOperationError: JpfError {JpfError("「によって」の条件(真偽値)が見つからなかった。")}
+    var conditionalOperationError: JpfError {JpfError("「によって」の前には、条件式(真偽値)が必要。")}
+    var conditionalSentenceNeeded: JpfError {JpfError("助詞「か」の前には、条件式(文)が必要。")}
+    func unsupportedNominalizer(_ s: String) -> JpfError   {JpfError("「\(s)」で節は名詞化できない。(未サポート)")}
     var logicalConditionError: JpfError     {JpfError("の前に条件(真偽値)が見つからなかった。")}
     var logicalRightEvaluationError: JpfError   {JpfError("の後に条件(真偽値)の評価に失敗した。")}
     var logicalOperatorError: JpfError      {JpfError("は、論理式の演算に使えない。")}
@@ -43,6 +45,7 @@ extension Node {
     var enumuratorError: JpfError           {JpfError("「列挙」の列挙子(識別子)が正しくない。：")}
     var cannotUseAsKeyword: JpfError        {JpfError("は、ラベルの値として使用できない。")}
     var notSupportedCall: JpfError          {JpfError("呼び出し式は未対応。対象：")}
+    var itsNotFound: JpfError               {JpfError("「その」が指すオブジェクトが無い。(スタックが空)")}
     // 仕様表示
     var strideLoopUsage: JpfError           {JpfError("仕様：<数値>から<数値>まで（<数値>ずつ）反復【入力が<識別子(カウント値)>、<処理>】。")}
     var rangeLoopUsage: JpfError            {JpfError("仕様：範囲【<下限><上限>】を反復【入力が<識別子(カウント値)>、<処理>】。")}
@@ -325,22 +328,31 @@ extension Boolean : Evaluatable {
 extension RangeLiteral : Evaluatable {
     func evaluate(with environment: Environment) -> JpfObject? {
         if let err = environment.push(JpfNull.object) {return err}  // 範囲の上下限が、配列にアクセスしないための回避策
-        var lowerBound, upperBound: (JpfInteger, Token)?
-        if let object = self.lowerBound?.evaluate(with: environment) {
-            if object.isError {return object}
-            guard let value = environment.peek as? JpfInteger else {return rangeTypeError + object.string}
-            environment.drop()
-            lowerBound = (value, self.lowerBound!.token)
+        defer {if let o = environment.peek, o.isNull {environment.drop()}}
+        var lower, upper: (JpfInteger, Token)?
+        do {
+            if let sentence = lowerBoundary?.sentence ?? lowerBound,
+               let token = lowerBoundary?.token ?? lowerBound?.token {
+                lower = (try evaluate(sentence, with: environment), token)
+            }
+            if let sentence = upperBoundary?.sentence ?? upperBound,
+               let token = upperBoundary?.token ?? upperBound?.token {
+                upper = (try evaluate(sentence, with: environment), token)
+            }
+            return JpfRange(lowerBound: lower, upperBound: upper)
+        } catch {
+            return jpfError(from: error)
         }
-        if let object = self.upperBound?.evaluate(with: environment) {
-            if object.isError {return object}
-            guard let value = environment.peek as? JpfInteger else {return rangeTypeError + object.string}
-            environment.drop()
-            upperBound = (value, self.upperBound!.token)
+    }
+    private func evaluate(_ sentence: Sentence, with env: Environment) throws -> JpfInteger {
+        if let err = sentence.evaluate(with: env), err.isError {
+            throw err.error!
         }
-        let range = JpfRange(lowerBound: lowerBound, upperBound: upperBound)
-        if let o = environment.peek, o.isNull {environment.drop()}
-        return range
+        guard let value = env.peek as? JpfInteger else {
+            throw rangeTypeError
+        }
+        env.drop()
+        return value
     }
 }
 extension Identifier : Evaluatable {
@@ -442,6 +454,13 @@ extension Identifier : Evaluatable {
             undefinedIdentifier(value)
     }
 }
+extension PropertyExpression : Evaluatable {
+    func evaluate(with environment: Environment) -> JpfObject? {
+        guard token.isKeyword(.ITS),
+              let target = environment.pull() else {return itsNotFound}
+        return target[property.literal, Token(.NO)]
+    }
+}
 extension PredicateExpression : Evaluatable {
     /// 述語を実行する。(結果があれば返す。= スタックに積まれる。)
     /// self.tokenは述語(Token.Keywordもしくは Token.IDENT(_))
@@ -452,6 +471,23 @@ extension PredicateExpression : Evaluatable {
         }
         let predicate = PredicateOperableFactory.create(from: token, with: environment)
         return predicate.operate()
+    }
+}
+extension NominalizedExpression : Evaluatable {
+    func evaluate(with environment: Environment) -> JpfObject? {
+        switch token.keyword {
+        case .QUESTION:
+            if let err = sentence.evaluate(with: environment), err.isError {
+                return err
+            }
+            guard let value = environment.peek, value is JpfBoolean else {
+                return conditionalSentenceNeeded
+            }
+            environment.drop()
+            return value
+        default:
+            return unsupportedNominalizer(token.literal)
+        }
     }
 }
 extension PhraseExpression : Evaluatable {
@@ -564,16 +600,20 @@ extension CaseExpression : Evaluatable {
 }
 extension LogicalExpression : Evaluatable {
     func evaluate(with environment: Environment) -> JpfObject? {
-        guard let condition = environment.peek else {return "「\(tokenLiteral)」" + logicalConditionError}
-        guard let object = right.evaluate(with: environment) else {return "「\(tokenLiteral)」" + logicalRightEvaluationError}
-        if object.isError {return object}
-        guard let right = environment.pull() else {return "「\(tokenLiteral)」" + logicalRightEvaluationError}
-        environment.drop()      // 入力（左辺(条件)）を捨てる
-        switch token {
-        case .keyword(.OR):
-            return JpfBoolean.object(of: condition.isTrue || right.isTrue)
-        case .keyword(.AND):
-            return JpfBoolean.object(of: condition.isTrue && right.isTrue)
+        guard let left = environment.peek else {
+            return "「\(tokenLiteral)」" + logicalConditionError
+        }
+        environment.drop()
+        if let err = right.evaluate(with: environment), err.isError {return err}
+        guard let right = environment.peek else {
+            return "「\(tokenLiteral)」" + logicalRightEvaluationError
+        }
+        environment.drop()
+        switch token.keyword {
+        case .OR:
+            return JpfBoolean.object(of: left.isTrue || right.isTrue)
+        case .AND:
+            return JpfBoolean.object(of: left.isTrue && right.isTrue)
         default:
             return "「\(tokenLiteral)」" + logicalOperatorError
         }
@@ -581,7 +621,13 @@ extension LogicalExpression : Evaluatable {
 }
 extension ConditionalOperation : Evaluatable {
     func evaluate(with environment: Environment) -> (any JpfObject)? {
-        guard let condition = environment.unwrappedPeek else {return conditionalOperationError}
+        guard
+            let condition = environment.peek,
+            let phrase = condition as? JpfPhrase,
+            phrase.value is JpfBoolean && phrase.isParticle(.NI)
+        else {
+            return conditionalOperationError
+        }
         environment.drop()
         return condition.isTrue ?
             consequence.evaluate(with: environment) :
@@ -687,16 +733,14 @@ extension LoopExpression : Evaluatable {
     }
     // 「反復」の条件を評価する。条件式が無い場合は、真オブジェクトを返す。
     private func evaluateCondition(with environment: Environment) -> JpfObject? {
-        if condition.isEmpty {return JpfBoolean.TRUE}
-        var result: JpfObject?
-        for expression in condition {
-            result = expression.evaluate(with: environment)
-            if let object = result {
-                if object.isBreakFactor {break}
-                if let err = environment.push(object) {return err}
-            }
+        guard let condition else {return JpfBoolean.TRUE}
+        if let result = condition.evaluate(with: environment) {
+            return result
         }
-        environment.drop()                          // 真偽値を捨てる
+        guard let result = environment.peek, result is JpfBoolean else {
+            return conditionEvaluationError
+        }
+        environment.drop()
         return result
     }
 }

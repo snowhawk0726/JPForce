@@ -65,7 +65,6 @@ struct PredicateOperableFactory {
         (.AVAILABLE,    {AvailableOperator($0)}),
         (.KOTO,         {NopOperator($0)}),                             // 45
         (.IT,           {ItOperator($0)}),
-        (.ITS,          {ItsOperator($0)}),
     ]
     static let dictionary: [Token.Keyword : (Environment) -> PredicateOperable] = {
         Dictionary(uniqueKeysWithValues: predicates.map {($0.keyword, $0.operator)})
@@ -250,7 +249,6 @@ extension PredicateOperable {
     var cannotCreateFromProtocol:  JpfError {JpfError("規約からインスタンスは生成できない。")}
     var cannotInitialize: JpfError      {JpfError("オブジェクトの初期化ができない。")}
     var detectParserError: JpfError     {JpfError("構文解析器がエラーを検出した。")}
-    var stackIsEmpty: JpfError          {JpfError("「その」が指すオブジェクトが無い。(スタックが空)")}
     func cannotAssignToIdentifier(_ o: JpfObject?) -> JpfError {JpfError("「\(o?.string ?? "??")」には代入できない。")}
 }
 // MARK: - 表示/音声
@@ -1104,15 +1102,6 @@ struct ItOperator : PredicateOperable {
     let environment: Environment
     func operate() -> JpfObject? {
         environment.pull()                          // 得る(空の場合→nil)
-    }
-}
-/// 「その」
-struct ItsOperator : PredicateOperable {
-    init(_ environment: Environment) {self.environment = environment}
-    let environment: Environment
-    func operate() -> JpfObject? {
-        guard let value = environment.pull() else {return stackIsEmpty}
-        return JpfPhrase(value: value, particle: Token(.NO))
     }
 }
 struct DropOperator : PredicateOperable {

@@ -23,6 +23,7 @@ struct PredicateCompilableFactory {
     static func create(from token: Token, with compiler: Compiler) -> PredicateCompilable? {
         switch token.type {
         case .keyword(.MONO):       return UnwrapCompiler(compiler, by: token)
+        case .keyword(.QUESTION):   return QuestionCompiler(compiler)
         case .keyword(.EXECUTE):    return ExecuteCompiler(compiler)
         case .keyword(.SURU):       return PerformCompiler(compiler)    // 〜にする、〜をする
         case .keyword(.RETURN):     return ReturnCompiler(compiler)     // (〜を)返す
@@ -32,8 +33,7 @@ struct PredicateCompilableFactory {
         case .keyword(.ASSIGN):     return AssignOperationCompiler(compiler, by: token)
         case .keyword(.PULL),.keyword(.DUPLICATE):
                                     return PullOperationCompiler(compiler, by: token)
-        case .keyword(.IT),.keyword(.ITS):
-                                    return ItCompiler(compiler)
+        case .keyword(.IT):         return ItCompiler(compiler)
         default:                    return nil
         }
     }
@@ -47,7 +47,6 @@ extension PredicateCompilable {
     var assignCllectionNotFound: JpfError {JpfError("代入するコレクションが見つからない。")}
     func assignKeyNotFound(of c: String?) -> JpfError {JpfError("代入する「\(c ?? " ??")」のキーが見つからない。")}
     func assignValueNotFound(to c: String?, key: String?) -> JpfError {JpfError("「\(c ?? "??")」の「\(key ?? "??")」に、代入する値が見つからない。")}
-    func unregisteredProperty(_ name: String) -> JpfError {JpfError("属性名「\(name)」は未登録。")}
 }
 // MARK: - 補助演算
 /// <式>たもの → <式>
@@ -60,6 +59,19 @@ struct UnwrapCompiler : PredicateCompilable {
     func compile() -> JpfObject? {
         guard compiler.isEmpty else {
             return UnwrapOperator(compiler.environment, by: op).operate()
+        }
+        if compiler.lastOpcode == .opPhrase {
+            compiler.removeLastInstruction()
+        }
+        return nil
+    }
+}
+struct QuestionCompiler : PredicateCompilable {
+    init(_ compiler: Compiler) {self.compiler = compiler}
+    let compiler: Compiler
+    func compile() -> JpfObject? {
+        if !compiler.isEmpty {
+            return compiler.environment.pull()
         }
         if compiler.lastOpcode == .opPhrase {
             compiler.removeLastInstruction()
@@ -407,17 +419,11 @@ private extension PullOperationCompiler {
     }
     /// 値を変換(map)
     private func emitMapProperty(by mode: ValueMode) throws {
-        guard let symbol = compiler.symbolTable.resolve(mode.rawValue) else {
-            throw unregisteredProperty(mode.rawValue)
-        }
-        _ = compiler.emit(op: .opMapProperty, operand: symbol.index)
+        try compiler.emitMapProperty(name: mode.rawValue)
     }
     /// 値を変換(stack)
     private func emitGetProperty(by mode: ValueMode) throws {
-        guard let symbol = compiler.symbolTable.resolve(mode.rawValue) else {
-            throw unregisteredProperty(mode.rawValue)
-        }
-        _ = compiler.emit(op: .opGetProperty, operand: symbol.index)
+        try compiler.emitGetProperty(name: mode.rawValue)
     }
     /// 識別子に代入するコードを出力する。
     /// - Parameters:

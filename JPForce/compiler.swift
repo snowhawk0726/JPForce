@@ -253,3 +253,24 @@ extension Compiler {
     }
     func clearIdentifier() {environment.identifier = nil}
 }
+/// emitヘルパー
+extension Compiler {
+    func emitGetProperty(name: String) throws {
+        let symbol = try resolvePropertySymbol(name)
+        symbol.emitOpGet(with: self)
+    }
+    func emitMapProperty(name: String) throws {
+        let symbol = try resolvePropertySymbol(name)
+        _ = emit(op: .opMapProperty, operand: symbol.index)
+    }
+    func unregisteredProperty(_ name: String) -> JpfError {
+        JpfError("属性名「\(name)」は未登録。")
+    }
+    // 共通: プロパティ解決（未登録時は一貫したエラーを投げる）
+    private func resolvePropertySymbol(_ name: String) throws -> Symbol {
+        guard let symbol = symbolTable.resolve(name), symbol.isProperty else {
+            throw unregisteredProperty(name)
+        }
+        return symbol
+    }
+}

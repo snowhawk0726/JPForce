@@ -452,6 +452,24 @@ extension Parsable {
         }
         return expressions
     }
+    // MARK: - Validate AST
+    /// 右辺チェック
+    func validateRhsType(from stmt: Statement) -> Bool {
+        guard
+            stmt is SimpleSentence ||
+            stmt is CompoundStatement ||
+            stmt is ExpressionStatement
+        else {
+            error(message: "右辺値に、「\(stmt.string.withoutPeriod)」は使えない。")
+            return false
+        }
+        if let cs = stmt as? CompoundStatement {
+            for s in cs.sentences {
+                guard validateRhsType(from: s) else { return false }
+            }
+        }
+        return true
+    }
     // MARK: - Literal Parser Common Procs
     /// ヘッダー部：　<型名>であって、(<型名>であり、)
     /// - Returns: <型>トークン
@@ -595,8 +613,8 @@ struct StatementParserFactory {
     static func create(from parser: Parser) -> StatementParsable {
         if parser.currentToken.isIdent {
             switch parser.nextToken.literal {
-            case DefineStatement.wa, DefineStatement.towa:
-                return DefStatementParser(parser)
+            case DefineStatement.wa:
+                return DefineStatementParser(parser)
             default:
                 break
             }
@@ -604,40 +622,33 @@ struct StatementParserFactory {
         return ExpressionStatementParser(parser)
     }
 }
-/// - 形式１：<識別子>とは、<式(値)>ことである。
-/// - 形式２：<識別子>は、<式(値)>。
-struct DefStatementParser : StatementParsable {
+/// - 形式：<識別子>は、<式(値)>。
+struct DefineStatementParser : StatementParsable {
     init(_ parser: Parser) {self.parser = parser}
     let parser: Parser
-    let syntax1 = "定義文「<識別子>とは、<式(値)>ことである。」"
-    let syntax2 = "定義文「<識別子>は、<式(値)>。」"
     func parse() -> Statement? {
         let identifier = Identifier(from: currentToken.literal)
         parser.insert(identifier.value)     // 識別子をLexerに登録
         getNext()
-        let token = currentToken            // 「は」「とは」
-        let syntax = (token.literal == DefineStatement.towa) ? syntax1 : syntax2
+        let token = currentToken            // 「は」
         _ = getNext(whenNextIs: .COMMA)     // 読点(、)を読み飛ばす
         let isExtended = getNext(whenNextIs: DefineStatement.further)   // 「さらに、」
         _ = getNext(whenNextIs: .COMMA)
         getNext()
-        guard let parsed = ExpressionStatementParser(parser).parse() as? ExpressionStatement else {
-            error(message: "\(syntax)で、式の解釈に失敗した。")
+        guard let parsed = ExpressionStatementParser(parser).parse() else {
+            error(message: "定義文「<識別子>は、<式(値)>。」で、式の解釈に失敗した。")
             return nil
         }
-        _ = getNext(whenNextIs: DefineStatement.koto)
         if !isEndOfBlock {
-            _ = getNext(whenNextIs: DefineStatement.dearu + DefineStatement.desu, matchAll: false)
             _ = getNext(whenNextIs: .PERIOD)
             skipNextEols()                  // EOLの前で解析を停止する。
         }
-        var value = parsed
-        if let function = parsed.expressions.first as? FunctionLiteral {
+        if let function = parsed.literal as? FunctionLiteral {
             function.name = identifier.value// 関数の名前を記録
             function.function.isOverloaded = isExtended
-            value = ExpressionStatement(token: parsed.token, expressions: [function])
         }
-        return DefineStatement(token: token, name: identifier, value: value, isExtended: isExtended)
+        guard validateRhsType(from: parsed) else { return nil }
+        return DefineStatement(token: token, name: identifier, value: parsed, isExtended: isExtended)
     }
 }
 /// 文の終わりまで、式を解析する。
@@ -674,11 +685,14 @@ struct ExpressionStatementParser : StatementParsable {
             getNext()                                   // 次の式解析に
         }
         let terminator = SentenceTerminator(symbol: currentToken.literal)
-        if terminator.isExplicit && previousToken.isComma {
+        if previousToken.isComma && (terminator == .period || terminator == .rbbracket) {
             error(message: "文の終端前の読点「、」が正しくない。")
             return nil
         }
         let es = ExpressionStatement(token: token, expressions: expressions, terminator: terminator)
+        if parser.options.useSentenceAST {
+            return parseSentecne(from: es)
+        }
         // Shadow mode: run sentence parsing in parallel for diagnostics only
         if parser.options.enableSentenceShadowMode {
             ExpressionStatementShadowRunner.shadowCheck(es, parser: parser)
@@ -911,6 +925,7 @@ struct PrefixExpressionParserFactory {
         case .keyword(.CONDITIONAL):return ConditionalOperationParser(parser)
         case .keyword(.IDENTIFIER),.keyword(.FILE),.keyword(.MEMBER),.keyword(.OUTER):
                                     return LabelExpressionParser(parser)
+        case .keyword(.ITS):        return PropertyExpressionParser(parser)
         case .keyword(_):           return PredicateExpressionParser(parser)
         case .illegal:              break
         default:                    return nil
@@ -1005,7 +1020,149 @@ struct RangeLiteralParser : ExpressionParsable {
             error(message: "範囲で、範囲式の解析に失敗した。(式が取り出せない。)")
             return nil
         }
+        if !parser.options.useSentenceAST {
+            return parseRangeExpressions(es.expressions, token: token)
+        }
+
+        let expressions = es.expressions
+
+        // Prefer pre-parsed RangeLiteral(s) produced by parseRangeExpression in prefix parsers.
+        // 1 item: single boundary (lower or upper)
+        if expressions.count == 1, let legacy = expressions.first as? RangeLiteral {
+            if let bridged = rangeLiteral(from: legacy, token: token) {
+                return bridged
+            }
+        }
+        // 2 items: combination of lower-boundary then upper-boundary (both pre-parsed)
+        if expressions.count == 2,
+           let firstLegacy = expressions.first as? RangeLiteral,
+           let secondLegacy = expressions.last  as? RangeLiteral,
+           let firstBridged  = rangeLiteral(from: firstLegacy,  token: token),
+           let secondBridged = rangeLiteral(from: secondLegacy, token: token) {
+            // Accept only (lower-only) + (upper-only) in this order
+            if firstBridged.upperBoundary == nil,
+               secondBridged.lowerBoundary == nil {
+                return RangeLiteral(
+                    token: token,
+                    lower: firstBridged.lowerBoundary,
+                    upper: secondBridged.upperBoundary
+                )
+            }
+            // If order or kinds are not compatible, fall through to legacy parsing below
+        }
+
+        // Find lower boundary marker
+        var lowerIndex: Int? = nil
+        var lowerToken: Token? = nil
+        for (i, expr) in expressions.enumerated() {
+            if let p = expr as? PhraseExpression, p.token.isLower {
+                lowerIndex = i
+                lowerToken = p.token
+                break
+            }
+        }
+
+        var lowerBoundary: BoundaryExpression? = nil
+        var restExpressions: [Expression] = expressions
+
+        if let lowerIndex, let lowerToken {
+            var lowerExprs = expressions.prefix(lowerIndex)
+            if let exp = (expressions[lowerIndex] as? PhraseExpression)?.left {
+                lowerExprs.append(exp)
+            }
+            if lowerExprs.isEmpty {
+                error(message: "範囲で、下限の式が見つからない。")
+                return nil
+            }
+            guard let sentence = buildSentence(from: Array(lowerExprs)) else {
+                error(message: "範囲で、下限の文の構築に失敗した。")
+                return nil
+            }
+            lowerBoundary = BoundaryExpression(token: lowerToken, sentence: sentence)
+            // Determine rest expressions after lower marker: if marker is PhraseExpression skip one element, else keep from marker
+            restExpressions = Array(expressions[(lowerIndex+1)...])
+        }
+
+        // Find upper boundary marker within rest
+        var upperIndex: Int? = nil
+        var upperToken: Token? = nil
+        for (i, expr) in restExpressions.enumerated() {
+            if let p = expr as? PhraseExpression, p.token.isUpper {
+                upperIndex = i
+                upperToken = p.token
+                break
+            }
+        }
+
+        var upperBoundary: BoundaryExpression? = nil
+
+        if let upperIndex, let upperToken {
+            var upperExprs = restExpressions.prefix(upperIndex)
+            if let exp = (restExpressions[upperIndex] as? PhraseExpression)?.left {
+                upperExprs.append(exp)
+            }
+            if upperExprs.isEmpty {
+                error(message: "範囲で、上限の式が見つからない。")
+                return nil
+            }
+            // Check no trailing expressions after upper boundary phrase
+            if upperIndex + 1 < restExpressions.count {
+                error(message: "範囲で、上限の形式が間違っている。")
+                return nil
+            }
+            guard let sentence = buildSentence(from: Array(upperExprs)) else {
+                error(message: "範囲で、上限の文の構築に失敗した。")
+                return nil
+            }
+            upperBoundary = BoundaryExpression(token: upperToken, sentence: sentence)
+        } else {
+            // No upper boundary found, restExpressions must be empty
+            if !restExpressions.isEmpty {
+                error(message: "範囲で、上限の形式が間違っている。")
+                return nil
+            }
+        }
+
+        // If at least one boundary was built, return RangeLiteral with boundaries
+        if lowerBoundary != nil || upperBoundary != nil {
+            return RangeLiteral(token: token, lower: lowerBoundary, upper: upperBoundary)
+        }
+
+        // Otherwise fall back to old behavior
         return parseRangeExpressions(es.expressions, token: token)
+    }
+    private func rangeLiteral(from legacyRange: RangeLiteral, token: Token) -> RangeLiteral? {
+        // Case: already parsed as range by prefix parsers (e.g., "1以上", "xまで").
+        // Convert legacy RangeLiteral (lowerBound/upperBound) into boundary-based RangeLiteral if possible.
+        if let lb = legacyRange.lowerBound,
+           let sentence = buildSentence(from: lb.expressions) {
+            let lower = BoundaryExpression(token: lb.token, sentence: sentence)
+            var upper: BoundaryExpression? = nil
+            if let ub = legacyRange.upperBound,
+               let us = buildSentence(from: ub.expressions) {
+                upper = BoundaryExpression(token: ub.token, sentence: us)
+            }
+            return RangeLiteral(token: token, lower: lower, upper: upper)
+        }
+        if let ub = legacyRange.upperBound,
+           let sentence = buildSentence(from: ub.expressions) {
+            let upper = BoundaryExpression(token: ub.token, sentence: sentence)
+            return RangeLiteral(token: token, lower: nil, upper: upper)
+        }
+        return nil
+    }
+    private func buildSentence(from expressions: [Expression]) -> Sentence? {
+        guard let last = expressions.last else { return nil }
+        if last.isPredicate {
+            return SimpleSentence(
+                token: last.sentenceToken,
+                auxiliaryVerb: last.auxiliaryVerb,
+                arguments: expressions.dropLast(),
+                predicateKind: last.sentenceToken.isPredicate ? .builtin : .custom,
+                string: expressions.map { $0.string }.joined()
+            )
+        }
+        return ExpressionStatement(token: last.token, expressions: expressions)
     }
 }
 struct FunctionLiteralParser : ExpressionParsable {
@@ -1272,7 +1429,7 @@ struct TypeLiteralParser : ExpressionParsable {
         var definitions = [DefineStatement]()
         while getNext(whenNextIs: TypeLiteral.katano) {
             getNext()   // DefStatemntParserは、currentTokenで処理をするため、1つ進める
-            guard let definition = DefStatementParser(parser).parse() as? DefineStatement else {
+            guard let definition = DefineStatementParser(parser).parse() as? DefineStatement else {
                 error(message: "型で、「型の<識別子>は、〜」の解析に失敗した。")
                 return false
             }
@@ -1341,14 +1498,23 @@ struct PredicateExpressionParser : ExpressionParsable {
     init(_ parser: Parser) {self.parser = parser}
     let parser: Parser
     func parse() -> Expression? {
-        if currentToken.isKeyword(.ITS) && !(nextToken.isIdent || nextToken.isKeyword(.TYPE)) {
-            error(message: "「\(nextToken.literal)」は属性名ではない。")
-            return nil
-        }
         return PredicateExpression(
             token:          currentToken,
             auxiliaryToken: parseAuxiliaryToken()
         )
+    }
+}
+struct PropertyExpressionParser : ExpressionParsable {
+    init(_ parser: Parser) {self.parser = parser}
+    let parser: Parser
+    func parse() -> Expression? {
+        let token = currentToken
+        guard nextToken.isIdent || nextToken.isKeyword(.TYPE) else {
+            error(message: "「\(nextToken.literal)」は属性名ではない。")
+            return nil
+        }
+        getNext()
+        return PropertyExpression(token: token, property: currentToken)
     }
 }
 /// 「場合」で始まる式を解析し、「場合、」に続くブロックをCaseExpression.consequenceとし、
@@ -1449,6 +1615,10 @@ struct ConditionalOperationParser : ExpressionParsable {
     init(_ parser: Parser) {self.parser = parser}
     let parser: Parser
     func parse() -> (any Expression)? {
+        guard previousToken.isParticle(.NI) else {
+            error(message: "「よって」の前には助詞「に」が必要。")
+            return nil
+        }
         let token = currentToken                            // よって
         _ = getNext(whenNextIs: .COMMA)                     // (、)
         getNext()
@@ -1475,43 +1645,57 @@ struct ConditionalOperationParser : ExpressionParsable {
 /// 3. 反復【<処理>】（処理を中止するには、「中止(する)」を使用する)
 /// 4. <配列、辞書>を反復【入力が<(要素の）識別子>、<処理>】
 struct LoopExpressionParser : ExpressionParsable {
-    init(_ parser: Parser) {self.parser = parser}
+    init(_ parser: Parser) { self.parser = parser }
     let parser: Parser
+
     func parse() -> Expression? {
         let token = parseHeader()
         let endSymbol: Token.Symbol = getNext(whenNextIs: .LBBRACKET) ? .RBBRACKET : .EOL
         // Input block
-        guard let (identifiers, _) = parseInputBlock(in: token.literal) else {return nil}
+        guard let (identifiers, _) = parseInputBlock(in: token.literal) else { return nil }
         // Condition block
-        guard let condition = parseCondition(endSymbol: endSymbol) else {
-            error(message: "反復で、「条件が〜の間、」の解析に失敗した。")
+        let condition: Statement?
+        do {
+            condition = try parseCondition()
+        } catch {
+            self.error(message: "反復で、「条件が〜の間、」の解析に失敗した。")
             return nil
         }
         // Body block
-        _ = getNext(whenNextIs: LoopExpression.syoriga + LoopExpression.syoriwa, matchAll: false)   // 処理が、(処理は、)
+        _ = getNext(whenNextIs: LoopExpression.syoriga + LoopExpression.syoriwa, matchAll: false) // 処理が、(処理は、)
         guard let body = BlockStatementParser(parser, symbol: endSymbol).blockStatement else {
             error(message: "反復で、処理の解析に失敗した。")
             return nil
         }
         return LoopExpression(token: token, parameters: identifiers, condition: condition, body: body)
     }
-    private func parseCondition(endSymbol: Token.Symbol) -> [Expression]? {
-        guard getNext(whenNextKeywordIs: LoopExpression.condition) else {return []}    // 空のパラメータ
+    enum LoopExpressionError : Error {
+        case input, condition, body
+    }
+    private func parseCondition() throws -> Statement? {
+        let token = currentToken
+        guard getNext(whenNextKeywordIs: LoopExpression.condition) else { return nil }
         getNext()
+        if nextToken.isSymbol(.LBBRACKET) {
+            getNext()
+            let block = BlockStatementParser(parser, symbol: .RBBRACKET).blockStatement
+            _ = getNext(whenNextIs: LoopExpression.aida)
+            _ = getNext(whenNextIs: .COMMA)
+            return block
+        }
         var expressions: [Expression] = []
         while true {
             skipEols()
             guard let expression = ExpressionParser(parser).parse() else {
-                error(message: "反復で、条件式の解析に失敗した。")
-                return nil
+                throw LoopExpressionError.condition
             }
             expressions.append(expression)
-            _ = getNext(whenNextIs: LoopExpression.aida)
-            if isEndOfElements {break}
+            if getNext(whenNextIs: LoopExpression.aida) { break }
+            if isEndOfElements { break }
             getNext()
         }
         _ = getNext(whenNextIs: .COMMA)
-        return expressions
+        return ExpressionStatement(token: token, expressions: expressions)
     }
 }
 // MARK: - infix expression parsers and those instance factory
@@ -1599,10 +1783,11 @@ struct GenitiveExpressionParser : ExpressionParsable {
             case .particle(.WA):
                 _ = getNext(whenNextIs: .COMMA)
                 getNext()
-                guard let parsed = ExpressionStatementParser(parser).parse() as? ExpressionStatement else {
+                guard let parsed = ExpressionStatementParser(parser).parse() else {
                     error(message: "属格で、値式の解釈に失敗した。")
                     return nil
                 }
+                guard validateRhsType(from: parsed) else { return nil }
                 return GenitiveExpression(token: token, left: left, right: right, value: parsed)
             default:
                 break

@@ -21,19 +21,20 @@ struct ExpressionStatementShadowRunner {
             // close enough; no op
         }
         // Terminator handling mismatches: explicit terminator with conjunctive sentence
-        var term: SentenceTerminality? = nil
-        if let provider = sentence as? SentenceTerminalityProvider {
-            term = provider.terminality
-        } else if let simple = sentence as? SimpleSentence {
-            term = simple.terminality
-        } else if let assign = sentence as? AssignmentSentence {
-            term = assign.terminality
-        }
-        if es.terminator.isExplicit, term == .conjunctive, !parser.isInCaseClause {
-            parser.shadowMetrics.record(ShadowDiff.terminatorMismatch, context: ShadowContext(tokenLiteral: es.token.literal, snippet: sentence.string))
+        let term = (sentence as? Sentence)?.terminality ?? nil
+        if es.terminator.isExplicit,
+           term == .conjunctive, !parser.isInCaseClause {
+                parser.shadowMetrics.record(
+                    ShadowDiff.terminatorMismatch,
+                    context: ShadowContext(
+                        tokenLiteral: es.token.literal,
+                        snippet: sentence.string
+                    )
+                )
         }
         if parser.options.verboseShadowLog {
             print("[Shadow] \(es.string) -> \(String(describing: type(of: sentence)))")
+            print("[Shadow] \(sentence.string)(sentence.string)")
         }
     }
 }
