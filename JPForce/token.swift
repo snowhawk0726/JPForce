@@ -81,6 +81,7 @@ enum Token : Equatable {
         case MATA       = "また"  // workaround for 1または -> 1(また) .WA
         case ASWELLAS   = "および"
         case CASE       = "場合"
+        case ELSE       = "それ以外"
         case QUESTION   = "か"
         case CONDITIONAL = "よって"
         case LOOP       = "反復"
@@ -292,7 +293,7 @@ enum Token : Equatable {
         .ADD, .MULTIPLY, .SUBSTRACT, .DIVIDE, .NEGATE, .NULL,
         .EQUAL, .BE, .NOT, .LT, .GT,
         .RETURN, .GOBACK, .BREAK, .CONTINUE,
-        .MONO, .INPUT, .KOTO, .IT, .ITS,
+        .MONO, .INPUT, .KOTO, .IT, .ITS, .ELSE,
         .DROP, /*.EMPTY,*/ .DUPLICATE, .PULL, .PUSH,
         .APPEND, .REMOVE, .CONTAINS, .FOREACH, .MAP, .FILTER, .REDUCE, .SORT, .REVERSE,
         .PRINT, .ASK, .NEWLINE, .READ, .FILES, .IDENTIFIERS,

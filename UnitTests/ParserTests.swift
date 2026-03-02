@@ -235,7 +235,7 @@ final class ParserTests: XCTestCase {
             "甲が乙より小さい場合、【甲を表示する。】。",
             "甲が乙より小さい場合、【甲を表示する。】",
             "甲が乙より小さい場合、【甲を表示する】",
-            "甲が乙より小さい場合、甲を表示する。",       // 【】省略形。行末までconsequence
+            "甲が乙より小さい場合、甲を表示する。",       // 【】省略形。文末までconsequence
         ]
         for input in testPatterns {
             print("テストパターン: \(input)")
@@ -265,6 +265,33 @@ final class ParserTests: XCTestCase {
                 XCTAssertNil(caseExpression.alternative, "caseExpression.alternative")
                 print("テスト終了: \(statement.string)(\(type(of: statement)))")
             }
+        }
+    }
+    func testCaseConsequences() throws {
+        let testPatterns: [(input: String, type: String, statements: Int)] = [
+            ("aが1である場合、甲を表示する。", "SimpleSentence", 1),
+            ("aが1である場合、甲を表示し、改行する。", "CompoundStatement", 1),
+            ("aが1である場合、甲を表示する。改行する。", "SimpleSentence", 2),
+            ("aが1である場合、甲を表示し、それ以外は、乙を表示する。", "SimpleSentence", 1),
+            ("aが1である場合、甲に1を足して、表示し、それ以外は、乙を表示する。", "CompoundStatement", 1),
+            ("aが1である場合、甲に1を足して、表示する。それ以外は、乙を表示する。", "CompoundStatement", 1),
+            ("aが1である場合、甲を表示する。甲に1を足して代入。それ以外は、乙を表示する。", "SimpleSentence", 0),
+        ]
+        for test in testPatterns {
+            print("テストパターン: \(test.input)")
+            guard let program = parseProgram(with: test.input, useSentenceAST: true) else {
+                XCTAssertEqual(test.statements, 0)
+                print("テスト終了: エラー(通常文の後に「それ以外」)")
+                continue
+            }
+            let statements = program.statements
+            XCTAssertEqual(statements.count, test.statements)
+            let cs = try XCTUnwrap(statements.first as? CompoundStatement)
+            let es = try XCTUnwrap(cs.sentences[1] as? ExpressionStatement)
+            let ce = try XCTUnwrap(es.expressions.first as? CaseExpression)
+            let consequence = try XCTUnwrap(ce.consequence.statements.first)
+            XCTAssertEqual(String(describing: type(of: consequence)), test.type)
+            print("テスト終了: \(program.string)(\(type(of: consequence)))")
         }
     }
     func testSwitchCaseExpression() throws {
@@ -791,6 +818,14 @@ final class ParserTests: XCTestCase {
                 XCTAssertEqual(loop.token, .keyword(.LOOP))
                 XCTAssertTrue(loop.parameters.isEmpty)
                 XCTAssertEqual(loop.condition?.string, "100より小さい。")
+                XCTAssertEqual(loop.body.statements.first?.string, "1を足す。")
+            }),
+            ("１から反復【条件が、【100より小さい。かつ、奇数である】間、1を足す】。", { expressions in
+                try self.testPhraseExpression(expressions[0], with: 1, "から")
+                let loop = try XCTUnwrap(expressions[1] as? LoopExpression)
+                XCTAssertEqual(loop.token, .keyword(.LOOP))
+                XCTAssertTrue(loop.parameters.isEmpty)
+                XCTAssertEqual(loop.condition?.string, "100より小さい。かつ、奇数である")
                 XCTAssertEqual(loop.body.statements.first?.string, "1を足す。")
             }),
         ]

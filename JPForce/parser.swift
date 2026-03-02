@@ -24,8 +24,7 @@ final class Parser {
         self.currentToken = other.currentToken
         self.nextToken = other.nextToken
         self.previousToken = other.previousToken
-        self.nestedBlockCounter = other.nestedBlockCounter
-        self.nestedElementsCounter = other.nestedElementsCounter
+        self.blockStack = other.blockStack
         self.switchCase = other.switchCase
         self.isInCaseClause = other.isInCaseClause
         self.errors = other.errors
@@ -36,8 +35,7 @@ final class Parser {
     var nextToken: Token
     var previousToken: Token
     var errors: [String] = []
-    var nestedBlockCounter = NestCounter(.RBBRACKET, .EOL)
-    var nestedElementsCounter = NestCounter(.RBBRACKET, .PERIOD)
+    var blockStack: [BlockFrame] = []
     var switchCase = SwitchCase()           // Switch-case監視
     var isInCaseClause: Bool = false
     var leadingIdentifier: Identifier? = nil
@@ -95,18 +93,53 @@ final class Parser {
         getNext()
         return true
     }
+    /// expetcted文字列に、tokenが一致していれば解析位置を進める。
+    /// - Parameters:
+    ///   - expected: チェックする文字列（揺れを許す場合は、"である" + "であって"のようにすれば、期待する位置まで解析位置を進めることができる。)
+    ///   - matchAll: true(デフォルト)の場合、揺れを許容せず完全一致しない場合は、falseを返す。
+    /// - Returns: matchAll = falseの場合、常にtrueを返す。
+    func getNext(whenNextIs expected: String, matchAll: Bool = true) -> Bool {
+        let lexer = Lexer(expected)
+        var tokens: [Token] = []
+        var token = lexer.getNext()
+        while token != Lexer.EoT {  // lexerからtokensを取り出す
+            tokens.append(token)
+            token = lexer.getNext()
+        }
+        // コピーしたParserで、仮の解析をする。(途中で失敗したらfalse)
+        let tempParser = Parser(from: self)
+        for token in tokens {
+            guard tempParser.getNext(whenNextIs: token) || !matchAll else {return false}
+        }
+        // 一致した場合、実際の解析を進める。
+        tokens.forEach {_ = getNext(whenNextIs: $0)}
+        return true
+    }
+    func getNext(whenNextIs expected: Token.Symbol, withError: Bool = false) -> Bool {getNext(whenNextIs: Token.symbol(expected), withError: withError)}
     func skipEols() {while currentToken.isEol {getNext()}}
     /// Lexerに識別子を登録
     func insert(_ identifier: String) {lexer.insert(identifier)}
-    /// 入れ子制御カウンター
-    class NestCounter {
-        var counters: [Token.Symbol : Int] = [:]
-        init(_ counters: Token.Symbol...) {counters.forEach {self.counters[$0] = 0}}
-        private init() {}
-        //
-        func up(to symbol: Token.Symbol) {counters[symbol]! += 1}
-        func down(to symbol: Token.Symbol) {counters[symbol]! -= 1}
-        func value(of symbol: Token.Symbol) -> Int {counters[symbol]!}
+}
+/// ブロック管理
+enum BlockKind {
+    case explicit
+    case implicit
+    //
+    init(isExplicit: Bool) {
+        self = isExplicit ? .explicit : .implicit
+    }
+}
+struct BlockFrame {
+    let kind: BlockKind
+    let target: String      // ブロックの対象、トークン
+    //
+    init(kind: BlockKind, token: Token?) {
+        self.kind = kind
+        self.target = token?.literal ?? ""
+    }
+    init(kind: BlockKind, target: String) {
+        self.kind = kind
+        self.target = target
     }
 }
 // MARK: - Helpers for Unit Test
