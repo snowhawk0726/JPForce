@@ -180,15 +180,12 @@ final class ExpressionStatement : Sentence {
     var tokenLiteral: String {token.literal}
     var baseString: String {expressions.toStringWithComma}
     //
-    static let yousoga = "要素が、"
-    static let yousowa = "要素は、"
-    static let hontaiga = "本体が、"
-    static let hontaiwa = "本体は、"
+    static let youso = "要素"
+    static let hontai = "本体"
     static let deatte = "であって、"
     static let deari = "であり、"
     static let ga = "が"
     static let wa = "は"
-    static let to = "と"
 }
 final class BlockStatement : Statement {
     let token: Token                // 【トークン
@@ -580,8 +577,7 @@ final class ConditionalOperation : Expression {
 final class LoopExpression : Expression {
     static let condition = "条件"
     static let aida = "間"
-    static let syoriga = "処理が、"
-    static let syoriwa = "処理は、"
+    static let syori = "処理"
     let token: Token                // .LOOPキーワード(反復)
     let parameters: [Identifier]    // カウンターまたは要素
     let condition: Statement?       // 条件式
@@ -660,8 +656,7 @@ enum SignatureKind {
     case none
 }
 struct ClauseLiteral {
-    static let joukouga = "条項が、"
-    static let joukouwa = "条項は、"
+    static let joukou = "条項"
     //
     let isTypeMember: Bool          // 型の要素
     let identifier: Identifier      // 識別子
@@ -851,7 +846,7 @@ extension FunctionBlock {
     }
 }
 final class CallExpression : Expression {
-    static let arguments = "引数が、"
+    static let arguments = "引数"
     //
     let token: Token                // トークン
     let target: Expression          // 呼び出し対象
@@ -865,7 +860,7 @@ final class CallExpression : Expression {
     var tokenLiteral: String {token.literal}
     var string: String {
         "\(target.string)【" +
-        (arguments.isEmpty ? "" : Self.arguments + arguments.reduce("") {$0 + $1.string.withoutComma}) + "】"
+        (arguments.isEmpty ? "" : "引数が、" + arguments.reduce("") {$0 + $1.string.withoutComma}) + "】"
     }
 }
 final class ArrayLiteral : Expression {

@@ -32,27 +32,8 @@ extension Parsable {
     func getNext(whenNextAre expecteds: Token.Symbol...) {
         expecteds.forEach {_ = getNext(whenNextIs: $0)}
     }
-    /// expetcted文字列に、tokenが一致していれば解析位置を進める。
-    /// - Parameters:
-    ///   - expected: チェックする文字列（揺れを許す場合は、"である" + "であって"のようにすれば、期待する位置まで解析位置を進めることができる。)
-    ///   - matchAll: true(デフォルト)の場合、揺れを許容せず完全一致しない場合は、falseを返す。
-    /// - Returns: matchAll = falseの場合、常にtrueを返す。
     func getNext(whenNextIs expected: String, matchAll: Bool = true) -> Bool {
-        let lexer = Lexer(expected)
-        var tokens: [Token] = []
-        var token = lexer.getNext()
-        while token != Lexer.EoT {  // lexerからtokensを取り出す
-            tokens.append(token)
-            token = lexer.getNext()
-        }
-        // コピーしたParserで、仮の解析をする。(途中で失敗したらfalse)
-        let tempParser = Parser(from: self.parser)
-        for token in tokens {
-            guard tempParser.getNext(whenNextIs: token) || !matchAll else {return false}
-        }
-        // 一致した場合、実際の解析を進める。
-        tokens.forEach {_ = getNext(whenNextIs: $0)}
-        return true
+        parser.getNext(whenNextIs: expected, matchAll: matchAll)
     }
     /// 入力が「<keyword>が、(は、)」に該当すれば解析位置を進め、trueを返す。
     /// - Parameters:
@@ -64,19 +45,17 @@ extension Parsable {
         _ = getNext(whenNextIs: .COMMA)
         return true
     }
-    func skipEols() {parser.skipEols()}
-    func skipNextEols(suppress: Bool = false) {while !suppress && nextToken.isEol {getNext()}}
-    // 判定
-    /// 解析中止要因：】, EOF, EOL, 。
-    var isBreakFactor: Bool {
-        isEndOfBlock || currentToken.isEof || currentToken.isEol || isEndOfStatement
+    func getNext(kind: BlockKind) -> Bool {
+        switch kind {
+        case .explicit:
+            return getNext(whenNextIs: .RBBRACKET)
+        case .implicit:
+            return getNext(whenNextIs: .EOL) || getNext(whenNextIs: .PERIOD)
+        }
     }
-    var isEndOfStatement: Bool {currentToken.isPeriod}
-    var isEndOfBlock: Bool {currentToken == .symbol(.RBBRACKET)}
-    var isEndOfElements: Bool {
-        nextToken.type == .symbol(.COMMA) || nextToken.type == .symbol(.PERIOD) ||
-        nextToken.type == .symbol(.RBBRACKET) ||
-        nextToken.type == .symbol(.EOL) || nextToken.type == .symbol(.EOF)
+    func skipEols() {parser.skipEols()}
+    func skipNextEols(blockKind: BlockKind = .explicit) {
+        while blockKind == .explicit && nextToken.isEol {getNext()}
     }
     /// エラー出力
     func error(message: String) {
@@ -85,11 +64,63 @@ extension Parsable {
     func error(message: String, at token: Token) {
         parser.errors.append(message + (currentToken.isIllegal ? "" : "(解析位置: \(token.literal))"))
     }
-    /// ブロックカウンター制御
-    ///  - ブロック文中のブロック記号【】とEOLをカウントし、整合性をチェックする。
-    var blockCount: Parser.NestCounter {parser.nestedBlockCounter}
-    ///  - 要素を持つ型でのブロック記号【】と読点「。」をカウントし、整合性をチェックする。
-    var elementsCount: Parser.NestCounter {parser.nestedElementsCounter}
+    /// ブロック制御
+    func openBlock(kind: BlockKind, with token: Token? = nil) {
+        parser.blockStack.append(BlockFrame(
+            kind: kind,
+            token: token
+        ))
+    }
+    func openBlock(kind: BlockKind, with string: String) {
+        parser.blockStack.append(BlockFrame(
+            kind: kind,
+            target: string
+        ))
+    }
+    func closeBlock(isExplicit: Bool) -> Bool {
+        isExplicit ? closeExplicitBlock() : closeImplicitBlock()
+    }
+    func closeBlock(kind: BlockKind) -> Bool {
+        switch kind {
+        case .explicit:
+            closeExplicitBlock()
+        case .implicit:
+            closeImplicitBlock()
+        }
+    }
+    private func closeExplicitBlock() -> Bool {
+        guard let top = parser.blockStack.last else {
+            error(message: ParserError.unmatchedClosingBlacket.message)
+            return false
+        }
+        guard top.kind == .explicit else {
+            error(message: ParserError.mismatchedBlockClose.message)
+            return false
+        }
+        parser.blockStack.removeLast()
+        return true
+    }
+    private func closeImplicitBlock() -> Bool {
+        if let top = parser.blockStack.last,
+              top.kind == .implicit {
+            parser.blockStack.removeLast()
+        }
+        return true
+    }
+    func shouldCloseExplicitBlock() -> Bool {
+        if let top = parser.blockStack.last,
+           top.kind == .explicit {
+            return true
+        }
+        return false
+    }
+    func shouldCloseImplicitBlock() -> Bool {
+        if let top = parser.blockStack.last,
+           top.kind == .implicit {
+            return true
+        }
+        return false
+    }
     /// 入力部(Input Block)の解析
     /// - 形式1: 入力が、識別子1(「型格」)(は<既定値>)と 識別子2(「型格」)(は<既定値>)と...、であり、
     /// - 形式2: 入力が、識別子1(「型格」)(は<既定値>)と 識別子2(「型格」)(は<既定値>)と...識別子n（「型格」）(は<既定値>)。
@@ -246,7 +277,7 @@ extension Parsable {
     /// - Returns: 抽出した上限式もしくは下限式(式文)
     private func getBound(of tokens: [Token], from expressions: [Expression]) -> ExpressionStatement? {
         // 式がIntegerLiteralで、tokenが、RangeLiteralまたはPhraseExpressionに解析済みの場合
-        if let e = expressions.first as? RangeLiteral {return isLowBound(tokens.first) ? e.lowerBound : e.upperBound}
+        if let e = expressions.first as? RangeLiteral {return tokens.first?.isLower == true ? e.lowerBound : e.upperBound}
         if let e = expressions.first as? PhraseExpression, tokens.contains(e.token) {return ExpressionStatement(token: e.token, expressions: [e.left])}
         // 複数式から、キーワードを拾いだす。(index.0: 下限キーワード、index.1: 拾いだした式の位置)
         guard let index = firstIndex(of: expressions, by: tokens) else {return nil}
@@ -281,34 +312,29 @@ extension Parsable {
         }
         return nil
     }
-    private func isLowBound(_ token: Token?) -> Bool {[Token(.KARA), Token(.GTEQUAL)].contains(token)
-    }
     /// 配列・辞書・列挙の要素を解析する（要素の終わりまで）
     /// 形式： 要素が(は)、〜。、要素が(は)、【〜】
     /// - Parameters:
     ///     - token:  要素群の種別を表すトークン
     ///     - endSymbol: 期待する終端
     /// - Returns: 解析した要素の配列(もしくは、nil : エラー)
-    func parseElements<T>(in token: Token, with endSymbol: Token.Symbol) -> [T]? {
-        if getNext(whenNextIs: endSymbol) {
+    func parseElements<T>(in token: Token, kind: BlockKind) -> [T]? {
+        if getNext(kind: kind) {
             return []                                           // 空の要素
         }
-        if endSymbol == .PERIOD && nextToken.isEol {            // 型直後の開業
+        if kind == .implicit && nextToken.isEol {               // 型直後の改行
             error(message: "\(token.literal)の要素が空である場合は、句点「。」が必要。")
             return nil
         }
         skipNextEols()
-        _ = getNext(whenNextIs: ExpressionStatement.yousoga + ExpressionStatement.yousowa, matchAll: false) // 要素が、(要素は、)
+        _ = getNext(whenNextKeywordIs: ExpressionStatement.youso)   // 要素が、(要素は、)
         skipNextEols()
         var commaNotFound: Bool = false                         // ブロック内で、要素の後に「、」が見つからない
         var elements: [T] = []
-        while true {
-            if isTerminator(nextToken, expected: endSymbol) {   // 次が終端ならば解析終了
-                break
-            }
+        while !isTerminator(nextToken, kind: kind) {            // 次が終端ならば解析終了
             getNext()
             skipEols()
-            if currentToken.isSymbol(.RBBRACKET) {              // ブロック終了なら即時リターン
+            if currentToken.isEndOfBlock {                      // ブロック終了なら即時リターン
                 return elements
             }
             guard let parsed: T = parseElement(of: token) else {
@@ -318,18 +344,17 @@ extension Parsable {
             elements.append(parsed)
             //
             if !getNext(whenNextIs: .COMMA) {                   // 次が「、」以外ならば解析終了
-                if (nextToken.isEol || nextToken.isPeriod) && endSymbol == .RBBRACKET  {
+                if (nextToken.isEol || nextToken.isPeriod) && kind == .explicit  {
                     commaNotFound = true
                 }
                 break
             }
         }
         // 後処理(endSymbolをcurrentにする。)
-        while nextToken.isEol ||
-              (nextToken.isPeriod && endSymbol != .PERIOD) {
+        while nextToken.isEol || (nextToken.isPeriod && kind != .implicit) {
             getNext()
         }
-        let endSymbolFound = getNext(whenNextIs: endSymbol)
+        let endSymbolFound = getNext(kind: kind)
         
         if commaNotFound && !endSymbolFound {   // ブロック内で、要素の後に区切り「、」が見つからず、終端でない
             error(message: "要素の区切りには、「、」が必要。")
@@ -338,11 +363,13 @@ extension Parsable {
         
         return elements
     }
-    private func isTerminator(_ token: Token, expected: Token.Symbol) -> Bool {
-        token.isSymbol(expected) ||             // 期待する終端
-        token.isSymbol(.RBBRACKET) ||           // 「】」は終端
-        (expected == .PERIOD && token.isEol) || // 終端「。」待ちならば、EOLは終端
-        token.isEof
+    private func isTerminator(_ token: Token, kind: BlockKind) -> Bool {
+        switch kind {
+        case .explicit:
+            return token.isEndOfBlock
+        case .implicit:
+            return token.isEndOfStatement
+        }
     }
     private func parseElement<T>(of token: Token) -> T? {
         switch token {
@@ -447,7 +474,7 @@ extension Parsable {
                let particle = p, phrase.hasParticle(particle) {
                 return expressions      // 指定格があった
             }
-            if isEndOfElements {break}
+            if nextToken.isEndOfElements {break}
             getNext()
         }
         return expressions
@@ -503,55 +530,79 @@ extension Parsable {
         return types
     }
     /// 定義部： <ブロック名>は(が)、【<定義>】
-    /// 定義部から<定義>を取り出し、ブロック文として返す。
-    /// - Returns: ブロック文、定義無し(nil)、もしくはエラー
-    func parseOptionalBlock(of blockname: String, in typename: String) -> Result<BlockStatement?, FunctionBlockError> {
+    /// 定義部から指定ブロック名を持つ<定義>を取り出し、ブロック文として返す。
+    /// - Returns:
+    ///     success: ブロック文、定義無し(nil)
+    ///     failure: エラー
+    func parseOptionalBlock(of blockname: String, in typename: String) -> Result<BlockStatement?, ParserError> {
         guard getNext(whenNextKeywordIs: blockname) else {return .success(nil)}
-        let endSymbol: Token.Symbol = getNext(whenNextIs: .LBBRACKET) ? .RBBRACKET : .EOL
-        guard let blockStatement = BlockStatementParser(parser, symbol: endSymbol).blockStatement else { 
+        let kind = BlockKind(isExplicit: getNext(whenNextIs: .LBBRACKET))
+        guard let blockStatement = BlockStatementParser(parser, kind: kind).blockStatement else {
             error(message: "\(typename)で、「\(blockname)は、〜」の解析に失敗した。")
-            return .failure(FunctionBlockError.body)
+            return .failure(.blockParseError)
         }
         _ = getNext(whenNextIs: .PERIOD)    // ブロックの句点を飛ばす
         return .success(blockStatement)
     }
-    func isEndOfBlock(of symbol: Token.Symbol) -> Bool {
-        nextToken == .symbol(symbol)
+    /// 定義ブロック内のブロックを解析
+    /// - Parameters:
+    ///   - name: ブロック名
+    ///   - kind: ブロック種別(明示: .explicit, 暗黙: .implicit)
+    ///   - typename: 定義型名
+    /// - Returns: BlockStatement / nil
+    func parseBlock(name: String, kind: BlockKind, in typename: String) -> Result<BlockStatement?, ParserError> {
+        switch parseOptionalBlock(of: name, in: typename) {
+        case .success(let block?):          // ブロック名明示
+            skipNextEols(blockKind: kind)
+            return .success(block)
+        case .success(nil):                 // ブロック名省略
+            guard !getNext(kind: kind) else {return .success(nil)}
+            guard let block = BlockStatementParser(parser, kind: kind).blockStatement else {
+                error(message: "\(typename)で、「\(name)は、〜」の解析に失敗した。")
+                return .failure(.blockParseError)
+            }
+            return .success(block)
+        default:
+            return .failure(.blockParseError)
+        }
+    }
+    func isEndOfBlock(kind: BlockKind) -> Bool {
+        switch kind {
+        case .explicit:
+            nextToken.isEndOfBlock
+        case .implicit:
+            nextToken.isEndOfStatement
+        }
     }
     /// 関数部：【入力が(は)、〜。出力が(は)、〜。本体が、〜。】
     /// - Returns: 関数ブロック、もしくはエラー
-    func parseFunctionBlock(in typename: String, endOfBlock: Token.Symbol? = nil, isOverloaded: Bool = false) -> Result<FunctionBlock, FunctionBlockError> {
-        let endSymbol: Token.Symbol = (endOfBlock == nil) ?
-        getNext(whenNextIs: .LBBRACKET) ? .RBBRACKET : .EOL :
-        endOfBlock!
+    func parseFunctionBlock(in typename: String, kind: BlockKind, isOverloaded: Bool = false) -> Result<FunctionBlock, FunctionBlockError> {
         // Prameter block
-        guard let (identifiers, signature) = parseInputBlock(in: typename) else {return .failure(FunctionBlockError.input)}
-        guard let returnTypes = parseOutputBlock(in: typename) else {return .failure(FunctionBlockError.output)}
+        guard let (identifiers, signature) = parseInputBlock(in: typename) else {return .failure(.input)}
+        guard let returnTypes = parseOutputBlock(in: typename) else {return .failure(.output)}
         // Body block
-        var body: BlockStatement?
-        if !getNext(whenNextIs: endSymbol) && nextToken != .symbol(.RBBRACKET) {
-            // FunctionBlocks block
-            _ = getNext(whenNextIs: ExpressionStatement.hontaiga + ExpressionStatement.hontaiwa, matchAll: false)   // 本体が、(本体は、)
-            guard let block = BlockStatementParser(parser, symbol: endSymbol).blockStatement else {return .failure(FunctionBlockError.body)}
-            body = block
+        switch parseBlock(name: ExpressionStatement.hontai, kind: kind, in: typename) {
+        case .success(let body):
+            _ = getNext(whenNextIs: .PERIOD)    // ブロックの句点を飛ばす
+            return .success(FunctionBlock(
+                parameters: identifiers,
+                paramForm: signature,
+                returnTypes: returnTypes,
+                body: body,
+                isOverloaded: isOverloaded
+            ))
+        case .failure:
+            return .failure(.body)
         }
-        _ = getNext(whenNextIs: .PERIOD)    // ブロックの句点を飛ばす
-        return .success(FunctionBlock(
-            parameters: identifiers,
-            paramForm: signature,
-            returnTypes: returnTypes,
-            body: body,
-            isOverloaded: isOverloaded
-        ))
     }
     func parseFunctionBlocks(of name: String, in typename: String) -> Result<FunctionBlocks, FunctionBlockError> {
         let functionBlocks = FunctionBlocks()
         while getNext(whenNextKeywordIs: name) {
             let isOverloaded = getNext(whenNextIs: DefineStatement.further)
             _ = getNext(whenNextIs: .COMMA)
-
             //
-            switch parseFunctionBlock(in: typename, isOverloaded: isOverloaded) {
+            let kind = BlockKind(isExplicit: getNext(whenNextIs: .LBBRACKET))
+            switch parseFunctionBlock(in: typename, kind: kind, isOverloaded: isOverloaded) {
             case .success(let function):
                 _ = functionBlocks.append(function)
             case .failure(let error):
@@ -566,9 +617,9 @@ extension Parsable {
     /// ＊：呼び元の要素解析で、終端まで解析を進めること！
     /// - Parameter endSymbol: 期待する終端
     /// - Returns: 解析結果
-    func parseEndOfElements(with endSymbol: Token.Symbol) -> Bool {
-        switch endSymbol {
-        case .PERIOD:
+    func parseEndOfElements(kind: BlockKind) -> Bool {
+        switch kind {
+        case .implicit:
             if currentToken.isPeriod || currentToken.isEof {return true}
             if currentToken.isEol {
                 if !nextToken.isEof {
@@ -577,22 +628,24 @@ extension Parsable {
                 return true
             }
             error(message: "要素の解析で、終端「。」が見つからない。")
-        case .RBBRACKET:
-            if currentToken.isSymbol(.RBBRACKET) {
-                // 余分な「】」が続く場合は読み進める
-                skipNextRBBrackets()
+        case .explicit:
+            if currentToken.isEndOfBlock {
+                // 余分な「】」が続く場合は blockStack の状態を見て読み進める
+                skipNextRBBracketsUsingBlockStack()
                 return true
             }
             error(message: "要素の解析で、終端「】」が見つからない。")
-        default:
-            error(message: "要素の解析で、期待しない終端「\(endSymbol.rawValue)」が見つかった。")
         }
         return false
     }
-    private func skipNextRBBrackets() {
-        while elementsCount.value(of: .RBBRACKET) < 1 &&    // 要素の解析が終了している
-                blockCount.value(of: .RBBRACKET) < 1 &&     // ブロックの終端ではない
-                nextToken.isSymbol(.RBBRACKET) {
+    private func skipNextRBBracketsUsingBlockStack() {
+        // 余分な「】」が続く場合は、blockStack の状態を確認しながら安全に読み進める。
+        // 明示ブロックをここで閉じるべきなら（shouldCloseExplicitBlock が true）、これ以上スキップしない。
+        while nextToken.isSymbol(.RBBRACKET) {
+            if shouldCloseExplicitBlock() {
+                break
+            }
+            // 暗黙ブロック(implicit)がトップの場合、ここで閉じるべきではない余剰な「】」とみなし読み進める。
             getNext()
         }
     }
@@ -604,6 +657,37 @@ enum FunctionBlockError : Error {
         case .input:        return "(入力の解析エラー)"
         case .output:       return "(出力の解析エラー)"
         case .body:         return "(本体の解析エラー)"
+        }
+    }
+}
+enum ParserError : Error {
+    case unmatchedClosingBlacket
+    case mismatchedBlockClose
+    case blockParseError
+    var message: String {
+        switch self {
+        case .unmatchedClosingBlacket:
+            return "ブロック記号が一致しない。"
+        case .mismatchedBlockClose:
+            return "ブロック記号以外でブロックが終了している。"
+        case .blockParseError:
+            return "ブロックの解析に失敗。"
+        }
+    }
+}
+extension Token {
+    var isEndOfStatement: Bool {
+        isSymbol(.PERIOD) || isSymbol(.EOL) || isSymbol(.EOF) || isSymbol(.RBBRACKET)
+    }
+    var isBreakFactor: Bool {isEndOfStatement}
+    var isEndOfElements: Bool {isComma || isBreakFactor}
+    var isEndOfBlock: Bool {isSymbol(.RBBRACKET)}
+    func isEndOfBlock(kind: BlockKind) -> Bool {
+        switch kind {
+        case .explicit:
+            return isSymbol(.RBBRACKET)
+        case .implicit:
+            return isSymbol(.PERIOD) || isSymbol(.EOL)
         }
     }
 }
@@ -639,7 +723,7 @@ struct DefineStatementParser : StatementParsable {
             error(message: "定義文「<識別子>は、<式(値)>。」で、式の解釈に失敗した。")
             return nil
         }
-        if !isEndOfBlock {
+        if !currentToken.isEndOfBlock {
             _ = getNext(whenNextIs: .PERIOD)
             skipNextEols()                  // EOLの前で解析を停止する。
         }
@@ -655,14 +739,14 @@ struct DefineStatementParser : StatementParsable {
 /// 文の終わり：句点、または改行
 /// 解析停止：EOF、ブロックの終わり(】)
 struct ExpressionStatementParser : StatementParsable {
-    init(_ parser: Parser) {self.parser = parser}
-    let parser: Parser
+    init(_ parser: Parser, until token: Token? = nil) {self.parser = parser; self.endToken = token}
+    let parser: Parser, endToken: Token?
     func parse() -> Statement? {
         let token = currentToken
         var expressions: [Expression] = []
         var semanticStartIndex = 0
         
-        while !isEndOfStatement && !currentToken.isEof {
+        while !currentToken.isEndOfStatement {
             skipEols()
             guard let expression = ExpressionParser(parser).parse() else {
                 error(message: "式文で、式の解析に失敗した。")
@@ -680,8 +764,9 @@ struct ExpressionStatementParser : StatementParsable {
                 semanticStartIndex = expressions.count
             }
             //
-            if getNextWhenNextIsEndOfStatement || isBreakFactor {break}    // 文の終わり
+            if getNextWhenNextIsEndOfStatement || currentToken.isBreakFactor {break}    // 文の終わり
             _ = getNext(whenNextIs: .COMMA)             // 読点を読み飛ばし、
+            if lookaheadIsEndToken() { break }
             getNext()                                   // 次の式解析に
         }
         let terminator = SentenceTerminator(symbol: currentToken.literal)
@@ -699,9 +784,9 @@ struct ExpressionStatementParser : StatementParsable {
         }
         return es
     }
+    private func lookaheadIsEndToken() -> Bool {nextToken == endToken}
 }
-private extension ExpressionStatementParser {
-    var isEndOfStatement: Bool {currentToken.isPeriod || currentToken.isEol || isEndOfBlock}
+extension Parsable {
     /// 文の終わりを検出する。(例えば、「】。」の場合、isBreakFactorによるbreakを抑止する)
     var getNextWhenNextIsEndOfStatement: Bool {
         getNext(whenNextIs: .PERIOD) ||
@@ -819,32 +904,32 @@ extension Array where Element == Expression {
     }
 }
 /// ブロック(【】)内で式を解析したstatementを、statementsに格納
-/// ブロッックの終わり: endSymbolを.EOLとすることで、【】を省略し行末までをブロックとして扱うことができる。
 /// 解析停止：EOF、ブロックの終わり
 struct BlockStatementParser : StatementParsable {
-    init(_ parser: Parser, symbol: Token.Symbol = .RBBRACKET) {self.parser = parser; self.endBlockSymbol = symbol}
-    let parser: Parser, endBlockSymbol: Token.Symbol
-    func parse() -> Statement? {blockStatement}
-    var blockStatement: BlockStatement? {
+    init(_ parser: Parser, kind: BlockKind) {self.parser = parser;self.kind = kind}
+    let parser: Parser, kind: BlockKind
+    func parse() -> Statement? {
         parser.switchCase.enter()
         var blockStatements: [Statement] = []
-        blockCount.up(to: endBlockSymbol)
         getNext()
         let token = currentToken
-        while !isEndOfBlock && !currentToken.isEof {
-            skipEolInBlock()                    // ブロック内での改行は読み飛ばす
+        openBlock(kind: kind, with: token)
+        let inBlock = kind == .explicit
+        while !isEndOfBlock(inBlock) && !currentToken.isEof {
+            skipEols(inBlock)                    // ブロック内での改行は読み飛ばす
             guard let statement = StatementParserFactory.create(from: parser).parse() else {
                 error(message: "ブロック(【】)内で文の解析に失敗した。")
                 return nil
             }
             blockStatements.append(statement)
-            if (blockCount.value(of: .EOL) > 1 && nextToken == .symbol(.EOL)) ||
-                isEndOfBlock || currentToken.isEof {break}   // 文で、】を検出（句点が検出できなかった。）
-            if currentToken == .symbol(.RBBRACKET) {break}
+            if currentToken.isEof {break}
+            if currentToken.isEndOfBlock && shouldCloseExplicitBlock() {break}
+            if currentToken.isEndOfStatement && shouldCloseImplicitBlock() {break}
             getNext()                                       // 句点等を読み飛ばす。
-            skipEolInBlock()
         }
-        blockCount.down(to: endBlockSymbol)
+        guard closeBlock(isExplicit: inBlock) else {
+            return nil
+        }
         if parser.switchCase.isActive {
             parser.errors.append(parser.switchCase.defaultError)
             return nil
@@ -852,12 +937,19 @@ struct BlockStatementParser : StatementParsable {
         parser.switchCase.leave()
         return BlockStatement(token: token, statements: blockStatements)
     }
-    private var isEndOfBlock: Bool {
-        currentToken == .symbol(endBlockSymbol)
+    var blockStatement: BlockStatement? {parse() as? BlockStatement}
+    private func isEndOfBlock(_ isInBlock: Bool) -> Bool {
+        if isInBlock && currentToken.isEndOfBlock {return true}
+        if !isInBlock && currentToken.isSymbol(.PERIOD) {
+            getNext()
+            return true
+        }
+        return false
     }
     /// 【】ブロック内の改行は読み飛ばす。
-    private func skipEolInBlock() {
-        while endBlockSymbol != .EOL && currentToken == .symbol(.EOL) {getNext()}
+    private func skipEols(_ isInBlock: Bool) {
+        guard isInBlock else {return}
+        skipEols()
     }
 }
 // MARK: - expression parser
@@ -926,6 +1018,9 @@ struct PrefixExpressionParserFactory {
         case .keyword(.IDENTIFIER),.keyword(.FILE),.keyword(.MEMBER),.keyword(.OUTER):
                                     return LabelExpressionParser(parser)
         case .keyword(.ITS):        return PropertyExpressionParser(parser)
+        case .keyword(.ELSE):
+            parser.errors.append("場合文外で、「それ以外」が使用されている。")
+            return nil
         case .keyword(_):           return PredicateExpressionParser(parser)
         case .illegal:              break
         default:                    return nil
@@ -939,11 +1034,13 @@ struct IdentifierParser : ExpressionParsable {
     let parser: Parser
     func parse() -> Expression? {
         let token = currentToken
+        // 中黒「・」で分離された列挙子
         let names = token.literal.components(separatedBy: EnumeratorLiteral.dot)
         if names.count == 2 {
             let enumerator = EnumeratorLiteral(token: token, type: names[0], name: names[1])
             return parseRangeExpression(with: enumerator)
         }
+        // 範囲への変換を試みる(例：<識別子>以上)
         return parseRangeExpression(
             with: Identifier(
                 from: token,
@@ -1010,8 +1107,8 @@ struct RangeLiteralParser : ExpressionParsable {
     let parser: Parser
     func parse() -> Expression? {
         let token = parseHeader()
-        let endSymbol: Token.Symbol = getNext(whenNextIs: .LBBRACKET) ? .RBBRACKET : .EOL
-        guard let block = BlockStatementParser(parser, symbol: endSymbol).blockStatement else {
+        let kind = BlockKind(isExplicit: getNext(whenNextIs: .LBBRACKET))
+        guard let block = BlockStatementParser(parser, kind: kind).blockStatement else {
             error(message: "範囲で、範囲式の解析に失敗した。")
             return nil
         }
@@ -1025,47 +1122,14 @@ struct RangeLiteralParser : ExpressionParsable {
         }
 
         let expressions = es.expressions
-
         // Prefer pre-parsed RangeLiteral(s) produced by parseRangeExpression in prefix parsers.
-        // 1 item: single boundary (lower or upper)
-        if expressions.count == 1, let legacy = expressions.first as? RangeLiteral {
-            if let bridged = rangeLiteral(from: legacy, token: token) {
-                return bridged
-            }
+        if let brideged = bridgedRange(in: expressions, headerToken: token) {
+            return brideged
         }
-        // 2 items: combination of lower-boundary then upper-boundary (both pre-parsed)
-        if expressions.count == 2,
-           let firstLegacy = expressions.first as? RangeLiteral,
-           let secondLegacy = expressions.last  as? RangeLiteral,
-           let firstBridged  = rangeLiteral(from: firstLegacy,  token: token),
-           let secondBridged = rangeLiteral(from: secondLegacy, token: token) {
-            // Accept only (lower-only) + (upper-only) in this order
-            if firstBridged.upperBoundary == nil,
-               secondBridged.lowerBoundary == nil {
-                return RangeLiteral(
-                    token: token,
-                    lower: firstBridged.lowerBoundary,
-                    upper: secondBridged.upperBoundary
-                )
-            }
-            // If order or kinds are not compatible, fall through to legacy parsing below
-        }
-
-        // Find lower boundary marker
-        var lowerIndex: Int? = nil
-        var lowerToken: Token? = nil
-        for (i, expr) in expressions.enumerated() {
-            if let p = expr as? PhraseExpression, p.token.isLower {
-                lowerIndex = i
-                lowerToken = p.token
-                break
-            }
-        }
-
+        // 下限範囲
         var lowerBoundary: BoundaryExpression? = nil
         var restExpressions: [Expression] = expressions
-
-        if let lowerIndex, let lowerToken {
+        if let (lowerToken, lowerIndex) = findBoundary(in: expressions, with: {$0.isLower})  {
             var lowerExprs = expressions.prefix(lowerIndex)
             if let exp = (expressions[lowerIndex] as? PhraseExpression)?.left {
                 lowerExprs.append(exp)
@@ -1082,21 +1146,9 @@ struct RangeLiteralParser : ExpressionParsable {
             // Determine rest expressions after lower marker: if marker is PhraseExpression skip one element, else keep from marker
             restExpressions = Array(expressions[(lowerIndex+1)...])
         }
-
-        // Find upper boundary marker within rest
-        var upperIndex: Int? = nil
-        var upperToken: Token? = nil
-        for (i, expr) in restExpressions.enumerated() {
-            if let p = expr as? PhraseExpression, p.token.isUpper {
-                upperIndex = i
-                upperToken = p.token
-                break
-            }
-        }
-
+        // 上限範囲
         var upperBoundary: BoundaryExpression? = nil
-
-        if let upperIndex, let upperToken {
+        if let (upperToken, upperIndex) = findBoundary(in: restExpressions, with: {$0.isUpper})  {
             var upperExprs = restExpressions.prefix(upperIndex)
             if let exp = (restExpressions[upperIndex] as? PhraseExpression)?.left {
                 upperExprs.append(exp)
@@ -1122,14 +1174,50 @@ struct RangeLiteralParser : ExpressionParsable {
                 return nil
             }
         }
-
         // If at least one boundary was built, return RangeLiteral with boundaries
         if lowerBoundary != nil || upperBoundary != nil {
             return RangeLiteral(token: token, lower: lowerBoundary, upper: upperBoundary)
         }
-
         // Otherwise fall back to old behavior
         return parseRangeExpressions(es.expressions, token: token)
+    }
+    private func bridgedRange(in exprs: [Expression], headerToken: Token) -> RangeLiteral? {
+        // Prefer pre-parsed RangeLiteral(s) produced by parseRangeExpression in prefix parsers.
+        // 1 item: single boundary (lower or upper)
+        if exprs.count == 1, let legacy = exprs.first as? RangeLiteral {
+            if let bridged = rangeLiteral(from: legacy, token: headerToken) {
+                return bridged
+            }
+        }
+        // 2 items: combination of lower-boundary then upper-boundary (both pre-parsed)
+        if exprs.count == 2,
+           let firstLegacy = exprs.first as? RangeLiteral,
+           let secondLegacy = exprs.last  as? RangeLiteral,
+           let firstBridged  = rangeLiteral(from: firstLegacy,  token: headerToken),
+           let secondBridged = rangeLiteral(from: secondLegacy, token: headerToken) {
+            // Accept only (lower-only) + (upper-only) in this order
+            if firstBridged.upperBoundary == nil,
+               secondBridged.lowerBoundary == nil {
+                return RangeLiteral(
+                    token: headerToken,
+                    lower: firstBridged.lowerBoundary,
+                    upper: secondBridged.upperBoundary
+                )
+            }
+        }
+        return nil
+    }
+    private func findBoundary(in exprs: [Expression], with isBoundary: (Token) -> Bool) -> (Token, Int)? {
+        var token: Token?
+        guard let i = exprs.firstIndex(where: { expr in
+            if let p = expr as? PhraseExpression, isBoundary(p.token) {
+                token = p.token
+                return true
+            }
+            return false
+        }) else { return nil }
+        
+        return (token!, i)
     }
     private func rangeLiteral(from legacyRange: RangeLiteral, token: Token) -> RangeLiteral? {
         // Case: already parsed as range by prefix parsers (e.g., "1以上", "xまで").
@@ -1170,7 +1258,8 @@ struct FunctionLiteralParser : ExpressionParsable {
     let parser: Parser
     func parse() -> Expression? {
         let token = parseHeader()
-        switch parseFunctionBlock(in: token.literal) {
+        let kind = BlockKind(isExplicit: getNext(whenNextIs: .LBBRACKET))
+        switch parseFunctionBlock(in: token.literal, kind: kind) {
         case .success(let function):
             return FunctionLiteral(token: token, function: function)
         case .failure(_):
@@ -1183,33 +1272,34 @@ struct ComputationLiteralParser : ExpressionParsable {
     let parser: Parser
     func parse() -> Expression? {
         let token = parseHeader()
-        let endOfType: Token.Symbol = getNext(whenNextIs: .LBBRACKET) ? .RBBRACKET : .EOL
-        skipNextEols(suppress: endOfType == .EOL)
+        let kind = BlockKind(isExplicit: getNext(whenNextIs: .LBBRACKET))
+        openBlock(kind: kind, with: token)
+        skipNextEols(blockKind: kind)
         // Setter block
         var setters = FunctionBlocks()
         switch parseFunctionBlocks(of: ComputationLiteral.settei, in: token.literal) {
         case .success(let blocks):
             setters = blocks
             _ = getNext(whenNextIs: .PERIOD)        // 設定ブロックの句点を飛ばす
-            skipNextEols(suppress: endOfType == .EOL)
+            skipNextEols(blockKind: kind)
         case .failure(let e):
             error(message: "算出で、「設定が、〜」の解析に失敗した。\(e.message)")
             return nil
         }
         // Getter block
         var getters = FunctionBlocks()
-        if !isEndOfBlock(of: endOfType) {
+        if !isEndOfBlock(kind: kind) {
             switch parseFunctionBlocks(of: ComputationLiteral.syutoku, in: token.literal) {
             case .success(let blocks):
                 getters = blocks
                 _ = getNext(whenNextIs: .PERIOD)    // 取得ブロックの句点を飛ばす
-                skipNextEols(suppress: endOfType == .EOL)
+                skipNextEols(blockKind: kind)
             case .failure(let e):
                 error(message: "算出で、「取得が、〜」の解析に失敗した。\(e.message)")
                 return nil
             }
             if getters.isEmpty {                    // 「取得は、」が無かった
-                switch parseFunctionBlock(in: token.literal, endOfBlock: endOfType) {
+                switch parseFunctionBlock(in: token.literal, kind: kind) {
                 case .success(let function):
                     _ = getters.append(function)
                 case .failure(let e):
@@ -1218,9 +1308,12 @@ struct ComputationLiteralParser : ExpressionParsable {
                 }
             }
         }
-        if !setters.isEmpty {_ = getNext(whenNextIs: endOfType)}    // 算出ブロックの終わりを読み飛ばす。
+        guard closeBlock(kind: kind) else {
+            return nil
+        }
+        if !setters.isEmpty {_ = getNext(kind: kind)}   // 算出ブロックの終わりを読み飛ばす。
         _ = getNext(whenNextIs: .PERIOD)            // 算出ブロックの句点を飛ばす
-        skipNextEols(suppress: endOfType == .EOL)
+        skipNextEols(blockKind: kind)
         return ComputationLiteral(token: token, setters: setters, getters: getters)
     }
 }
@@ -1229,24 +1322,29 @@ struct ProtocolLiteralParser : ExpressionParsable {
     let parser: Parser
     func parse() -> Expression? {
         let token = parseHeader()
-        let endSymbol: Token.Symbol = getNext(whenNextIs: .LBBRACKET) ? .RBBRACKET : .EOL
+        let kind = BlockKind(isExplicit: getNext(whenNextIs: .LBBRACKET))
         // Protocols block
         guard let protocols = parseProtocols() else {return nil}
         // Clauses block
-        guard let clauses = parseClauses(until: endSymbol) else {
+        guard let clauses = parseClauses(kind: kind) else {
             error(message: "規約で、「条項が、〜」の解析に失敗した。")
             return nil
         }
-        if endSymbol == .RBBRACKET {_ = getNext(whenNextIs: endSymbol)}
+        _ = getNext(kind: kind)
         return ProtocolLiteral(token: token, protocols: protocols, clauses: clauses)
     }
     /// 条項群の解析
-    private func parseClauses(until symbol: Token.Symbol) -> [ClauseLiteral]? {
+    private func parseClauses(kind: BlockKind) -> [ClauseLiteral]? {
         var clauses: [ClauseLiteral] = []
-        _ = getNext(whenNextIs: ClauseLiteral.joukouga + ClauseLiteral.joukouwa, matchAll: false)   // 条項が、(条項は、)
-        while nextToken != .symbol(symbol) && !nextToken.isEof {
-            guard let clauseGroup = parseClauseGroup(until: symbol) else {return nil}
+        _ = getNext(whenNextKeywordIs: ClauseLiteral.joukou)    // 条項が、(条項は、)
+    
+        openBlock(kind: kind, with: ProtocolLiteral.kiyaku)
+        while !nextToken.isEndOfBlock(kind: kind) && !nextToken.isEof {
+            guard let clauseGroup = parseClauseGroup(kind: kind) else {return nil}
             clauses.append(contentsOf: clauseGroup)
+        }
+        guard closeBlock(kind: kind) else {
+            return nil
         }
         return clauses
     }
@@ -1255,8 +1353,8 @@ struct ProtocolLiteralParser : ExpressionParsable {
     /// 2. (型の)<識別子>は、関数【<入力定義>。<出力定義>】
     /// 3. (型の)<識別子>は、算出【<入力定義>。<出力定義>】
     /// 4. 初期化は(が)、【<入力定義>。<出力定義>】
-    private func parseClauseGroup(until symbol: Token.Symbol) -> [ClauseLiteral]? {
-        skipNextEols(suppress: symbol == .EOL)
+    private func parseClauseGroup(kind: BlockKind) -> [ClauseLiteral]? {
+        skipNextEols(blockKind: kind)
         //
         let isStatic = getNext(whenNextIs: TypeLiteral.katano)  // 型の<識別子>
         var token = nextToken
@@ -1289,7 +1387,7 @@ struct ProtocolLiteralParser : ExpressionParsable {
         }
         guard let signatureKinds = parseClauseContents(from: token) else {return nil}
         _ = getNext(whenNextIs: .PERIOD)
-        skipNextEols(suppress: symbol == .EOL)
+        skipNextEols(blockKind: kind)
         
         return signatureKinds.map { kind in
             ClauseLiteral(
@@ -1383,17 +1481,17 @@ struct TypeLiteralParser : ExpressionParsable {
         }
         // Header proc
         let token = parseHeader()
-        let endOfType: Token.Symbol = getNext(whenNextIs: .LBBRACKET) ? .RBBRACKET : .EOL
-        skipNextEols(suppress: endOfType == .EOL)
+        let kind = BlockKind(isExplicit: getNext(whenNextIs: .LBBRACKET))
+        skipNextEols(blockKind: kind)
         // Protocols block
         guard let protocols = parseProtocols() else {return nil}
-        skipNextEols(suppress: endOfType == .EOL)
+        skipNextEols(blockKind: kind)
         // Type member block
         var members: BlockStatement?
         switch parseOptionalBlock(of: TypeLiteral.typemembers, in: token.literal) { // 「型の要素は、【<要素定義>】
         case .success(let block):
             members = block
-            skipNextEols(suppress: endOfType == .EOL)
+            skipNextEols(blockKind: kind)
         case .failure(_):
             return nil
         }
@@ -1405,24 +1503,17 @@ struct TypeLiteralParser : ExpressionParsable {
         switch parseFunctionBlocks(of: TypeLiteral.syokika, in: token.literal) {
         case .success(let inits):
             initializers = inits
-            skipNextEols(suppress: endOfType == .EOL)
+            skipNextEols(blockKind: kind)
         case .failure(_):
             return nil
         }
         // Body block
-        var body: BlockStatement?
-        if !isEndOfBlock(of: endOfType) {
-            _ = getNext(whenNextIs: ExpressionStatement.hontaiga + ExpressionStatement.hontaiwa, matchAll: false)   // 本体が、(本体は、)
-            let endSymbol: Token.Symbol = 
-                getNext(whenNextIs: .LBBRACKET) || (endOfType == .RBBRACKET) ?
-                .RBBRACKET : .EOL
-            body = BlockStatementParser(parser, symbol: endSymbol).blockStatement
-            if body == nil {
-                error(message: "型で、「本体が、〜」の解析に失敗した。")
-                return nil
-            }
+        switch parseBlock(name: ExpressionStatement.hontai, kind: kind, in: token.literal) {
+        case .success(let body):
+            return TypeLiteral(token: token, protocols: protocols, typeMembers: members, initializers: initializers, body: body)
+        case .failure(_):
+            return nil
         }
-        return TypeLiteral(token: token, protocols: protocols, typeMembers: members, initializers: initializers, body: body)
     }
     /// 型の<識別子>は、<定義>を型の要素に取り込む
     private func parseTypeMembers(with typeMembers: inout BlockStatement?) -> Bool {
@@ -1448,15 +1539,17 @@ struct EnumLiteralParser : ExpressionParsable {
     let parser: Parser
     func parse() -> Expression? {
         let token = parseHeader()
-        let endSymbol: Token.Symbol = getNext(whenNextIs: .LBBRACKET) ? .RBBRACKET : .PERIOD
-        elementsCount.up(to: endSymbol)
+        let kind = BlockKind(isExplicit: getNext(whenNextIs: .LBBRACKET))
+        openBlock(kind: kind, with: token)
         // 要素の解析
-        guard let elements: [Statement] = parseElements(in: token, with: endSymbol) else {
+        guard let elements: [Statement] = parseElements(in: token, kind: kind) else {
             error(message: "列挙で、「要素が、〜」の解析に失敗した。")
             return nil
         }
-        elementsCount.down(to: endSymbol)
-        guard parseEndOfElements(with: endSymbol) else {return nil}
+        guard closeBlock(kind: kind) else {
+            return nil
+        }
+        guard parseEndOfElements(kind: kind) else {return nil}
         return EnumLiteral(token: token, elements: elements)
     }
 }
@@ -1465,15 +1558,17 @@ struct ArrayLiteralParser : ExpressionParsable {
     let parser: Parser
     func parse() -> Expression? {
         let token = parseHeader()
-        let endSymbol: Token.Symbol = getNext(whenNextIs: .LBBRACKET) ? .RBBRACKET : .PERIOD
-        elementsCount.up(to: endSymbol)
+        let kind = BlockKind(isExplicit: getNext(whenNextIs: .LBBRACKET))
+        openBlock(kind: kind, with: token)
         // 要素の解析
-        guard let elements: [ExpressionStatement] = parseElements(in: token, with: endSymbol) else {
+        guard let elements: [ExpressionStatement] = parseElements(in: token, kind: kind) else {
             error(message: "配列で、「要素が、〜」の解析に失敗した。")
             return nil
         }
-        elementsCount.down(to: endSymbol)
-        guard parseEndOfElements(with: endSymbol) else {return nil}
+        guard closeBlock(kind: kind) else {
+            return nil
+        }
+        guard parseEndOfElements(kind: kind) else {return nil}
         return ArrayLiteral(token: token, elements: elements)
     }
 }
@@ -1482,15 +1577,17 @@ struct DictionaryLiteralParser : ExpressionParsable {
     let parser: Parser
     func parse() -> Expression? {
         let token = parseHeader()
-        let endSymbol: Token.Symbol = getNext(whenNextIs: .LBBRACKET) ? .RBBRACKET : .PERIOD
-        elementsCount.up(to: endSymbol)
+        let kind = BlockKind(isExplicit: getNext(whenNextIs: .LBBRACKET))
+        openBlock(kind: kind, with: token)
         // 要素の解析
-        guard let pairs: [PairExpression] = parseElements(in: token, with: endSymbol) else {
+        guard let pairs: [PairExpression] = parseElements(in: token, kind: kind) else {
             error(message: "辞書で、「要素が、〜」の解析に失敗した。")
             return nil
         }
-        elementsCount.down(to: endSymbol)
-        guard parseEndOfElements(with: endSymbol) else {return nil}
+        guard closeBlock(kind: kind) else {
+            return nil
+        }
+        guard parseEndOfElements(kind: kind) else {return nil}
         return DictionaryLiteral(token: token, pairs: pairs)
     }
 }
@@ -1525,9 +1622,8 @@ struct CaseExpressionParser : ExpressionParsable {
     func parse() -> Expression? {
         let token = currentToken                            // 場合
         _ = getNext(whenNextIs: .COMMA)                     // (、)
-        var endSymbol: Token.Symbol = getNext(whenNextIs: .LBBRACKET) ? .RBBRACKET : .EOL
         parser.isInCaseClause = true
-        guard let consequence = BlockStatementParser(parser, symbol: endSymbol).blockStatement else {
+        guard let consequence = parseConsequenceBlock() else {
             error(message: "「場合、」に続くブロック解析に失敗した。")
             return nil
         }
@@ -1538,14 +1634,68 @@ struct CaseExpressionParser : ExpressionParsable {
         if getNext(whenNextIs: CaseExpression.soreigai) {   // それ以外
             _ = getNext(whenNextIs: ExpressionStatement.wa) // (は)
             _ = getNext(whenNextIs: .COMMA)                 // (、)
-            endSymbol = getNext(whenNextIs: .LBBRACKET) ? .RBBRACKET : .EOL
-            alternative = BlockStatementParser(parser, symbol: endSymbol).blockStatement
+            let kind = BlockKind(isExplicit: getNext(whenNextIs: .LBBRACKET))
+            alternative = BlockStatementParser(parser, kind: kind).blockStatement
             if alternative == nil {
-                error(message: "場合文の「それ以外、」に続くブロック解析に失敗した。")
+                error(message: "場合文の「それ以外」に続くブロック解析に失敗した。")
                 return nil
             }
         }
         return CaseExpression(token: token, consequence: consequence, alternative: alternative)
+    }
+    /// 「場合」に続く文を解析する。
+    private func parseConsequenceBlock() -> BlockStatement? {
+        if getNext(whenNextIs: .LBBRACKET) {
+            return BlockStatementParser(parser, kind: .explicit).blockStatement
+        }
+        // Non-block: parse a single ExpressionStatement up to period/EOL or before "それ以外は"
+        getNext()
+        let token = currentToken
+        openBlock(kind: .implicit, with: token)
+        var expressions: [Expression] = []
+        var semanticStartIndex = 0
+        while !currentToken.isEndOfStatement {
+            guard let expression = ExpressionParser(parser).parse() else { return nil }
+            expressions.append(expression)
+            // Existing LHS semantics
+            if expression.isAssignment {
+                expressions.markLhsCandidates(from: semanticStartIndex)
+                splitElementAssignmentTarget(in: &expressions, from: semanticStartIndex)
+                semanticStartIndex = expressions.count
+            } else if isLhsAssignPredicate(expression) {
+                expressions.markLhsCandidates(from: semanticStartIndex)
+                semanticStartIndex = expressions.count
+            }
+            // Stop on next end-of-statement signals
+            if getNextWhenNextIsEndOfStatement || currentToken.isBreakFactor { break }
+            _ = getNext(whenNextIs: .COMMA)
+            // Stop if upcoming is "それ以外は"
+            if lookaheadIsElse() { break }
+            getNext()
+        }
+        guard closeBlock(isExplicit: false) else {
+            return nil
+        }
+        let es = ExpressionStatement(token: token, expressions: expressions)
+        // If Sentence AST is enabled, convert here to allow conjunctive ending in consequence context
+        if parser.options.useSentenceAST {
+            if let stmt = ExpressionStatementParser(parser).parseSentecne(from: es) {
+                return BlockStatement(token: token, statements: [stmt])
+            }
+            return nil
+        }
+        return BlockStatement(token: token, statements: [es])
+    }
+    private func lookaheadIsElse() -> Bool {
+        // Non-tokenized phrase detection: check upcoming stream for "それ以外は" optionally followed by a comma
+        let temp = Parser(from: parser)
+        // Try to match the exact literal first; rely on existing getNext(whenNextIs:) overload for String
+        if temp.getNext(whenNextIs: CaseExpression.soreigai) {   // それ以外
+            _ = temp.getNext(whenNextIs: ExpressionStatement.wa) // (は)
+            _ = temp.getNext(whenNextIs: .COMMA)
+            return true
+        }
+        return false
     }
 }
 /// 「または」または「かつ」で始まる式を解析し、続くブロック(または条件式)をLogicalExpression.rightとする。
@@ -1556,41 +1706,56 @@ struct LogicalExpressionParser : ExpressionParsable {
         let token = currentToken                            // 「または」または「かつ」
         let precedence = Precedence[token.type]
         _ = getNext(whenNextIs: .COMMA)                     // (、)
-        let endSymbol: Token.Symbol = getNext(whenNextIs: .LBBRACKET) ? .RBBRACKET : .EOL
-        guard let consequence = parseLogicalExpressions(parser, symbol: endSymbol, precedance: precedence) else {
+        guard let consequence = parseConditionalBlock(precedance: precedence) else {
             error(message: "「\(currentToken.literal)、」に続くブロック解析に失敗した。")
             return nil
         }
         _ = getNext(whenNextIs: .COMMA)                     // (、)のみ読み飛ばす
         return LogicalExpression(token: token, right: consequence)
     }
-    ///  論理式の右辺(条件式を解析する)
-    /// - Parameters:
-    ///   - parser: 解析器
-    ///   - symbol: ブロックの終端。「】」ならばブロック、そうでなければ条件式として解析する。
-    /// - Returns: ブロック文を返す。(解析失敗は、nil)
-    private func parseLogicalExpressions(_ parser: Parser, symbol: Token.Symbol, precedance: Precedence) -> BlockStatement? {
-        if symbol == .RBBRACKET {
-            return BlockStatementParser(parser, symbol: symbol).blockStatement
+    ///  論理式の右辺(条件式)を解析する
+    private func parseConditionalBlock(precedance: Precedence) -> BlockStatement? {
+        if getNext(whenNextIs: .LBBRACKET) {
+            return BlockStatementParser(parser, kind: .explicit).blockStatement
         }
         getNext()
-        var expressions: [Expression] = []
         let token = currentToken
-        while !(currentToken.isPeriod || currentToken.isEof || currentToken.isSymbol(.RBBRACKET)) {
-            skipEols()
+        openBlock(kind: .implicit, with: token)
+        var expressions: [Expression] = []
+        var semanticStartIndex = 0
+        while !currentToken.isEndOfStatement {
             guard let expression = ExpressionParser(parser).parse() else {
                 error(message: "条件式で、右辺の解析に失敗した。")
                 return nil
             }
             expressions.append(expression)
+            // Existing LHS semantics
+            if expression.isAssignment {
+                expressions.markLhsCandidates(from: semanticStartIndex)
+                splitElementAssignmentTarget(in: &expressions, from: semanticStartIndex)
+                semanticStartIndex = expressions.count
+            } else if isLhsAssignPredicate(expression) {
+                expressions.markLhsCandidates(from: semanticStartIndex)
+                semanticStartIndex = expressions.count
+            }
             _ = getNext(whenNextIs: .COMMA)     // 読点を読み飛ばし、
-            if isBreakFactor || shouldFoldLogicalExpression(currentPrecedence: precedance) {
+            if currentToken.isBreakFactor || shouldFoldLogicalExpression(currentPrecedence: precedance) {
                 break
             }
             getNext()                           // 次の式解析に
         }
-        let statement = ExpressionStatement(token: token, expressions: expressions)
-        return BlockStatement(token: token, statements: [statement])
+        guard closeBlock(kind: .implicit) else{
+            return nil
+        }
+        let es = ExpressionStatement(token: token, expressions: expressions)
+        // If Sentence AST is enabled, convert here to allow conjunctive ending in consequence context
+        if parser.options.useSentenceAST {
+            if let stmt = ExpressionStatementParser(parser).parseSentecne(from: es) {
+                return BlockStatement(token: token, statements: [stmt])
+            }
+            return nil
+        }
+        return BlockStatement(token: token, statements: [es])
     }
     /// 論理式を畳み込むか否か
     /// 畳み込みにより、かつ > または、の優先順位を実現する。
@@ -1650,7 +1815,7 @@ struct LoopExpressionParser : ExpressionParsable {
 
     func parse() -> Expression? {
         let token = parseHeader()
-        let endSymbol: Token.Symbol = getNext(whenNextIs: .LBBRACKET) ? .RBBRACKET : .EOL
+        let kind = BlockKind(isExplicit: getNext(whenNextIs: .LBBRACKET))
         // Input block
         guard let (identifiers, _) = parseInputBlock(in: token.literal) else { return nil }
         // Condition block
@@ -1662,40 +1827,32 @@ struct LoopExpressionParser : ExpressionParsable {
             return nil
         }
         // Body block
-        _ = getNext(whenNextIs: LoopExpression.syoriga + LoopExpression.syoriwa, matchAll: false) // 処理が、(処理は、)
-        guard let body = BlockStatementParser(parser, symbol: endSymbol).blockStatement else {
-            error(message: "反復で、処理の解析に失敗した。")
-            return nil
+        switch parseBlock(name: LoopExpression.syori, kind: kind, in: token.literal) {    // 処理が、(処理は、)
+        case .success(let block?):
+            return LoopExpression(token: token, parameters: identifiers, condition: condition, body: block)
+        case .success(nil):
+            error(message: "反復で、処理の解析に失敗した。(本体が見つからない)")
+        default:
+            break
         }
-        return LoopExpression(token: token, parameters: identifiers, condition: condition, body: body)
+        return nil
     }
     enum LoopExpressionError : Error {
         case input, condition, body
     }
     private func parseCondition() throws -> Statement? {
-        let token = currentToken
         guard getNext(whenNextKeywordIs: LoopExpression.condition) else { return nil }
-        getNext()
-        if nextToken.isSymbol(.LBBRACKET) {
-            getNext()
-            let block = BlockStatementParser(parser, symbol: .RBBRACKET).blockStatement
+        if getNext(whenNextIs: .LBBRACKET) {
+            let block = BlockStatementParser(parser, kind: .explicit).blockStatement
             _ = getNext(whenNextIs: LoopExpression.aida)
             _ = getNext(whenNextIs: .COMMA)
             return block
         }
-        var expressions: [Expression] = []
-        while true {
-            skipEols()
-            guard let expression = ExpressionParser(parser).parse() else {
-                throw LoopExpressionError.condition
-            }
-            expressions.append(expression)
-            if getNext(whenNextIs: LoopExpression.aida) { break }
-            if isEndOfElements { break }
-            getNext()
-        }
+        getNext()
+        guard let stmt = ExpressionStatementParser(parser, until: Token(.WHILE)).parse() else { return nil }
+        _ = getNext(whenNextIs: LoopExpression.aida)
         _ = getNext(whenNextIs: .COMMA)
-        return ExpressionStatement(token: token, expressions: expressions)
+        return stmt
     }
 }
 // MARK: - infix expression parsers and those instance factory
@@ -1736,12 +1893,12 @@ struct CallExpressionParser : ExpressionParsable {
     let left: Expression?
     func parse() -> (any Expression)? {
         let token = currentToken
-        _ = getNext(whenNextIs: CallExpression.arguments)   // 引数が、
+        _ = getNext(whenNextKeywordIs: CallExpression.arguments)   // 引数が(は)、
         guard let caller = left else {
             error(message: "呼び出し式で、左辺の解析に失敗した。")
             return nil
         }
-        guard let block = BlockStatementParser(parser, symbol: .RBBRACKET).blockStatement else {
+        guard let block = BlockStatementParser(parser, kind: .explicit).blockStatement else {
             error(message: "呼び出し式で、引数の解析に失敗した。")
             return nil
         }
@@ -1820,3 +1977,4 @@ struct PhraseExpressionParser : ExpressionParsable {
         return PhraseExpression(token: token, left: left)
     }
 }
+
