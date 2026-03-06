@@ -817,6 +817,44 @@ extension Parsable {
             break
         }
     }
+    func parseImplicitSingleStatementBlock(token: Token, precedence: Precedence?, stopWhen: (Expression, [Expression]) -> Bool) -> BlockStatement? {
+        openBlock(kind: .implicit, with: token)
+        var expressions: [Expression] = []
+        var semanticStartIndex = 0
+        while !currentToken.isEndOfStatement {
+            guard let expression = ExpressionParser(parser).parse() else {
+                error(message: "\(token.literal)で始まる文の解析に失敗した。")
+                return nil
+            }
+            expressions.append(expression)
+            // Existing LHS semantics
+            if expression.isAssignment {
+                expressions.markLhsCandidates(from: semanticStartIndex)
+                splitElementAssignmentTarget(in: &expressions, from: semanticStartIndex)
+                semanticStartIndex = expressions.count
+            } else if isLhsAssignPredicate(expression) {
+                expressions.markLhsCandidates(from: semanticStartIndex)
+                semanticStartIndex = expressions.count
+            }
+            // Stop on next end-of-statement signals or stopWhen condition
+            if getNextWhenNextIsEndOfStatement || currentToken.isBreakFactor { break }
+            _ = getNext(whenNextIs: .COMMA)     // 読点を読み飛ばし、
+            if stopWhen(expression, expressions) { break }
+            getNext()                           // 次の式解析に
+        }
+        guard closeBlock(kind: .implicit) else {
+            return nil
+        }
+        let es = ExpressionStatement(token: token, expressions: expressions)
+        // If Sentence AST is enabled, convert here to allow conjunctive ending in consequence context
+        if parser.options.useSentenceAST {
+            if let stmt = ExpressionStatementParser(parser).parseSentecne(from: es) {
+                return BlockStatement(token: token, statements: [stmt])
+            }
+            return nil
+        }
+        return BlockStatement(token: token, statements: [es])
+    }
 }
 /// 式文要素の左辺候補の操作を行う。
 extension Array where Element == Expression {
@@ -1651,40 +1689,9 @@ struct CaseExpressionParser : ExpressionParsable {
         // Non-block: parse a single ExpressionStatement up to period/EOL or before "それ以外は"
         getNext()
         let token = currentToken
-        openBlock(kind: .implicit, with: token)
-        var expressions: [Expression] = []
-        var semanticStartIndex = 0
-        while !currentToken.isEndOfStatement {
-            guard let expression = ExpressionParser(parser).parse() else { return nil }
-            expressions.append(expression)
-            // Existing LHS semantics
-            if expression.isAssignment {
-                expressions.markLhsCandidates(from: semanticStartIndex)
-                splitElementAssignmentTarget(in: &expressions, from: semanticStartIndex)
-                semanticStartIndex = expressions.count
-            } else if isLhsAssignPredicate(expression) {
-                expressions.markLhsCandidates(from: semanticStartIndex)
-                semanticStartIndex = expressions.count
-            }
-            // Stop on next end-of-statement signals
-            if getNextWhenNextIsEndOfStatement || currentToken.isBreakFactor { break }
-            _ = getNext(whenNextIs: .COMMA)
-            // Stop if upcoming is "それ以外は"
-            if lookaheadIsElse() { break }
-            getNext()
+        return parseImplicitSingleStatementBlock(token: token, precedence: nil) { _, _ in
+            self.lookaheadIsElse()
         }
-        guard closeBlock(isExplicit: false) else {
-            return nil
-        }
-        let es = ExpressionStatement(token: token, expressions: expressions)
-        // If Sentence AST is enabled, convert here to allow conjunctive ending in consequence context
-        if parser.options.useSentenceAST {
-            if let stmt = ExpressionStatementParser(parser).parseSentecne(from: es) {
-                return BlockStatement(token: token, statements: [stmt])
-            }
-            return nil
-        }
-        return BlockStatement(token: token, statements: [es])
     }
     private func lookaheadIsElse() -> Bool {
         // Non-tokenized phrase detection: check upcoming stream for "それ以外は" optionally followed by a comma
@@ -1720,42 +1727,9 @@ struct LogicalExpressionParser : ExpressionParsable {
         }
         getNext()
         let token = currentToken
-        openBlock(kind: .implicit, with: token)
-        var expressions: [Expression] = []
-        var semanticStartIndex = 0
-        while !currentToken.isEndOfStatement {
-            guard let expression = ExpressionParser(parser).parse() else {
-                error(message: "条件式で、右辺の解析に失敗した。")
-                return nil
-            }
-            expressions.append(expression)
-            // Existing LHS semantics
-            if expression.isAssignment {
-                expressions.markLhsCandidates(from: semanticStartIndex)
-                splitElementAssignmentTarget(in: &expressions, from: semanticStartIndex)
-                semanticStartIndex = expressions.count
-            } else if isLhsAssignPredicate(expression) {
-                expressions.markLhsCandidates(from: semanticStartIndex)
-                semanticStartIndex = expressions.count
-            }
-            _ = getNext(whenNextIs: .COMMA)     // 読点を読み飛ばし、
-            if currentToken.isBreakFactor || shouldFoldLogicalExpression(currentPrecedence: precedance) {
-                break
-            }
-            getNext()                           // 次の式解析に
+        return parseImplicitSingleStatementBlock(token: token, precedence: precedance) { _, _ in
+            currentToken.isBreakFactor || shouldFoldLogicalExpression(currentPrecedence: precedance)
         }
-        guard closeBlock(kind: .implicit) else{
-            return nil
-        }
-        let es = ExpressionStatement(token: token, expressions: expressions)
-        // If Sentence AST is enabled, convert here to allow conjunctive ending in consequence context
-        if parser.options.useSentenceAST {
-            if let stmt = ExpressionStatementParser(parser).parseSentecne(from: es) {
-                return BlockStatement(token: token, statements: [stmt])
-            }
-            return nil
-        }
-        return BlockStatement(token: token, statements: [es])
     }
     /// 論理式を畳み込むか否か
     /// 畳み込みにより、かつ > または、の優先順位を実現する。
