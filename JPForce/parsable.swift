@@ -64,7 +64,7 @@ extension Parsable {
     func error(message: String, at token: Token) {
         parser.errors.append(message + (currentToken.isIllegal ? "" : "(解析位置: \(token.literal))"))
     }
-    /// ブロック制御
+    /// ブロック(入れ子)制御
     func openBlock(kind: BlockKind, with token: Token? = nil) {
         parser.blockStack.append(BlockFrame(
             kind: kind,
@@ -479,23 +479,41 @@ extension Parsable {
         }
         return expressions
     }
-    // MARK: - Validate AST
-    /// 右辺チェック
-    func validateRhsType(from stmt: Statement) -> Bool {
-        guard
-            stmt is SimpleSentence ||
-            stmt is CompoundStatement ||
-            stmt is ExpressionStatement
-        else {
-            error(message: "右辺値に、「\(stmt.string.withoutPeriod)」は使えない。")
-            return false
-        }
-        if let cs = stmt as? CompoundStatement {
-            for s in cs.sentences {
-                guard validateRhsType(from: s) else { return false }
+    /// 要素群の終端解析
+    /// ＊：呼び元の要素解析で、終端まで解析を進めること！
+    /// - Parameter endSymbol: 期待する終端
+    /// - Returns: 解析結果
+    func parseEndOfElements(kind: BlockKind) -> Bool {
+        switch kind {
+        case .implicit:
+            if currentToken.isPeriod || currentToken.isEof {return true}
+            if currentToken.isEol {
+                if !nextToken.isEof {
+                    print("警告：要素の終りの句点「。」が見つかりません。要素が複数行にまたがる場合は、ブロック「【】」で囲ってください。")
+                }
+                return true
             }
+            error(message: "要素の解析で、終端「。」が見つからない。")
+        case .explicit:
+            if currentToken.isEndOfBlock {
+                // 余分な「】」が続く場合は blockStack の状態を見て読み進める
+                skipNextRBBracketsUsingBlockStack()
+                return true
+            }
+            error(message: "要素の解析で、終端「】」が見つからない。")
         }
-        return true
+        return false
+    }
+    private func skipNextRBBracketsUsingBlockStack() {
+        // 余分な「】」が続く場合は、blockStack の状態を確認しながら安全に読み進める。
+        // 明示ブロックをここで閉じるべきなら（shouldCloseExplicitBlock が true）、これ以上スキップしない。
+        while nextToken.isSymbol(.RBBRACKET) {
+            if shouldCloseExplicitBlock() {
+                break
+            }
+            // 暗黙ブロック(implicit)がトップの場合、ここで閉じるべきではない余剰な「】」とみなし読み進める。
+            getNext()
+        }
     }
     // MARK: - Literal Parser Common Procs
     /// ヘッダー部：　<型名>であって、(<型名>であり、)
@@ -536,6 +554,10 @@ extension Parsable {
     ///     failure: エラー
     func parseOptionalBlock(of blockname: String, in typename: String) -> Result<BlockStatement?, ParserError> {
         guard getNext(whenNextKeywordIs: blockname) else {return .success(nil)}
+        if nextToken.isEndOfStatement {
+            error(message: "\(typename)で、「\(blockname)」の定義が正しくない。「\(blockname)が、」の後ろにはブロック記号`【`、もしくは文が必要。")
+            return .failure(.blockParseError)
+        }
         let kind = BlockKind(isExplicit: getNext(whenNextIs: .LBBRACKET))
         guard let blockStatement = BlockStatementParser(parser, kind: kind).blockStatement else {
             error(message: "\(typename)で、「\(blockname)は、〜」の解析に失敗した。")
@@ -613,41 +635,105 @@ extension Parsable {
         }
         return .success(functionBlocks)
     }
-    /// 要素群の終端解析
-    /// ＊：呼び元の要素解析で、終端まで解析を進めること！
-    /// - Parameter endSymbol: 期待する終端
-    /// - Returns: 解析結果
-    func parseEndOfElements(kind: BlockKind) -> Bool {
-        switch kind {
-        case .implicit:
-            if currentToken.isPeriod || currentToken.isEof {return true}
-            if currentToken.isEol {
-                if !nextToken.isEof {
-                    print("警告：要素の終りの句点「。」が見つかりません。要素が複数行にまたがる場合は、ブロック「【】」で囲ってください。")
-                }
-                return true
-            }
-            error(message: "要素の解析で、終端「。」が見つからない。")
-        case .explicit:
-            if currentToken.isEndOfBlock {
-                // 余分な「】」が続く場合は blockStack の状態を見て読み進める
-                skipNextRBBracketsUsingBlockStack()
-                return true
-            }
-            error(message: "要素の解析で、終端「】」が見つからない。")
+    // MARK: - Statement Parser Common Procs
+    /// 単文暗黙ブロックの解析
+    func parseImplicitSingleStatementBlock(token: Token, precedence: Precedence?, stopWhen: (Expression, [Expression]) -> Bool) -> BlockStatement? {
+        openBlock(kind: .implicit, with: token)
+        guard let stmt = parseExpressionStatement(token: token, precedence: precedence, stopWhen: stopWhen) else {
+            return nil
         }
-        return false
+        guard closeBlock(kind: .implicit) else {
+            return nil
+        }
+        return BlockStatement(token: token, statements: [stmt])
     }
-    private func skipNextRBBracketsUsingBlockStack() {
-        // 余分な「】」が続く場合は、blockStack の状態を確認しながら安全に読み進める。
-        // 明示ブロックをここで閉じるべきなら（shouldCloseExplicitBlock が true）、これ以上スキップしない。
-        while nextToken.isSymbol(.RBBRACKET) {
-            if shouldCloseExplicitBlock() {
-                break
+    /// 式文の解析
+    func parseExpressionStatement(token: Token, precedence: Precedence?, stopWhen: (Expression, [Expression]) -> Bool) -> Statement? {
+        var expressions: [Expression] = []
+        var semanticStartIndex = 0
+        while !currentToken.isEndOfStatement {
+            guard let expression = ExpressionParser(parser).parse() else {
+                error(message: "\(token.literal)で始まる文の解析に失敗した。")
+                return nil
             }
-            // 暗黙ブロック(implicit)がトップの場合、ここで閉じるべきではない余剰な「】」とみなし読み進める。
-            getNext()
+            expressions.append(expression)
+            // Existing LHS semantics
+            if expression.isAssignment {
+                expressions.markLhsCandidates(from: semanticStartIndex)
+                splitElementAssignmentTarget(in: &expressions, from: semanticStartIndex)
+                semanticStartIndex = expressions.count
+            } else if isLhsAssignPredicate(expression) {
+                expressions.markLhsCandidates(from: semanticStartIndex)
+                semanticStartIndex = expressions.count
+            }
+            _ = getNext(whenNextIs: .COMMA)     // 読点を読み飛ばし、
+            // Stop on next end-of-statement signals or stopWhen condition
+            if getNextWhenNextIsEndOfStatement || currentToken.isBreakFactor { break }
+            if stopWhen(expression, expressions) { break }
+            getNext()                           // 次の式解析に
         }
+        let terminator = SentenceTerminator(symbol: currentToken.literal)
+        if previousToken.isComma && (terminator == .period || terminator == .rbbracket) {
+            error(message: "文の終端前の読点「、」が正しくない。")
+            return nil
+        }
+        let es = ExpressionStatement(token: token, expressions: expressions, terminator: terminator)
+        if parser.options.useSentenceAST {
+            return ExpressionStatementParser(parser).parseSentecne(from: es)
+        }
+        // Shadow mode: run sentence parsing in parallel for diagnostics only
+        if parser.options.enableSentenceShadowMode {
+            ExpressionStatementShadowRunner.shadowCheck(es, parser: parser)
+        }
+        return es
+    }
+    /// 文の終わりを検出する。(例えば、「】。」の場合、isBreakFactorによるbreakを抑止する)
+    private var getNextWhenNextIsEndOfStatement: Bool {
+        getNext(whenNextIs: .PERIOD) ||
+        getNext(whenNextIs: .RBBRACKET) ||
+        getNext(whenNextIs: .EOL)
+    }
+    /// 式が左辺(代入される対象の識別子)を持つ述語かどうか
+    private func isLhsAssignPredicate(_ exp: Expression) -> Bool {
+        guard let predicate = exp as? PredicateExpression else {
+            return false
+        }
+        return predicate.token.hasLhsIdentifier
+    }
+    /// 要素代入する対象の属格を２つの句に分割する
+    private func splitElementAssignmentTarget(
+        in exps: inout [Expression],
+        from startIndex: Int
+    ) {
+        for i in startIndex..<exps.count {
+            guard let genitive = exps[i] as? GenitiveExpression,
+                  let rightPhrase = genitive.right as? PhraseExpression,
+                  rightPhrase.hasParticle(.NI)  else {
+                continue
+            }
+            // 属格を句に分割
+            exps[i] = PhraseExpression(token: Token(.NO), left: genitive.left)
+            exps.insert(rightPhrase, at: i + 1)
+            break
+        }
+    }
+    // MARK: - Validate AST
+    /// 右辺チェック
+    func validateRhsType(from stmt: Statement) -> Bool {
+        guard
+            stmt is SimpleSentence ||
+            stmt is CompoundStatement ||
+            stmt is ExpressionStatement
+        else {
+            error(message: "右辺値に、「\(stmt.string.withoutPeriod)」は使えない。")
+            return false
+        }
+        if let cs = stmt as? CompoundStatement {
+            for s in cs.sentences {
+                guard validateRhsType(from: s) else { return false }
+            }
+        }
+        return true
     }
 }
 enum FunctionBlockError : Error {
@@ -673,187 +759,6 @@ enum ParserError : Error {
         case .blockParseError:
             return "ブロックの解析に失敗。"
         }
-    }
-}
-extension Token {
-    var isEndOfStatement: Bool {
-        isSymbol(.PERIOD) || isSymbol(.EOL) || isSymbol(.EOF) || isSymbol(.RBBRACKET)
-    }
-    var isBreakFactor: Bool {isEndOfStatement}
-    var isEndOfElements: Bool {isComma || isBreakFactor}
-    var isEndOfBlock: Bool {isSymbol(.RBBRACKET)}
-    func isEndOfBlock(kind: BlockKind) -> Bool {
-        switch kind {
-        case .explicit:
-            return isSymbol(.RBBRACKET)
-        case .implicit:
-            return isSymbol(.PERIOD) || isSymbol(.EOL)
-        }
-    }
-}
-//
-// MARK: - statemt parsers and those instance factory
-struct StatementParserFactory {
-    static func create(from parser: Parser) -> StatementParsable {
-        if parser.currentToken.isIdent {
-            switch parser.nextToken.literal {
-            case DefineStatement.wa:
-                return DefineStatementParser(parser)
-            default:
-                break
-            }
-        }
-        return ExpressionStatementParser(parser)
-    }
-}
-/// - 形式：<識別子>は、<式(値)>。
-struct DefineStatementParser : StatementParsable {
-    init(_ parser: Parser) {self.parser = parser}
-    let parser: Parser
-    func parse() -> Statement? {
-        let identifier = Identifier(from: currentToken.literal)
-        parser.insert(identifier.value)     // 識別子をLexerに登録
-        getNext()
-        let token = currentToken            // 「は」
-        _ = getNext(whenNextIs: .COMMA)     // 読点(、)を読み飛ばす
-        let isExtended = getNext(whenNextIs: DefineStatement.further)   // 「さらに、」
-        _ = getNext(whenNextIs: .COMMA)
-        getNext()
-        guard let parsed = ExpressionStatementParser(parser).parse() else {
-            error(message: "定義文「<識別子>は、<式(値)>。」で、式の解釈に失敗した。")
-            return nil
-        }
-        if !currentToken.isEndOfBlock {
-            _ = getNext(whenNextIs: .PERIOD)
-            skipNextEols()                  // EOLの前で解析を停止する。
-        }
-        if let function = parsed.literal as? FunctionLiteral {
-            function.name = identifier.value// 関数の名前を記録
-            function.function.isOverloaded = isExtended
-        }
-        guard validateRhsType(from: parsed) else { return nil }
-        return DefineStatement(token: token, name: identifier, value: parsed, isExtended: isExtended)
-    }
-}
-/// 文の終わりまで、式を解析する。
-/// 文の終わり：句点、または改行
-/// 解析停止：EOF、ブロックの終わり(】)
-struct ExpressionStatementParser : StatementParsable {
-    init(_ parser: Parser, until token: Token? = nil) {self.parser = parser; self.endToken = token}
-    let parser: Parser, endToken: Token?
-    func parse() -> Statement? {
-        let token = currentToken
-        var expressions: [Expression] = []
-        var semanticStartIndex = 0
-        
-        while !currentToken.isEndOfStatement {
-            skipEols()
-            guard let expression = ExpressionParser(parser).parse() else {
-                error(message: "式文で、式の解析に失敗した。")
-                return nil
-            }
-            expressions.append(expression)
-            // 未確定区間の意味処理
-            if expression.isAssignment {
-                expressions.markLhsCandidates(from: semanticStartIndex)
-                splitElementAssignmentTarget(in: &expressions, from: semanticStartIndex)
-                semanticStartIndex = expressions.count
-            } else
-            if isLhsAssignPredicate(expression) {
-                expressions.markLhsCandidates(from: semanticStartIndex)
-                semanticStartIndex = expressions.count
-            }
-            //
-            if getNextWhenNextIsEndOfStatement || currentToken.isBreakFactor {break}    // 文の終わり
-            _ = getNext(whenNextIs: .COMMA)             // 読点を読み飛ばし、
-            if lookaheadIsEndToken() { break }
-            getNext()                                   // 次の式解析に
-        }
-        let terminator = SentenceTerminator(symbol: currentToken.literal)
-        if previousToken.isComma && (terminator == .period || terminator == .rbbracket) {
-            error(message: "文の終端前の読点「、」が正しくない。")
-            return nil
-        }
-        let es = ExpressionStatement(token: token, expressions: expressions, terminator: terminator)
-        if parser.options.useSentenceAST {
-            return parseSentecne(from: es)
-        }
-        // Shadow mode: run sentence parsing in parallel for diagnostics only
-        if parser.options.enableSentenceShadowMode {
-            ExpressionStatementShadowRunner.shadowCheck(es, parser: parser)
-        }
-        return es
-    }
-    private func lookaheadIsEndToken() -> Bool {nextToken == endToken}
-}
-extension Parsable {
-    /// 文の終わりを検出する。(例えば、「】。」の場合、isBreakFactorによるbreakを抑止する)
-    var getNextWhenNextIsEndOfStatement: Bool {
-        getNext(whenNextIs: .PERIOD) ||
-        getNext(whenNextIs: .RBBRACKET) ||
-        getNext(whenNextIs: .EOL)
-    }
-    /// 式が左辺(代入される対象の識別子)を持つ述語かどうか
-    func isLhsAssignPredicate(_ exp: Expression) -> Bool {
-        guard let predicate = exp as? PredicateExpression else {
-            return false
-        }
-        return predicate.token.hasLhsIdentifier
-    }
-    /// 要素代入する対象の属格を２つの句に分割する
-    func splitElementAssignmentTarget(
-        in exps: inout [Expression],
-        from startIndex: Int
-    ) {
-        for i in startIndex..<exps.count {
-            guard let genitive = exps[i] as? GenitiveExpression,
-                  let rightPhrase = genitive.right as? PhraseExpression,
-                  rightPhrase.hasParticle(.NI)  else {
-                continue
-            }
-            // 属格を句に分割
-            exps[i] = PhraseExpression(token: Token(.NO), left: genitive.left)
-            exps.insert(rightPhrase, at: i + 1)
-            break
-        }
-    }
-    func parseImplicitSingleStatementBlock(token: Token, precedence: Precedence?, stopWhen: (Expression, [Expression]) -> Bool) -> BlockStatement? {
-        openBlock(kind: .implicit, with: token)
-        var expressions: [Expression] = []
-        var semanticStartIndex = 0
-        while !currentToken.isEndOfStatement {
-            guard let expression = ExpressionParser(parser).parse() else {
-                error(message: "\(token.literal)で始まる文の解析に失敗した。")
-                return nil
-            }
-            expressions.append(expression)
-            // Existing LHS semantics
-            if expression.isAssignment {
-                expressions.markLhsCandidates(from: semanticStartIndex)
-                splitElementAssignmentTarget(in: &expressions, from: semanticStartIndex)
-                semanticStartIndex = expressions.count
-            } else if isLhsAssignPredicate(expression) {
-                expressions.markLhsCandidates(from: semanticStartIndex)
-                semanticStartIndex = expressions.count
-            }
-            // Stop on next end-of-statement signals or stopWhen condition
-            if getNextWhenNextIsEndOfStatement || currentToken.isBreakFactor { break }
-            _ = getNext(whenNextIs: .COMMA)     // 読点を読み飛ばし、
-            if stopWhen(expression, expressions) { break }
-            getNext()                           // 次の式解析に
-        }
-        guard closeBlock(kind: .implicit) else {
-            return nil
-        }
-        let es = ExpressionStatement(token: token, expressions: expressions)
-        // If Sentence AST is enabled, convert here to allow conjunctive ending in consequence context
-        if parser.options.useSentenceAST {
-            if let stmt = ExpressionStatementParser(parser).parseSentecne(from: es) {
-                return BlockStatement(token: token, statements: [stmt])
-            }
-            return nil
-        }
-        return BlockStatement(token: token, statements: [es])
     }
 }
 /// 式文要素の左辺候補の操作を行う。
@@ -939,6 +844,80 @@ extension Array where Element == Expression {
                 ident.isLhsCandidate = false
             }
         }
+    }
+}
+extension Token {
+    var isEndOfStatement: Bool {
+        isSymbol(.PERIOD) || isSymbol(.EOL) || isSymbol(.EOF) || isSymbol(.RBBRACKET)
+    }
+    var isBreakFactor: Bool {isEndOfStatement}
+    var isEndOfElements: Bool {isComma || isBreakFactor}
+    var isEndOfBlock: Bool {isSymbol(.RBBRACKET)}
+    func isEndOfBlock(kind: BlockKind) -> Bool {
+        switch kind {
+        case .explicit:
+            return isSymbol(.RBBRACKET)
+        case .implicit:
+            return isSymbol(.PERIOD) || isSymbol(.EOL)
+        }
+    }
+}
+//
+// MARK: - statemt parsers and those instance factory
+struct StatementParserFactory {
+    static func create(from parser: Parser) -> StatementParsable {
+        if parser.currentToken.isIdent {
+            switch parser.nextToken.literal {
+            case DefineStatement.wa:
+                return DefineStatementParser(parser)
+            default:
+                break
+            }
+        }
+        return ExpressionStatementParser(parser)
+    }
+}
+/// - 形式：<識別子>は、<式(値)>。
+struct DefineStatementParser : StatementParsable {
+    init(_ parser: Parser) {self.parser = parser}
+    let parser: Parser
+    func parse() -> Statement? {
+        let identifier = Identifier(from: currentToken.literal)
+        parser.insert(identifier.value)     // 識別子をLexerに登録
+        getNext()
+        let token = currentToken            // 「は」
+        _ = getNext(whenNextIs: .COMMA)     // 読点(、)を読み飛ばす
+        let isExtended = getNext(whenNextIs: DefineStatement.further)   // 「さらに、」
+        _ = getNext(whenNextIs: .COMMA)
+        getNext()
+        guard let parsed = ExpressionStatementParser(parser).parse() else {
+            error(message: "定義文「\(identifier.value)は、<式(値)>。」で、式の解釈に失敗した。")
+            return nil
+        }
+        if !currentToken.isEndOfBlock {
+            _ = getNext(whenNextIs: .PERIOD)
+            skipNextEols()                  // EOLの前で解析を停止する。
+        }
+        if let function = parsed.literal as? FunctionLiteral {
+            function.name = identifier.value// 関数の名前を記録
+            function.function.isOverloaded = isExtended
+        }
+        guard validateRhsType(from: parsed) else { return nil }
+        return DefineStatement(token: token, name: identifier, value: parsed, isExtended: isExtended)
+    }
+}
+/// 文の終わりまで、式を解析する。
+/// 文の終わり：句点、または改行
+/// 解析停止：EOF、ブロックの終わり(】)
+struct ExpressionStatementParser : StatementParsable {
+    init(_ parser: Parser, until token: Token? = nil) {self.parser = parser; self.endToken = token}
+    let parser: Parser, endToken: Token?
+    func parse() -> Statement? {
+        let token = currentToken
+        let stmt = parseExpressionStatement(token: token, precedence: nil) { _, _ in
+            self.nextToken == self.endToken
+        }
+        return stmt
     }
 }
 /// ブロック(【】)内で式を解析したstatementを、statementsに格納
