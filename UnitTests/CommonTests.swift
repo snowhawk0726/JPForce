@@ -22,6 +22,7 @@ final class CommonTests: XCTestCase {
             ("配列【1,2,3】の1に0を代入。",[1,0,3]),
             ("aは配列【1,2,3】。iは1。aのiに0を代入。a。",[1,0,3]),
             ("aは配列【1,2,3】。iは1。aの1にaの2を足す。",5),
+            ("aは配列【1,2,3】。aの1に2を足し、bに代入する。b。",4),
             ("1をxに代入し、xと１を足し、cに代入。c。",2),
             ("1と2を積む。aとbに得、aとbを足す。",3),
             ("xと１を足し、cに代入。c。","識別子『x』が定義されていない。"),
@@ -86,7 +87,6 @@ final class CommonTests: XCTestCase {
     let syntaxError: Error = CommonTestError.syntax
     //
     private func parseSentenses(with parser: Parser) throws -> [Statement] {
-        parser.options.useSentenceAST = true
         let program = try XCTUnwrap(parser.parseProgram())
         return program.statements
     }

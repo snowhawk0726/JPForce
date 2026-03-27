@@ -659,8 +659,8 @@ extension Parsable {
             expressions.append(expression)
             // Existing LHS semantics
             if expression.isAssignment {
-                expressions.markLhsCandidates(from: semanticStartIndex)
                 splitElementAssignmentTarget(in: &expressions, from: semanticStartIndex)
+                expressions.markLhsCandidates(from: semanticStartIndex)
                 semanticStartIndex = expressions.count
             } else if isLhsAssignPredicate(expression) {
                 expressions.markLhsCandidates(from: semanticStartIndex)
@@ -680,10 +680,6 @@ extension Parsable {
         let es = ExpressionStatement(token: token, expressions: expressions, terminator: terminator)
         if parser.options.useSentenceAST {
             return ExpressionStatementParser(parser).parseSentecne(from: es)
-        }
-        // Shadow mode: run sentence parsing in parallel for diagnostics only
-        if parser.options.enableSentenceShadowMode {
-            ExpressionStatementShadowRunner.shadowCheck(es, parser: parser)
         }
         return es
     }
@@ -705,16 +701,29 @@ extension Parsable {
         in exps: inout [Expression],
         from startIndex: Int
     ) {
+        // 分割候補
+        var candidate: (index: Int, left: PhraseExpression, right: PhraseExpression)? = nil
         for i in startIndex..<exps.count {
+            if candidate != nil,
+               let predicate = exps[i] as? PredicateExpression {
+                if predicate.isAssignment {
+                    break
+                } else {
+                    candidate = nil // 分割候補をキャンセル
+                }
+            }
             guard let genitive = exps[i] as? GenitiveExpression,
                   let rightPhrase = genitive.right as? PhraseExpression,
                   rightPhrase.hasParticle(.NI)  else {
                 continue
             }
-            // 属格を句に分割
-            exps[i] = PhraseExpression(token: Token(.NO), left: genitive.left)
-            exps.insert(rightPhrase, at: i + 1)
-            break
+            // 分割候補を設定
+            candidate = (i, PhraseExpression(token: Token(.NO), left: genitive.left), rightPhrase)
+        }
+        // 属格を句に分割
+        if let candidate {
+            exps[candidate.index] = candidate.left
+            exps.insert(candidate.right, at: candidate.index + 1)
         }
     }
     // MARK: - Validate AST
@@ -782,59 +791,85 @@ extension Array where Element == Expression {
             .first { $0.isLhsCandidate }
     }
     /// 代入先が不変(immutable)かをチェック
-    /// - Returns: 最初に見つかった「に」格の句の左辺が識別子でない場合に true。
-    ///            条件を満たさない場合は false。
+    /// - Returns:
+    ///     1. 「aのbに」で、aが識別子でない場合、true (immutable)
+    ///     2. 「aに」で、aが識別子でない場合、true (immutable)
     var hasImmutableLhs: Bool {
         for (i, element) in self.enumerated() {
+            // 〜に
             guard let lhsPhrase = element as? PhraseExpression,
                   lhsPhrase.hasParticle(.NI) else {
                 continue
             }
+            // 〜の〜に
             if i > 0, let genitivePhrase = self[i-1] as? PhraseExpression,
                genitivePhrase.hasParticle(.NO) {
-                return true
+                return !(genitivePhrase.left is Identifier)
             }
             return !(lhsPhrase.left is Identifier)
         }
         return false
     }
     /// LHSフラグ付け
+    /// 1. <識別子>に
+    /// 2. <識別子>の<式>に (式の型に依らない)
+    /// 3. <識別子>と<識別子>に
+    enum LhsCandidate {
+        case TO(Identifier)
+        case NO(Identifier)
+        case NI(Identifier?)
+        //
+        init?(from phrase: PhraseExpression) {
+            switch phrase.token {
+            case Token(.TO) where phrase.left is Identifier:
+                self = .TO(phrase.left as! Identifier)
+            case Token(.NO) where phrase.left is Identifier:
+                self = .NO(phrase.left as! Identifier)
+            case Token(.NI):    // 識別子でない場合(nil)も無効なLHS候補とする
+                self = .NI(phrase.left as? Identifier)
+            default:
+                return nil
+            }
+        }
+        // 対象の(有効な)<識別子>を候補としてマークする
+        func mark() {
+            switch self {
+            case .TO(let id),.NO(let id),.NI(let id?):
+                id.isLhsCandidate = true
+            default:
+                return
+            }
+        }
+    }
     mutating func markLhsCandidates(from startIndex: Int) {
-        var candidates: [PhraseExpression] = []
+        var candidates: [LhsCandidate] = []
         for exp in self[startIndex...] {
-            // 関係の無い述語であれば、候補をキャンセル
+            // 文中に関係の無い述語があれば、その前の候補をキャンセル
             if let predicate = exp as? PredicateExpression,
                !predicate.token.hasLhsIdentifier {
                 candidates.removeAll()
                 continue
             }
+            // 候補対象の絞り込み
             guard let phrase = exp as? PhraseExpression,
-                  phrase.left is Identifier else {
+                  let candidate = LhsCandidate(from: phrase) else {
                 continue
             }
-            switch phrase.token {
-            case .particle(.TO):
-                candidates.append(phrase)
-                continue
-            case .particle(.NO):
-                candidates = [phrase]
-                continue
-            case .particle(.NI):
-                // 新仕様: 直前が「の」格 (aのbに) の場合は不変とみなし、候補確定しない。
-                if let first = candidates.first, first.hasParticle(.NO) {
-                    candidates.removeAll()
-                    continue
+            switch candidate {
+            case .TO:
+                candidates.append(candidate)
+            case .NO:
+                candidates = [candidate]
+            case .NI:
+                if case .NO = candidates.first {
+                    break                       // 「<識別子>に」を候補としない
+                } else {
+                    candidates.append(candidate)
                 }
-                candidates.append(phrase)
-            default:
-                continue
             }
-            // 確定した候補の識別子のフラグをオンにする。
-            candidates.forEach {
-                ($0.left as? Identifier)?.isLhsCandidate = true
-            }
-            candidates.removeAll()
         }
+        // 確定した候補の識別子のフラグをオンにする。
+        candidates.forEach { $0.mark() }
     }
     /// 識別子候補を破棄する。
     mutating func clearLhsCandidates() {
@@ -1639,12 +1674,10 @@ struct CaseExpressionParser : ExpressionParsable {
     func parse() -> Expression? {
         let token = currentToken                            // 場合
         _ = getNext(whenNextIs: .COMMA)                     // (、)
-        parser.isInCaseClause = true
         guard let consequence = parseConsequenceBlock() else {
             error(message: "「場合、」に続くブロック解析に失敗した。")
             return nil
         }
-        parser.isInCaseClause = false
         _ = getNext(whenNextIs: .COMMA)                     // 読点(、)を読み飛ばす
         _ = getNext(whenNextIs: .EOL)                       // EOLを読み飛ばす
         var alternative: BlockStatement? = nil

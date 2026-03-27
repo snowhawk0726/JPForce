@@ -8,7 +8,6 @@
 import XCTest
 
 final class CompilerTests: XCTestCase {
-    var useSentenceAST = true
     typealias CompilerTestCase = (
         input: String,
         expectedConstants: [Any],
@@ -1023,7 +1022,7 @@ final class CompilerTests: XCTestCase {
     private func runCompilerTests(_ tests: [CompilerTestCase]) throws {
         for t in tests {
             print("テスト開始：「\(t.input)」")
-            let program = parseProgram(with: t.input, useSentenceAST: useSentenceAST)!
+            let program = parseProgram(with: t.input)!
             let compiler = Compiler(from: program)
             XCTAssertNil(compiler.compile())
             let bytecode = compiler.bytecode

@@ -19,14 +19,10 @@ struct Evaluator {
 func testEvaluator(_ input: String) -> JpfObject? {
     let lexer = Lexer(input)
     let parser = Parser(lexer)
-    parser.options.useSentenceAST = true
-    parser.options.enableSentenceShadowMode = true
-    parser.options.verboseShadowLog = false
     guard let program = parser.parseProgram(), parser.errors.isEmpty else {
         parser.errors.forEach {print("Parser errors: \($0)")}
         return nil
     }
-    printMetrics(parser: parser)
     let environment = Environment()
     let eval = Evaluator(from: program, with: environment)
     return eval.object ?? environment.peek

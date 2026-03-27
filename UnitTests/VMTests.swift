@@ -94,14 +94,14 @@ final class VMTests: XCTestCase {
             ("１が２より大きい場合【10】、それ以外は【20】", 20),
             ("１が２より大きい場合、【10】", nil),
             ("偽である場合、【10】。", nil),
-            ("１が２より大きい場合【10】である場合【20】", "「ある」には１つ以上の入力が必要。仕様：(〜が)〜である。または、(〜は)〜である。"),
+            ("１が２より大きい場合【10】である場合【20】", "「ある」で評価すべき値が空だった。"),
             // VM
             ("真で。ある場合、【10】。", 10),
             ("真である。場合【10】、それ以外は【20】。", 10),
             ("１が２より大きい。場合【10】、それ以外は【20】", 20),
             ("１が２より大きい。場合【10】", nil),
             ("無で。ある場合【10】", nil),
-            ("１が２より大きい。場合【10】である場合【20】", "「ある」には１つ以上の入力が必要。仕様：(〜が)〜である。または、(〜は)〜である。"),
+            ("１が２より大きい。場合【10】である場合【20】", "「ある」で評価すべき値が空だった。"),
         ]
         try runVmTests(with: testPattern)
     }
@@ -327,7 +327,7 @@ final class VMTests: XCTestCase {
             ("aは1。aに5を足して代入する。a。", 6),
             ("aは1。aとaと5を足して代入する。a。", 7),
             ("aに、1と4を足して代入する。a。", undefinedIdentifier("a")),
-            ("aに、1を代入し、7を足して代入する。a。", "「足す」には、２つ以上の数値、文字列、配列の入力が必要。仕様：(〜と…)〜を足す。"),
+            ("aに、1を代入し、7を足して代入する。a。", "複合代入文では、文末以外に代入を書くことはできない。(解析位置: 代入)"),
             // 要素代入
             ("iは1。配列【1,2,3】のiに0を代入する。",[1,0,3]),
             ("vは0。配列【1,2,3】の1にvを代入する。",[1,0,3]),
@@ -449,8 +449,6 @@ final class VMTests: XCTestCase {
             print("テスト開始：「\(t.input)」")
             var result: JpfObject?
             let parser = Parser(input: t.input)
-            parser.options.enableSentenceShadowMode = true
-            parser.options.verboseShadowLog = false
             guard let program = parser.parseProgram() else {
                 XCTAssertEqual(t.expected as? String, parser.errors.first!)
                 print("テスト結果：\(parser.errors.first!)")

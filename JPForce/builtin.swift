@@ -50,6 +50,12 @@ struct ObjectProperties {
     var names: [String] {allProperties.map(\.name)}
     var common: [String] {commonProperties.map(\.name)}
     var specific: [String] {specificProperties.map(\.name)}
+    // 全属性名
+    static let allPropertyNames: Set<String> = {
+        let base = ObjectProperties()
+        return Set(base.allProperties.map(\.name))
+    }()
+    static func hasName(_ name: String) -> Bool {allPropertyNames.contains(name)}
 }
 
 extension JpfObject {

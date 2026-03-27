@@ -75,7 +75,7 @@ extension ExpressionStatement {
 }
 /// Sentence(節)層
 extension Sentence {
-    var isTerminalConnector: Bool {token.isTerminalConnector}
+    var isTerminalConnector: Bool {firstToken?.isTerminalConnector == true}
     var firstToken: Token? {token}
     var isIdentifierOnlySentence: Bool {false}
     var terminality: SentenceTerminality {
@@ -138,7 +138,10 @@ extension PredicateExpression {
 extension Identifier {
     var isPredicate: Bool {true}
     var isTerminalCandidate: Bool {true}
-    var isConjunctiveForm: Bool {auxiliaryToken?.isConjunctiveForm ?? token.isConjunctiveForm}
+    var isConjunctiveForm: Bool {
+        if ObjectProperties.hasName(value) {return false}
+        return auxiliaryToken?.isConjunctiveForm ?? token.isConjunctiveForm
+    }
     var auxiliaryVerb: AuxiliaryVerb {AuxiliaryVerb(auxiliaryToken: auxiliaryToken)}
 }
 extension PhraseExpression {
@@ -431,6 +434,12 @@ extension SimpleSentence {
         return Identifier(from: token)
     }
     var isIdentifierOnlySentence: Bool {token.isIdent && arguments.isEmpty}
+    var firstToken: Token? {
+        if let phrase = arguments.first as? PhraseExpression {
+            return phrase.left.token
+        }
+        return token
+    }
 }
 /// 旧AST互換インタフェース
 extension ExpressionStatement {

@@ -33,6 +33,7 @@ struct PredicateCompilableFactory {
         case .keyword(.ASSIGN):     return AssignOperationCompiler(compiler, by: token)
         case .keyword(.PULL),.keyword(.DUPLICATE):
                                     return PullOperationCompiler(compiler, by: token)
+        case .keyword(.DROP):       return DropCompiler(compiler)
         case .keyword(.IT):         return ItCompiler(compiler)
         default:                    return nil
         }
@@ -223,8 +224,8 @@ struct AssignOperationCompiler : PredicateCompilable {
 }
 private extension AssignOperationCompiler {
     func compileCollectionAssignment(value: JpfObject?, collection: JpfObject?, key: JpfObject?) -> JpfObject? {
-        // 「<値>を」が翻訳済みの場合は、emit
-        if value == nil && compiler.isLastOpPhrase(particle: .WO) {
+        // <値>が翻訳済みの場合は、emit
+        if value == nil {
             do {try emitCollectionAssignment(value: nil, collection: collection, key: key)}
             catch {return jpfError(from: error)}
             return nil
@@ -440,6 +441,20 @@ private extension PullOperationCompiler {
         if identifiers.isEmpty, mode != .none {
             try emitGetProperty(by: mode)
         }
+    }
+}
+struct DropCompiler : PredicateCompilable {
+    init(_ compiler: Compiler) {self.compiler = compiler}
+    let compiler: Compiler
+    func compile() -> JpfObject? {
+        var number = 1
+        if compiler.environment.isPeekParticle(.KO),
+            let n = compiler.environment.unwrappedPeek?.number {
+            number = n
+            compiler.drop()
+        }
+        _ = compiler.emit(op: .opDropConst, operand: number)
+        return nil
     }
 }
 struct ItCompiler : PredicateCompilable {

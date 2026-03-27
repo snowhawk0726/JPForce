@@ -146,20 +146,10 @@ extension SentencePredicateKind {
 }
 extension AssignmentSentence : Compilable {
     func compile(with c: Compiler) -> JpfObject? {
-        // 右辺の式を抽出(ヲ格をチェック)
-        let rhsExpressionsResult = extractRightHandExpressions()
-        switch rhsExpressionsResult {
-        case .failure(let error):
-            return error
-        case .success(let expressions):
-            // 右辺の計算（キャッシュで継続可能な場合は push）
-            if let exit = expressions.compile(with: c) {
-                return exit
-            }
-        }
-        // キャッシュを出力し、左辺への代入コードを emit
         do {
-            try c.emitAllCashe()
+            if !arguments.isEmpty {
+                try compileRhs(arguments, with: c)
+            }
             let ident = try JpfIdentifier(ensuring: target, with: c)
             try ident.emitOpSet(with: c)
         } catch {
@@ -167,19 +157,58 @@ extension AssignmentSentence : Compilable {
         }
         return nil
     }
-    // 右辺の式リストを抽出する。
-    // 最後が PhraseExpression かつ 格「を」(WO) の場合は、その左項を右辺に含める。
-    private func extractRightHandExpressions() -> Result<[Expression], JpfError> {
-        var expressions = Array(arguments.dropLast())
-        if let phrase = arguments.last as? PhraseExpression {
-            guard phrase.hasParticle(.WO) else {
-                return .failure(assignUsage)
-            }
-            expressions.append(phrase.left)
-        } else if let last = arguments.last {
-            expressions.append(last)
+    private func compileRhs(_ exprs: [Expression], with c: Compiler) throws {
+        let params = try getParams(from: exprs)
+        guard let data = params.0 else {    // 代入対象
+            throw assignUsage
         }
-        return .success(expressions)
+        if let result = data.compile(with: c) {
+            if result.isError { throw result.error! }
+            try result.emit(with: c)
+        }
+        if let pos = params.1 {             // 要素代入
+            _ = c.emit(particle: .WO)
+            let ident = try JpfIdentifier(ensuring: target, with: c)
+            try ident.emit(with: c)         // 代入先
+            _ = c.emit(particle: .NO)
+            if let result = pos.compile(with: c) {
+                if result.isError { throw result.error! }
+                try result.emit(with: c)
+            }
+            _ = c.emit(particle: .NI)
+            _ = c.emit(predicate: .ASSIGN)
+        }
+    }
+    private func getParams(from exprs: [Expression]) throws -> (Expression?, Expression?) {
+        if exprs.isEmpty { return (nil, nil) }  // 翻訳済み
+        var params: [(Token?, Expression)] = []
+        for expr in exprs {
+            if let phrase = expr as? PhraseExpression {
+                params.append((phrase.token, phrase.left))
+            } else
+            if let genitive = expr as? GenitiveExpression,
+               let phrase = genitive.right as? PhraseExpression {
+                let expr = GenitiveExpression(token: genitive.token, left: genitive.left, right: phrase.left)
+                params.append((phrase.token, expr))
+            } else {
+                params.append((nil, expr))
+            }
+        }
+        if params.count == 2 {
+            switch (params[0].0, params[1].0) {
+            case (Token(.NI), Token(.WO)), (Token(.NI), nil):
+                params.swapAt(0, 1)
+                fallthrough
+            case (Token(.WO), Token(.NI)), (nil, Token(.NI)):
+                return (params[0].1, params[1].1)
+            default:
+                throw assignUsage
+            }
+        }
+        if params.count == 1, (params[0].0 == nil || params[0].0 == Token(.WO)) {
+            return (params[0].1, nil)
+        }
+        throw assignUsage
     }
 }
 // MARK: Expression compilers

@@ -26,7 +26,6 @@ final class Parser {
         self.previousToken = other.previousToken
         self.blockStack = other.blockStack
         self.switchCase = other.switchCase
-        self.isInCaseClause = other.isInCaseClause
         self.errors = other.errors
     }
     //
@@ -37,10 +36,8 @@ final class Parser {
     var errors: [String] = []
     var blockStack: [BlockFrame] = []
     var switchCase = SwitchCase()           // Switch-case監視
-    var isInCaseClause: Bool = false
     var leadingIdentifier: Identifier? = nil
     var options = ParserOptions()
-    var shadowMetrics = SentenceShadowMetrics()
     // MARK: - プログラムの解析
     func parseProgram() -> Program? {
         var statements: [Statement] = []
@@ -143,29 +140,16 @@ struct BlockFrame {
     }
 }
 // MARK: - Helpers for Unit Test
-func parseProgram(with input: String, isShadowMode: Bool = true, verboseMode: Bool = false, useSentenceAST: Bool = false) -> Program? {
+func parseProgram(with input: String) -> Program? {
     let lexer = Lexer(input)
     let parser = Parser(lexer)
-    parser.options.useSentenceAST = useSentenceAST
-    parser.options.enableSentenceShadowMode = isShadowMode
-    parser.options.verboseShadowLog = verboseMode
+    parser.options.useSentenceAST = true
     let program = parser.parseProgram()
     check(parser.errors)
-    printMetrics(parser: parser)
     return program
 }
 private func check(_ errors: [String]) {
     if errors.isEmpty {return}
     print("Parserが、\(errors.count)個のエラーを検出した。")
     errors.forEach {print("Parerエラー: \($0)")}
-}
-func printMetrics(parser: Parser) {
-    let metrics = parser.shadowMetrics
-    guard !metrics.samples.isEmpty else {return}
-    print("ExpressionStatementとの差異")
-    print("parseSentence失敗: \(metrics.failedBuildCount)")
-    print("文の種別の差分(代入): \(metrics.kindMismatchCount)")
-    print("単文/複文の差分:    \(metrics.multiSentenceMismatchCount)")
-    print("終端の差分:       \(metrics.terminatorMismatchCount)")
-    print("差分のサンプル:     \(metrics.samples)")
 }

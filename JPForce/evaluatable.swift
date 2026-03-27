@@ -258,23 +258,26 @@ extension SimpleSentence : Evaluatable {
            result.isBreakFactor {
             return result
         }
-        if let result = predicateKind.evaluate(token: token, auxiliaryVerb: auxiliaryVerb, with: environment) { // 述語を評価
-            if let exit = processEvaluationResult(result, in: environment) {
-                return exit
-            }
+        let result = predicateKind.evaluate(token: token, auxiliaryVerb: auxiliaryVerb, with: environment)  // 述語を評価
+        if let exit = processEvaluationResult(result, in: environment) {
+            return exit
         }
-        return nil
+        return result
     }
 }
 extension SentencePredicateKind {
     func evaluate(token: Token, auxiliaryVerb: AuxiliaryVerb, with environment: Environment) -> JpfObject? {
         switch self {
         case .builtin:
+            if let keyword = token.keyword, environment.contains(keyword) { // 再定義済み？
+                let ident = Identifier(from: token)
+                return ident.evaluate(with: environment)
+            }
             let predicate = PredicateOperableFactory.create(from: token, with: environment)
             return predicate.operate()
         case .custom:
-            let identifier = Identifier(from: token, with: auxiliaryVerb.token)
-            return identifier.evaluate(with: environment)
+            let ident = Identifier(from: token, with: auxiliaryVerb.token)
+            return ident.evaluate(with: environment)
         }
     }
 }
@@ -284,21 +287,47 @@ extension AssignmentSentence : Evaluatable {
            exit.isBreakFactor {
             return exit
         }
-        var rhs: JpfObject?
-        if let phrase = environment.peek as? JpfPhrase {
-            guard phrase.isParticle(.WO) else {
+        guard let params = getPrarms(from: environment) else {
+            return assignUsage
+        }
+        guard let data = params.0 else {    // 代入対象
+            return assignUsage
+        }
+        var rhs = data
+        // 要素代入
+        if let position = params.1 {        // 代入位置
+            guard let container = environment.get(target: target) else {
                 return assignUsage
             }
-            rhs = phrase.value
-        } else {
-            rhs = environment.peek
+            rhs = container.assign(data, to: position)
+            if rhs.isError {return rhs}
         }
-        guard let rhs else {return assignUsage}
-        environment.drop()
+        // 値代入
         do {
             try environment.assign(target: target, value: rhs)
+            return nil
         } catch {
             return jpfError(from: error)
+        }
+    }
+    private func getPrarms(from env: Environment) -> (JpfObject?, JpfObject?)? {
+        if var params = env.peek(2) {
+            switch (params[0].particle, params[1].particle) {
+            case (Token(.NI), Token(.WO)), (Token(.NI), nil):
+                params.swapAt(0, 1)
+                fallthrough
+            case (Token(.WO), Token(.NI)), (nil, Token(.NI)):
+                env.drop(2)
+                return (params[0].value, params[1].value)
+            default:
+                break
+            }
+        }
+        if let param = env.peek {
+            if param.particle == Token(.WO) || param.particle == nil {
+                env.drop()
+                return (param.value, nil)
+            }
         }
         return nil
     }

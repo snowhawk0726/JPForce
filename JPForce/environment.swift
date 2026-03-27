@@ -77,19 +77,41 @@ final class Environment {
             self[name] = nil
         }
     }
+    /// 指定Identifierの値を辞書から取り出す。
+    func get(target: Identifier) -> JpfObject? {
+        target.isOuter ?
+            outer?[target.value] :
+            self[target.value]
+    }
     /// 識別子を辞書に代入する。
-    /// 「外部」を指定された場合、外部識別子が未定義であれば、エラー
+    /// 1.「外部」を指定された場合、外部識別子が未定義であれば、エラー
+    /// 2. 指定がない場合
+    ///  1) 内部に識別子があれば、内部に上書き
+    ///  2) 外部に識別子があれば、外部に上書き
+    ///  3) それ以外は、新規ローカル代入
     func assign(target: Identifier, value: JpfObject) throws {
+        // 外部指定代入
         if target.isOuter {
             guard let outer, outer.contains(target.value) else {
                 throw outerUndefinedIdentifier(target.value)
             }
             outer[target.value] = value
-        } else {
+            return
+        }
+        // 暗黙代入
+        // 上書き代入
+        if contains(target.value) {
             self[target.value] = value
         }
+        // 暗黙の外部代入
+        if let outer, outer.contains(target.value) {
+            outer[target.value] = value
+        }
+        // 新規代入
+        self[target.value] = value
     }
-    /// 識別子名を使って、<識別子>に<値>を代入 TODO: Sentence方式に移行後削除
+    /// 識別子名を使って、<識別子>に<値>を代入
+    //  TODO: Sentence方式に移行後削除
     func assign(_ value: JpfObject, with name: String) -> JpfObject? {
         guard !name.isEmpty else {return value}
         if contains(Self.OUTER) {           // 外部指定されている場合

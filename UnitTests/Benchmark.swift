@@ -34,6 +34,7 @@ final class Benchmark : XCTestCase {
         }
         let lexer = Lexer(input)
         let parser = Parser(lexer)
+        parser.options.useSentenceAST = true
         guard let program = parser.parseProgram(), parser.errors.isEmpty else {
             parser.errors.forEach {print("Parser errors: \($0)")}
             return
@@ -42,10 +43,10 @@ final class Benchmark : XCTestCase {
         let environment = Environment()
         let evaluator = Evaluator(from: program, with: environment)
         var start = Date()
-        var object = evaluator.object
+        var object = evaluator.object ?? environment.pull()
         var duration = Date().timeIntervalSince(start)
         guard let result = object?.number else {
-            print("評価エラー：\(String(describing: object))")
+            XCTFail("評価エラー：\(String(describing: object))")
             return
         }
         print("インタープリタ:\t結果は、\(result)、実行時間は、\(duration)秒")
@@ -53,7 +54,7 @@ final class Benchmark : XCTestCase {
         let compiler = Compiler(from: program)
         start = Date()
         if let error = compiler.compile() {
-            print("コンパイルエラー：\(error.message)")
+            XCTFail("コンパイルエラー：\(error.message)")
             return
         }
         duration = Date().timeIntervalSince(start)
@@ -62,13 +63,13 @@ final class Benchmark : XCTestCase {
         let vm = VM(with: compiler.bytecode)
         start = Date()
         if let error = vm.run() {
-            print("実行エラー：\(error.message)")
+            XCTFail("実行エラー：\(error.message)")
             return
         }
         object = vm.stack.top
         duration = Date().timeIntervalSince(start)
         guard let result = object?.number else {
-            print("エラー：\(String(describing: object))")
+            XCTFail("エラー：\(String(describing: object))")
             return
         }
         print("VM:\t\t\t\t結果は、\(result)、実行時間は、\(duration)秒")

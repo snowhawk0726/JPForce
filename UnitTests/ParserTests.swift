@@ -28,7 +28,7 @@ final class ParserTests: XCTestCase {
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let program = try XCTUnwrap(parseProgram(with: test.input, useSentenceAST: useSentenceAST))
+            let program = try XCTUnwrap(parseProgram(with: test.input))
             XCTAssertEqual(program.statements.count, test.count)
             for i in 0..<program.statements.count {
                 try testDefineStatement(
@@ -63,7 +63,7 @@ final class ParserTests: XCTestCase {
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            guard let program = parseProgram(with: test.input, useSentenceAST: true) else {
+            guard let program = parseProgram(with: test.input) else {
                 XCTAssertNil(test.type)
                 print("テスト終了：rhs = エラー")
                 continue
@@ -91,7 +91,7 @@ final class ParserTests: XCTestCase {
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let program = try XCTUnwrap(parseProgram(with: test.input, useSentenceAST: useSentenceAST))
+            let program = try XCTUnwrap(parseProgram(with: test.input,))
             XCTAssertEqual(program.statements.count, 1)
             let statement = try XCTUnwrap(program.statements.first)
             try testPhraseExpression(statement.arguments[0], with: test.expectedValue, "を")
@@ -110,7 +110,7 @@ final class ParserTests: XCTestCase {
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let program = try XCTUnwrap(parseProgram(with: test.input, useSentenceAST: useSentenceAST))
+            let program = try XCTUnwrap(parseProgram(with: test.input))
             XCTAssertEqual(program.statements.count, 1)
             let statement = try XCTUnwrap(program.statements.first)
             let ident = try XCTUnwrap(statement.literal as? Identifier)
@@ -122,7 +122,7 @@ final class ParserTests: XCTestCase {
     func testStringLiteralExpression() throws {
         let input = "「みなさん、こんにちは。」"
         print("テストパターン: \(input)")
-        let program = try XCTUnwrap(parseProgram(with: input, useSentenceAST: useSentenceAST))
+        let program = try XCTUnwrap(parseProgram(with: input))
         XCTAssertEqual(program.statements.count, 1)
         let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
         let literal = try XCTUnwrap(statement.expressions.first as? StringLiteral)
@@ -133,7 +133,7 @@ final class ParserTests: XCTestCase {
     func testIntegerLiteralExpression() throws {
         let input = "-5。"
         print("テストパターン: \(input)")
-        let program = try XCTUnwrap(parseProgram(with: input, useSentenceAST: useSentenceAST))
+        let program = try XCTUnwrap(parseProgram(with: input))
         XCTAssertEqual(program.statements.count, 1)
         let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
         let literal = try XCTUnwrap(statement.expressions.first as? IntegerLiteral)
@@ -155,7 +155,7 @@ final class ParserTests: XCTestCase {
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let program = try XCTUnwrap(parseProgram(with: test.input, useSentenceAST: useSentenceAST))
+            let program = try XCTUnwrap(parseProgram(with: test.input))
             XCTAssertEqual(program.statements.count, 1)
             let statement = try XCTUnwrap(program.statements.first)
             for (i, clause) in test.clauses.enumerated() {
@@ -180,7 +180,7 @@ final class ParserTests: XCTestCase {
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let program = try XCTUnwrap(parseProgram(with: test.input, useSentenceAST: useSentenceAST))
+            let program = try XCTUnwrap(parseProgram(with: test.input))
             XCTAssertEqual(program.statements.count, 1)
             if useSentenceAST {
                 if let cs = program.statements.first as? CompoundStatement {
@@ -222,7 +222,7 @@ final class ParserTests: XCTestCase {
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let program = try XCTUnwrap(parseProgram(with: test.input, useSentenceAST: useSentenceAST))
+            let program = try XCTUnwrap(parseProgram(with: test.input))
             XCTAssertEqual(program.statements.count, 1)
             let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
             try testBooleanLiteral(statement.literal, value: test.exprected)
@@ -239,7 +239,7 @@ final class ParserTests: XCTestCase {
         ]
         for input in testPatterns {
             print("テストパターン: \(input)")
-            let program = try XCTUnwrap(parseProgram(with: input, useSentenceAST: useSentenceAST))
+            let program = try XCTUnwrap(parseProgram(with: input))
             XCTAssertEqual(program.statements.count, 1, "program.statements.count")
             if useSentenceAST {
                 let statement = try XCTUnwrap(program.statements.first as? CompoundStatement)
@@ -279,7 +279,7 @@ final class ParserTests: XCTestCase {
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            guard let program = parseProgram(with: test.input, useSentenceAST: true) else {
+            guard let program = parseProgram(with: test.input) else {
                 XCTAssertEqual(test.statements, 0)
                 print("テスト終了: エラー(通常文の後に「それ以外」)")
                 continue
@@ -301,7 +301,7 @@ final class ParserTests: XCTestCase {
             (1, "甲を表示し"), (2, "乙を表示し"), (nil, "丙を表示する"),
         ]
         //
-        let program = try XCTUnwrap(parseProgram(with: input, useSentenceAST: useSentenceAST))
+        let program = try XCTUnwrap(parseProgram(with: input))
         XCTAssertEqual(program.statements.count, 1, "program.statements.count")
         if useSentenceAST {
             let cs = try XCTUnwrap(program.statements.first as? CompoundStatement)
@@ -356,7 +356,7 @@ final class ParserTests: XCTestCase {
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let program = try XCTUnwrap(parseProgram(with: test.input, useSentenceAST: useSentenceAST))
+            let program = try XCTUnwrap(parseProgram(with: test.input))
             XCTAssertEqual(program.statements.count, test.statements, "program.statements.count")
             if useSentenceAST {
                 let cs = try XCTUnwrap(program.statements.first as? CompoundStatement)
@@ -375,7 +375,7 @@ final class ParserTests: XCTestCase {
     }
     func testFunctionLiteralWithName() throws {
         let input = "myFunctionは、関数であって、【】。"
-        let program = try XCTUnwrap(parseProgram(with: input, useSentenceAST: useSentenceAST))
+        let program = try XCTUnwrap(parseProgram(with: input))
         XCTAssertEqual(program.statements.count, 1)
         let define = try XCTUnwrap(program.statements.first as? DefineStatement)
         let function = try XCTUnwrap(define.rhsLiteral as? FunctionLiteral)
@@ -389,7 +389,7 @@ final class ParserTests: XCTestCase {
         ]
         for input in testPatterns {
             print("テストパターン: \(input)")
-            let program = try XCTUnwrap(parseProgram(with: input, useSentenceAST: useSentenceAST))
+            let program = try XCTUnwrap(parseProgram(with: input))
             XCTAssertEqual(program.statements.count, 1, "program.statements.count")
             let statement = try XCTUnwrap(program.statements.first)
             XCTAssertEqual(statement.expressionCount, 1, "statement.expressions.count")
@@ -424,7 +424,7 @@ final class ParserTests: XCTestCase {
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let program = try XCTUnwrap(parseProgram(with: test.input, useSentenceAST: useSentenceAST))
+            let program = try XCTUnwrap(parseProgram(with: test.input))
             XCTAssertEqual(program.statements.count, 1, "program.statements.count")
             let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
             XCTAssertEqual(statement.expressions.count, 1, "statement.expressions.count")
@@ -446,7 +446,7 @@ final class ParserTests: XCTestCase {
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let program = try XCTUnwrap(parseProgram(with: test.input, useSentenceAST: useSentenceAST))
+            let program = try XCTUnwrap(parseProgram(with: test.input))
             XCTAssertEqual(program.statements.count, 1, "program.statements.count")
             let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
             XCTAssertEqual(statement.expressions.count, 1, "statement.expressions.count")
@@ -471,7 +471,7 @@ final class ParserTests: XCTestCase {
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let program = try XCTUnwrap(parseProgram(with: test.input, useSentenceAST: useSentenceAST))
+            let program = try XCTUnwrap(parseProgram(with: test.input))
             XCTAssertEqual(program.statements.count, 1, "program.statements.count")
             let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
             XCTAssertEqual(statement.expressions.count, 1, "statement.expressions.count")
@@ -501,7 +501,7 @@ final class ParserTests: XCTestCase {
         ]
         for input in testPatterns {
             print("テストパターン: \(input)")
-            let program = try XCTUnwrap(parseProgram(with: input, useSentenceAST: useSentenceAST))
+            let program = try XCTUnwrap(parseProgram(with: input))
             XCTAssertEqual(program.statements.count, 1, "program.statements.count")
             let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
             XCTAssertEqual(statement.expressions.count, 1, "statement.expressions.count")
@@ -523,7 +523,7 @@ final class ParserTests: XCTestCase {
         ]
         for input in testPatterns {
             print("テストパターン: \(input)")
-            let program = try XCTUnwrap(parseProgram(with: input, useSentenceAST: useSentenceAST))
+            let program = try XCTUnwrap(parseProgram(with: input))
             XCTAssertEqual(program.statements.count, 1, "program.statements.count")
             let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
             XCTAssertEqual(statement.expressions.count, 1, "statement.expressions.count")
@@ -543,7 +543,7 @@ final class ParserTests: XCTestCase {
         ]
         for input in testPatterns {
             print("テストパターン: \(input)")
-            let program = try XCTUnwrap(parseProgram(with: input, isShadowMode: false, useSentenceAST: useSentenceAST))
+            let program = try XCTUnwrap(parseProgram(with: input))
             XCTAssertEqual(program.statements.count, 1, "program.statements.count")
             let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
             XCTAssertEqual(statement.expressions.count, 1, "statement.expressions.count")
@@ -583,7 +583,7 @@ final class ParserTests: XCTestCase {
     func testProtocolComformingProtocols() throws {
         let input = "規約であって、準拠する規約が、甲と、乙と、丙。条項が、丁は「数値」。"
         print("テストパターン: \(input)")
-        let program = try XCTUnwrap(parseProgram(with: input, useSentenceAST: useSentenceAST))
+        let program = try XCTUnwrap(parseProgram(with: input))
         XCTAssertEqual(program.statements.count, 1, "program.statements.count")
         let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
         XCTAssertEqual(statement.expressions.count, 1, "statement.expressions.count")
@@ -605,7 +605,7 @@ final class ParserTests: XCTestCase {
         ]
         for input in testPatterns {
             print("テストパターン: \(input)")
-            let program = try XCTUnwrap(parseProgram(with: input, useSentenceAST: useSentenceAST))
+            let program = try XCTUnwrap(parseProgram(with: input))
             XCTAssertEqual(program.statements.count, 1, "program.statements.count")
             let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
             XCTAssertEqual(statement.expressions.count, 1, "statement.expressions.count")
@@ -625,7 +625,7 @@ final class ParserTests: XCTestCase {
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let program = try XCTUnwrap(parseProgram(with: test.input, useSentenceAST: useSentenceAST))
+            let program = try XCTUnwrap(parseProgram(with: test.input))
             let define = try XCTUnwrap(program.statements[0] as? DefineStatement)
             XCTAssertEqual(define.name.value, "列挙子")
             let enumerator = try XCTUnwrap(define.rhsLiteral as? EnumeratorLiteral)
@@ -637,7 +637,7 @@ final class ParserTests: XCTestCase {
     func testArrayLiterals() throws {
         let input = "配列であって、【要素が、１と、2に２を掛けたものと、3に３を足したもの】。"
         print("テストパターン: \(input)")
-        let program = try XCTUnwrap(parseProgram(with: input, useSentenceAST: useSentenceAST))
+        let program = try XCTUnwrap(parseProgram(with: input))
         let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
         let array = try XCTUnwrap(statement.expressions.first as? ArrayLiteral)
         XCTAssertEqual(array.elements.count, 3)
@@ -655,7 +655,7 @@ final class ParserTests: XCTestCase {
     func testParsingDictionaryLiteralsStringKeys() throws {
         let input = "辞書【「一」が1、「二」が2、「三」が3】"
         print("テストパターン: \(input)")
-        let program = try XCTUnwrap(parseProgram(with: input, useSentenceAST: useSentenceAST))
+        let program = try XCTUnwrap(parseProgram(with: input))
         let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
         let dictionary = try XCTUnwrap(statement.expressions.first as? DictionaryLiteral)
         XCTAssertEqual(dictionary.pairs.count, 3)
@@ -671,7 +671,7 @@ final class ParserTests: XCTestCase {
         let inputs = ["辞書【】", "辞書。"]
         for input in inputs {
             print("テストパターン: \(input)")
-            let program = try XCTUnwrap(parseProgram(with: input, useSentenceAST: useSentenceAST))
+            let program = try XCTUnwrap(parseProgram(with: input))
             let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
             let dictionary = try XCTUnwrap(statement.expressions.first as? DictionaryLiteral)
             XCTAssertEqual(dictionary.pairs.count, 0)
@@ -681,7 +681,7 @@ final class ParserTests: XCTestCase {
     func testParsingDictionaryLiteralWithExpressions() throws {
         let input = "辞書【「一」が0と1を足す、「二」が10から8を引く、「三」が15を5で割る】"
         print("テストパターン: \(input)")
-        let program = try XCTUnwrap(parseProgram(with: input, useSentenceAST: useSentenceAST))
+        let program = try XCTUnwrap(parseProgram(with: input))
         let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
         let dictionary = try XCTUnwrap(statement.expressions.first as? DictionaryLiteral)
         XCTAssertEqual(dictionary.pairs.count, 3)
@@ -713,7 +713,7 @@ final class ParserTests: XCTestCase {
         let input = "「一」または「二」または「三」または「四」"
         print("テストパターン: \(input)")
         let expected = "「一」、または、「二」、または、「三」、または、「四」。"
-        let program = try XCTUnwrap(parseProgram(with: input, useSentenceAST: useSentenceAST))
+        let program = try XCTUnwrap(parseProgram(with: input))
         let statement = try XCTUnwrap(program.statements.first)
         XCTAssertEqual(statement.string, expected)
         print("テスト(\(program.string))終了")
@@ -732,7 +732,7 @@ final class ParserTests: XCTestCase {
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let program = try XCTUnwrap(parseProgram(with: test.input, useSentenceAST: useSentenceAST))
+            let program = try XCTUnwrap(parseProgram(with: test.input))
             let statement = try XCTUnwrap(program.statements.first)
             XCTAssertEqual(statement.string.withoutPeriod, test.expected)
             print("テスト(\(statement.string))終了")
@@ -747,7 +747,7 @@ final class ParserTests: XCTestCase {
         
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let program = try XCTUnwrap(parseProgram(with: test.input, useSentenceAST: useSentenceAST))
+            let program = try XCTUnwrap(parseProgram(with: test.input))
             XCTAssertEqual(program.statements.count, 1, "program.statements.count")
             if useSentenceAST {
                 let cs = try XCTUnwrap(program.statements.first as? CompoundStatement)
@@ -831,7 +831,7 @@ final class ParserTests: XCTestCase {
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let program = try XCTUnwrap(parseProgram(with: test.input, useSentenceAST: useSentenceAST))
+            let program = try XCTUnwrap(parseProgram(with: test.input))
             XCTAssertEqual(program.statements.count, 1, "program.statements.count")
             let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
             try test.testFunc(statement.expressions)
@@ -854,7 +854,7 @@ final class ParserTests: XCTestCase {
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let program = try XCTUnwrap(parseProgram(with: test.input, useSentenceAST: useSentenceAST))
+            let program = try XCTUnwrap(parseProgram(with: test.input))
             let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
             let range = try XCTUnwrap(statement.expressions.first as? RangeLiteral)
             if let lowerBound = range.lowerBound {
@@ -919,7 +919,7 @@ final class ParserTests: XCTestCase {
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let program = try XCTUnwrap(parseProgram(with: test.input, useSentenceAST: useSentenceAST))
+            let program = try XCTUnwrap(parseProgram(with: test.input))
             let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
             let range = try XCTUnwrap(statement.expressions.first as? RangeLiteral)
             try test.testFunc(range.lowerBound, range.upperBound)
@@ -939,7 +939,7 @@ final class ParserTests: XCTestCase {
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let program = try XCTUnwrap(parseProgram(with: test.input, useSentenceAST: useSentenceAST))
+            let program = try XCTUnwrap(parseProgram(with: test.input))
             let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
             let function = try XCTUnwrap(statement.expressions.first as? FunctionLiteral)
             let functionBlock = function.function
@@ -958,7 +958,7 @@ final class ParserTests: XCTestCase {
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let program = try XCTUnwrap(parseProgram(with: test.input, useSentenceAST: useSentenceAST))
+            let program = try XCTUnwrap(parseProgram(with: test.input))
             let statement = try XCTUnwrap(program.statements.first as? ExpressionStatement)
             let label = try XCTUnwrap(statement.expressions.first as? Label)
             XCTAssertEqual(label.tokenLiteral, test.label)
@@ -1018,7 +1018,7 @@ final class ParserTests: XCTestCase {
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
-            let program = try XCTUnwrap(parseProgram(with: test.input, useSentenceAST: useSentenceAST))
+            let program = try XCTUnwrap(parseProgram(with: test.input))
             XCTAssertEqual(program.statements.count, test.statements, "program.statements.count")
             if let define = program.statements.first as? DefineStatement {
                 XCTAssertEqual(define.rhsCount, test.expressions, "statement.expressions.count")
@@ -1104,10 +1104,8 @@ final class ParserTests: XCTestCase {
         for test in testPatterns {
             print("テストパターン： \(test.input)")
             let parser = Parser(input: test.input)
-            let program = try XCTUnwrap(parseProgram(with: test.input, isShadowMode: false))
-            let es = try XCTUnwrap(program.statements.first as? ExpressionStatement)
-            let esp = ExpressionStatementParser(parser)
-            guard let stmt = esp.parseSentecne(from: es) else {
+            guard let program = parseProgram(with: test.input),
+                  let stmt = program.statements.first else {
                 parser.errors.forEach {print($0)}
                 XCTAssertNil(test.numberOfSentences, "テスト失敗(エラー発生！！！)")
                 print("テスト終了： エラー\(parser.errors.count)個。")
@@ -1132,7 +1130,7 @@ final class ParserTests: XCTestCase {
         }
     }
     func testSentenceTreminators() throws {
-        let testPatterns: [(input: String, SentenceTerminator: SentenceTerminator?)] = [
+        let testPatterns: [(input: String, sentenceTerminator: SentenceTerminator?)] = [
             ("1と2を足す。", .period),
             ("1と2を足し。", .period),
             ("1と2を足す】", .rbbracket),
@@ -1155,12 +1153,13 @@ final class ParserTests: XCTestCase {
             var terminator: SentenceTerminator? = nil
             let parser = Parser(input: test.input)
             parser.options.useSentenceAST = false
+            /* sentence ast使用だと、terminatorを取得できない */
             var string = ""
             if let es = ExpressionStatementParser(parser).parse() as? ExpressionStatement {
                 terminator = es.terminator
                 string = es.string
             }
-            XCTAssertEqual(terminator, test.SentenceTerminator)
+            XCTAssertEqual(terminator, test.sentenceTerminator)
             let symbol = (terminator?.rawValue ?? "nil(エラー)")
                 .replacingOccurrences(of: "\n", with: "EOL")
                 .replacingOccurrences(of: "\0", with: "EOF")

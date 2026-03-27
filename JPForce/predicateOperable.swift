@@ -235,6 +235,7 @@ extension PredicateOperable {
     var additionParamError: JpfError    {JpfError("「足す」には、２つ以上の数値、文字列、配列の入力が必要。")}
     var particleError: JpfError         {JpfError("助詞が間違っている。")}
     var valueNotFound: JpfError         {JpfError("で判定すべき値が無かった。")}
+    var valueIsEmpty: JpfError          {JpfError("で評価すべき値が空だった。")}
     var determineError: JpfError        {JpfError("判定の述語が間違っている。述語：「ある」「ない」「等しい」")}
     var rangeFormatError: JpfError      {JpfError("範囲の判定対象は数値のみ。")}
     var returnParamError: JpfError      {JpfError("返すべき値がない。")}
@@ -465,7 +466,7 @@ struct BooleanOperator : PredicateOperable {
             environment.drop()
             return determined(operand, op.type)                 // 当否判定
         }
-        return "「\(op.literal)」" + atLeastOneParamError + (op.type == .keyword(.BE) ? beUsage : notUsage)
+        return "「\(op.literal)」" + valueIsEmpty                 // 入力が空
     }
     /// rightがコンテナ(contains(_:)を持つ)の場合は存在判定を、それ以外は等値判定を行う。
     private func determined(_ left: JpfObject, _ opType: Token.TokenType, _ right: JpfObject) -> JpfObject {
@@ -715,11 +716,11 @@ struct AssignOperator : PredicateOperable {
     func operate() -> JpfObject? {
         if var params = environment.peek(3) {       // 配列または辞書に値を代入
             switch (params[0].particle, params[1].particle, params[2].particle) {
-            case (Token(.NO),Token(.NI),Token(.WO)):
+            case (Token(.NO),Token(.NI),Token(.WO)), (Token(.NO),Token(.NI),nil):
                 params.swapAt(0, 1)
                 params.swapAt(0, 2)
                 fallthrough
-            case (Token(.WO),Token(.NO),Token(.NI)):
+            case (Token(.WO),Token(.NO),Token(.NI)), (nil,Token(.NO),Token(.NI)):
                 guard let value = params[0].value,
                       let object = params[1].value else {break}
                 let result = object.assign(value, to: params[2].value)
