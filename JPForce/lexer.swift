@@ -63,25 +63,25 @@ final class Lexer {
             while nextToken.type == .ident {skipToken()}
         case (.symbol(.LWBRACKET),_,_):                 // "『" 文字列開始
             guard let s = readString(until: .RWBRACKET) else {  // 識別子トークンに変換
-                return Token(illegal: "』が見つからない")
+                return Token(illegal: "』が見つかりません")
             }
             token = Token(ident: s)
         case (.symbol(.LBRACKET),_, _):                 // "「" 文字列開始
             guard let s = readString(until: .RBRACKET) else {   // 文字列トークンに変換
-                return Token(illegal: "」が見つからない")
+                return Token(illegal: "」が見つかりません")
             }
             token = Token(string: s)
         case (.symbol(.LDABRACKET),_, _):               // "《" 文字列開始
             guard let s = readString(until: .RDABRACKET) else { // キーワードトークンに変換
-                return Token(illegal: "≫が見つからない")
+                return Token(illegal: "≫が見つかりません")
             }
             guard let resolved = Token(resolvingKewyword: s) else {
-                return Token(illegal: "対応する予約語がない: \(s)")
+                return Token(illegal: "対応する予約語がありません: \(s)")
             }
             token = resolved
         case (.symbol(.LPAREN),_,_):                    // "（" コメント開始
             guard skipToken(until: .RPAREN) else {      // "）" まで読み飛ばす
-                return Token(illegal: "）が見つからない")
+                return Token(illegal: "）が見つかりません")
             }
             token = getNext()
         case (.symbol(.REFMARK),_,_):                   // "※" コメント開始

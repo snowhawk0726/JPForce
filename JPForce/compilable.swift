@@ -41,7 +41,7 @@ extension Node {
     }
     // 翻訳エラー
     func notImplemented(type: String, description: String) -> JpfError {
-        JpfError("型：\(type)「\(description)」は、翻訳不可(未実装)")
+        JpfError("型：\(type)「\(description)」は、翻訳不可(未実装)です。")
     }
 }
 extension Program : Compilable {

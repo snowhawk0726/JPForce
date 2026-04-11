@@ -53,7 +53,7 @@ struct Repl {
         print(">> ", terminator: "")
     }
     private func printErros(of errors: [String]) {
-        print("構文解析器が、\(errors.count)個のエラーを検出した。")
+        print("構文解析器が、\(errors.count)個のエラーを検出しました。")
         errors.forEach {print("\t\($0)")}
     }
     private func runEvaluator(of program: Program, with environment: Environment) {
@@ -65,7 +65,7 @@ struct Repl {
         // 翻訳部
         let compiler = Compiler(from: program, symbolTable, constants)
         if let error = compiler.compile() {
-            print("翻訳器が、エラーを検出した。")
+            print("翻訳器が、エラーを検出しました。")
             print("\tエラー: \(error.message)")
             return
         }
@@ -81,7 +81,7 @@ struct Repl {
         // 実行部
         let machine = VM(with: compiler.bytecode, globals, stack)
         if let error = machine.run() {
-            print("バイトコード実行時にエラーを検出した。")
+            print("バイトコード実行時にエラーを検出しました。")
             print(error.message)
             return
         }

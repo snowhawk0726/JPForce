@@ -308,7 +308,7 @@ extension ExpressionStatementParser {
         guard let last = slice.last else {return nil}
         let lhs = slice.extractLhsIdentifier()
         guard let target = lhs ?? parser.leadingIdentifier else {
-            error(message: "代入先が見つからない。", at: last.sentenceToken)
+            error(message: "代入先が見つかりません。", at: last.sentenceToken)
             return nil
         }
         let kind: AssignmentKind = (lhs == nil) ? .compound : .simple
@@ -338,7 +338,7 @@ extension ExpressionStatementParser {
                 }
                 // The sentence before QUESTION must be a boolean-returning SimpleSentence
                 guard let prevSimple = result[i - 1] as? SimpleSentence else {
-                    error(message: "助詞「か」の前は、真偽値を返す文が必要。", at: phrase.left.token)
+                    error(message: "助詞「か」の前は、真偽値を返す文が必要です。", at: phrase.left.token)
                     continue
                 }
                 // Build noun clause from the previous sentence and inject into current
@@ -358,7 +358,7 @@ extension ExpressionStatementParser {
         guard exprs.count >= 2 else { return }
         if let phrase = exprs[1] as? PhraseExpression,
            phrase.hasKeyword(.QUESTION) {
-            error(message: "助詞「か」の前は、真偽値を返す文が必要。", at: phrase.left.token)
+            error(message: "助詞「か」の前は、真偽値を返す文が必要です。", at: phrase.left.token)
         }
     }
     /// 文中制約チェック
@@ -367,13 +367,13 @@ extension ExpressionStatementParser {
             let isNextTerminalConnector = i < sentences.count - 1 && sentences[i + 1].isTerminalConnector   // 次の語が終端(Terminal)に繋がる
             if sentence.terminality == .terminal && !isNextTerminalConnector {
                 let identifierDetected = sentence.isIdentifierOnlySentence ?
-                    "識別子「\(sentence.tokenLiteral)」は終止形の文として解析された。\n" : ""
-                error(message: identifierDetected + "終止形の文の後に、文を続けることはできない。", at: sentence.token)
+                    "識別子「\(sentence.tokenLiteral)」は終止形の文として解析されました。\n" : ""
+                error(message: identifierDetected + "終止形の文の後に、文を続けることはできません。", at: sentence.token)
                 return
             }
             if let assignment = sentence as? AssignmentSentence,
                assignment.kind == .compound {
-                error(message: "複合代入文では、文末以外に代入を書くことはできない。", at: sentence.token)
+                error(message: "複合代入文では、文末以外に代入を書くとことができません。", at: sentence.token)
                 return
             }
         }
@@ -387,14 +387,14 @@ extension ExpressionStatementParser {
         else {
             return
         }
-        error(message: "連用形の文を「\(terminator.rawValue)」で終えることはできない。", at: sentence.token)
+        error(message: "連用形の文を「\(terminator.rawValue)」で終えることはできません。", at: sentence.token)
     }
     /// 複合代入文のチェック
     private func validateCompoundAssignment(sentences: [Sentence], slices: [SentenceSlice]) {
         guard let assignment = sentences.last as? AssignmentSentence else {return}
         // 単文代入の構文エラーチェック
         if sentences.count == 1 && assignment.kind == .compound {
-            error(message: "代入先が見つからない。", at: assignment.token)
+            error(message: "代入先が見つかりません。", at: assignment.token)
             /* 例： aを代入 ← 文頭に識別子があるのが、単文のためエラー */
             return
         }
@@ -405,20 +405,20 @@ extension ExpressionStatementParser {
         
         guard previousSlice.trailingParticle == .TE else {
             if assignment.kind == .compound {
-                error(message: "複合代入文では「て」を省略できない。", at: previousSetence.token)
+                error(message: "複合代入文では「て」を省略できません。", at: previousSetence.token)
             }
             return
         }
         if assignment.kind == .simple {
-            error(message: "複合代入文では、代入先は文頭で指定。", at: assignment.target.token)
+            error(message: "複合代入文では、代入先は文頭で指定します。", at: assignment.target.token)
             return
         }
         if sentences.dropLast().contains(where: {$0 is AssignmentSentence}) {
-            error(message: "複合代入文では、文末以外に代入を書くことはできない。", at: assignment.token)
+            error(message: "複合代入文では、文末以外に代入を書くとことができません。", at: assignment.token)
             return
         }
         if !previousSetence.token.isValuePredicate {
-            error(message: "代入直前の文が値を出力しない。", at: previousSetence.token)
+            error(message: "代入直前の文が、値を出力していません。", at: previousSetence.token)
             return
         }
     }

@@ -124,7 +124,7 @@ final class LexerTests: XCTestCase {
             (.IDENT(),"割った余り"),(Token(.EOL),"\n"),
             (.keyword(.FOREACH),"繰り返す"),(Token(.EOL),"\n"),
             (.keyword(.FOREACH),"繰り返し"),(Token(.EOL),"\n"),
-            (.ILLEGAL("対応する予約語がない: 繰り返せ"),"対応する予約語がない: 繰り返せ"),(Token(.EOL),"\n"),
+            (.ILLEGAL("対応する予約語がありません: 繰り返せ"),"対応する予約語がありません: 繰り返せ"),(Token(.EOL),"\n"),
             (.STRING(),"foobar"),(Token(.EOL),"\n"),(.STRING(),"foo bar"),(Token(.EOL),"\n"),
             (.IDENT(),"3.14"),(Token(.EOL),"\n"),(.INT(),"1"),(Token(.COMMA),"、"),(.INT(),"260"),(Token(.EOL),"\n"),
             (.INT(),"1"),(Token(.COMMA),"、"),(.INT(),"2"),(Token(.COMMA),"、"),(.INT(),"3"),(Token(.EOL),"\n"),

@@ -143,7 +143,7 @@ extension Parsable {
                 getNext()
                 let token = currentToken
                 guard var expressions = parseElement(until: .TO) else {
-                    error(message: "入力部で、既定値の式の解析に失敗した。")
+                    error(message: "入力部で、既定値の式の解析に失敗しました。")
                     return nil
                 }
                 foundTerminator = removeTerminators(from: &expressions)
@@ -190,7 +190,7 @@ extension Parsable {
         repeat {
             getNext()
             guard currentToken.isString else {
-                error(message: "出力の型が間違っている。(\(nextToken))")
+                error(message: "出力の型が間違っています。(\(nextToken))")
                 return nil
             }
             types.append(currentToken.literal)
@@ -209,7 +209,7 @@ extension Parsable {
         if getNext(whenNextKeywordIs: ProtocolLiteral.kiyaku) { // 規約は、(規約が、)
             repeat {
                 guard nextToken.isIdent || nextToken.isString else {
-                    error(message: "型で、準拠する規約の型が間違っている。(\(nextToken))")
+                    error(message: "型で、準拠する規約の型が間違っています。(\(nextToken))")
                     return nil
                 }
                 protocols.append(nextToken.literal)
@@ -250,18 +250,18 @@ extension Parsable {
         let lowerBound = getBound(of: [Token(.KARA), Token(.GTEQUAL)], from: expressions)
         let rest = getRest(of: expressions, except: lowerBound)
         guard rest.isEmpty || getBound(of: [Token(.KARA), Token(.GTEQUAL)], from: rest) == nil else {
-            error(message: "範囲で、範囲式の解析に失敗した。(下限「\(lowerBound?.tokenLiteral ?? "?")」が重複)")
+            error(message: "範囲で、範囲式の解析に失敗しました。(下限「\(lowerBound?.tokenLiteral ?? "?")」が重複しています。)")
             return nil
         }
         let upperBound = getBound(of: [Token(.MADE), Token(.LTEQUAL), Token(.UNDER)], from: rest)
         if upperBound != nil {
             guard getRest(of: rest, except: upperBound).isEmpty else {
-                error(message: "範囲で、範囲式の解析に失敗した。(上限「\(upperBound?.tokenLiteral ?? "?")」に後続の式がある。)")
+                error(message: "範囲で、範囲式の解析に失敗しました。(上限「\(upperBound?.tokenLiteral ?? "?")」に後続の式があります。)")
                 return nil
             }
         } else {
             guard rest.isEmpty else {
-                error(message: "範囲で、範囲式の解析に失敗した。(上限の形式が間違っている。)")
+                error(message: "範囲で、範囲式の解析に失敗しました。(上限の形式が間違っています。)")
                 return nil
             }
         }
@@ -323,7 +323,7 @@ extension Parsable {
             return []                                           // 空の要素
         }
         if kind == .implicit && nextToken.isEol {               // 型直後の改行
-            error(message: "\(token.literal)の要素が空である場合は、句点「。」が必要。")
+            error(message: "\(token.literal)の要素が空である場合は、句点「。」が必要です。")
             return nil
         }
         skipNextEols()
@@ -338,7 +338,7 @@ extension Parsable {
                 return elements
             }
             guard let parsed: T = parseElement(of: token) else {
-                error(message: "\(token.literal)で、要素の解釈に失敗した。")
+                error(message: "\(token.literal)で、要素の解釈に失敗しました。")
                 return nil
             }
             elements.append(parsed)
@@ -357,7 +357,7 @@ extension Parsable {
         let endSymbolFound = getNext(kind: kind)
         
         if commaNotFound && !endSymbolFound {   // ブロック内で、要素の後に区切り「、」が見つからず、終端でない
-            error(message: "要素の区切りには、「、」が必要。")
+            error(message: "要素の区切りには、「、」が必要です。")
             return nil
         }
         
@@ -388,7 +388,7 @@ extension Parsable {
     private func parseArrayElement() -> ExpressionStatement? {
         let token = currentToken
         guard var expressions = parseElement() else {
-            error(message: "配列で、式の解析に失敗した。")
+            error(message: "配列で、式の解析に失敗しました。")
             return nil
         }
         _ = remove(lastParticle: .TO, from: &expressions)   // 「と」を取り除く
@@ -399,7 +399,7 @@ extension Parsable {
     private func parseEnumElement() -> Statement? {
         let token = currentToken
         guard token.isIdent else {
-            error(message: "列挙で、識別子の解析に失敗した。")
+            error(message: "列挙で、識別子の解析に失敗しました。")
             return nil
         }
         let ident = Identifier(from: token)
@@ -409,7 +409,7 @@ extension Parsable {
             getNext()
             let valueToken = currentToken
             guard var expressions = parseElement() else {
-                error(message: "列挙で、値の式の解析に失敗した。")
+                error(message: "列挙で、値の式の解析に失敗しました。")
                 return nil
             }
             _ = remove(lastParticle: .TO, from: &expressions)   // 「と」を取り除く
@@ -424,12 +424,12 @@ extension Parsable {
     private func parseDictionaryElement() -> PairExpression? {
         // 索引の解析
         guard var expressions = parseElement(until: .GA) else {
-            error(message: "辞書で、索引の式の解析に失敗した。")
+            error(message: "辞書で、索引の式の解析に失敗しました。")
             return nil
         }
         _ = getNext(whenNextIs: .COMMA)
         guard remove(lastParticle: .GA, from: &expressions) else {  //「が」を取り除く
-            error(message: "辞書で、索引と値の区切り「が」が見つからなかった。")
+            error(message: "辞書で、索引と値の区切り「が」が見つかりません。")
             return nil
         }
         let keyToken = Token(word: expressions[0].tokenLiteral)
@@ -437,7 +437,7 @@ extension Parsable {
         getNext()
         // 値の解析
         guard var expressions = parseElement() else {
-            error(message: "辞書で、値の式の解析に失敗した。")
+            error(message: "辞書で、値の式の解析に失敗しました。")
             return nil
         }
         _ = remove(lastParticle: .TO, from: &expressions)           //「と」を取り除く
@@ -493,14 +493,14 @@ extension Parsable {
                 }
                 return true
             }
-            error(message: "要素の解析で、終端「。」が見つからない。")
+            error(message: "要素の解析で、終端「。」が見つかりません。")
         case .explicit:
             if currentToken.isEndOfBlock {
                 // 余分な「】」が続く場合は blockStack の状態を見て読み進める
                 skipNextRBBracketsUsingBlockStack()
                 return true
             }
-            error(message: "要素の解析で、終端「】」が見つからない。")
+            error(message: "要素の解析で、終端「】」が見つかりません。")
         }
         return false
     }
@@ -527,7 +527,7 @@ extension Parsable {
     /// - Returns: 識別子の配列および入力形式、もしくはエラー(nil)
     func parseInputBlock(in type: String) -> ([Identifier], InputFormat)? {
         guard let paramenters = parseParameters() else {
-            error(message: "\(type)で、「入力が〜」の解析に失敗した。")
+            error(message: "\(type)で、「入力が〜」の解析に失敗しました。")
             return nil
         }
         return (paramenters.map {$0.0}, 
@@ -538,11 +538,11 @@ extension Parsable {
     /// - Returns: 型名の配列もしくはエラー(nil)
     func parseOutputBlock(in type: String) -> [String]? {
         guard let types = parseReturnTypes() else {
-            error(message: "\(type)で、「出力が〜」の解析に失敗した。")
+            error(message: "\(type)で、「出力が〜」の解析に失敗しました。")
             return nil
         }
         if types.contains(where: \.isEmpty), types.count > 1 {
-            error(message: "出力が「」で、複数の型を指定することはできない。")
+            error(message: "出力が「」で、複数の型を指定することはできません。")
             return nil
         }
         return types
@@ -555,12 +555,12 @@ extension Parsable {
     func parseOptionalBlock(of blockname: String, in typename: String) -> Result<BlockStatement?, ParserError> {
         guard getNext(whenNextKeywordIs: blockname) else {return .success(nil)}
         if nextToken.isEndOfStatement {
-            error(message: "\(typename)で、「\(blockname)」の定義が正しくない。「\(blockname)が、」の後ろにはブロック記号`【`、もしくは文が必要。")
+            error(message: "\(typename)で、「\(blockname)」の定義が正しくありません。「\(blockname)が、」の後ろにはブロック記号`【`、もしくは文が必要です。")
             return .failure(.blockParseError)
         }
         let kind = BlockKind(isExplicit: getNext(whenNextIs: .LBBRACKET))
         guard let blockStatement = BlockStatementParser(parser, kind: kind).blockStatement else {
-            error(message: "\(typename)で、「\(blockname)は、〜」の解析に失敗した。")
+            error(message: "\(typename)で、「\(blockname)は、〜」の解析に失敗しました。")
             return .failure(.blockParseError)
         }
         _ = getNext(whenNextIs: .PERIOD)    // ブロックの句点を飛ばす
@@ -580,7 +580,7 @@ extension Parsable {
         case .success(nil):                 // ブロック名省略
             guard !getNext(kind: kind) else {return .success(nil)}
             guard let block = BlockStatementParser(parser, kind: kind).blockStatement else {
-                error(message: "\(typename)で、「\(name)は、〜」の解析に失敗した。")
+                error(message: "\(typename)で、「\(name)は、〜」の解析に失敗しました。")
                 return .failure(.blockParseError)
             }
             return .success(block)
@@ -653,7 +653,6 @@ extension Parsable {
         var semanticStartIndex = 0
         while !currentToken.isEndOfStatement {
             guard let expression = ExpressionParser(parser).parse() else {
-                error(message: "\(token.literal)で始まる文の解析に失敗した。")
                 return nil
             }
             expressions.append(expression)
@@ -674,7 +673,7 @@ extension Parsable {
         }
         let terminator = SentenceTerminator(symbol: currentToken.literal)
         if previousToken.isComma && (terminator == .period || terminator == .rbbracket) {
-            error(message: "文の終端前の読点「、」が正しくない。")
+            error(message: "文の終端前の読点「、」が正しくありません。")
             return nil
         }
         let es = ExpressionStatement(token: token, expressions: expressions, terminator: terminator)
@@ -734,7 +733,7 @@ extension Parsable {
             stmt is CompoundStatement ||
             stmt is ExpressionStatement
         else {
-            error(message: "右辺値に、「\(stmt.string.withoutPeriod)」は使えない。")
+            error(message: "右辺値に、「\(stmt.string.withoutPeriod)」は使えません。")
             return false
         }
         if let cs = stmt as? CompoundStatement {
@@ -762,11 +761,11 @@ enum ParserError : Error {
     var message: String {
         switch self {
         case .unmatchedClosingBlacket:
-            return "ブロック記号が一致しない。"
+            return "ブロック記号が一致しません。"
         case .mismatchedBlockClose:
-            return "ブロック記号以外でブロックが終了している。"
+            return "ブロック記号以外でブロックが終了しています。"
         case .blockParseError:
-            return "ブロックの解析に失敗。"
+            return "ブロックの解析に失敗しました。"
         }
     }
 }
@@ -926,7 +925,7 @@ struct DefineStatementParser : StatementParsable {
         _ = getNext(whenNextIs: .COMMA)
         getNext()
         guard let parsed = ExpressionStatementParser(parser).parse() else {
-            error(message: "定義文「\(identifier.value)は、<式(値)>。」で、式の解釈に失敗した。")
+            error(message: "定義文「\(identifier.value)は、<式(値)>。」で、式の解釈に失敗しました。")
             return nil
         }
         if !currentToken.isEndOfBlock {
@@ -970,7 +969,7 @@ struct BlockStatementParser : StatementParsable {
         while !isEndOfBlock(inBlock) && !currentToken.isEof {
             skipEols(inBlock)                    // ブロック内での改行は読み飛ばす
             guard let statement = StatementParserFactory.create(from: parser).parse() else {
-                error(message: "ブロック(【】)内で文の解析に失敗した。")
+                error(message: "ブロック(【】)内で文の解析に失敗しました。")
                 return nil
             }
             blockStatements.append(statement)
@@ -1024,7 +1023,7 @@ struct ExpressionParser : ExpressionParsable {
     let parser: Parser, precedence: Precedence
     func parse() -> Expression? {
         guard let prefix = PrefixExpressionParserFactory.create(from: parser) else {
-            error(message: "式の解析で、「\(currentToken)」に対応する構文解析方法が実装されていない。")
+            error(message: "式の解析で、「\(currentToken)」に対応する構文解析方法が実装されていません。")
             return nil
         }
         var leftExpression = prefix.parse()
@@ -1071,7 +1070,7 @@ struct PrefixExpressionParserFactory {
                                     return LabelExpressionParser(parser)
         case .keyword(.ITS):        return PropertyExpressionParser(parser)
         case .keyword(.ELSE):
-            parser.errors.append("場合文外で、「それ以外」が使用されている。")
+            parser.errors.append("場合文外で、「それ以外」が使用されています。")
             return nil
         case .keyword(_):           return PredicateExpressionParser(parser)
         case .illegal:              break
@@ -1111,7 +1110,7 @@ struct IntegerLiteralParser : ExpressionParsable {
     let parser: Parser
     func parse() -> Expression? {
         guard let value = currentToken.number else {
-            error(message: "整数リテラルの解析で、「\(currentToken.literal)」を整数に変換できなかった。")
+            error(message: "整数リテラルの解析で、「\(currentToken.literal)」を整数に変換できません。")
             return nil
         }
         return parseRangeExpression(with: IntegerLiteral(from: value))
@@ -1142,7 +1141,7 @@ struct LabelExpressionParser : ExpressionParsable {
         case .string,.ident,.int,.keyword(.TRUE),.keyword(.FALSE):
             break
         default:
-            error(message: "「\(label.literal)」の後続が<文字列>、<識別子>、<真>、<偽>または<数値>ではなかった。)")
+            error(message: "「\(label.literal)」の後続が<文字列>、<識別子>、<真>、<偽>または<数値>ではありません。)")
             return nil
         }
         getNext()
@@ -1161,12 +1160,12 @@ struct RangeLiteralParser : ExpressionParsable {
         let token = parseHeader()
         let kind = BlockKind(isExplicit: getNext(whenNextIs: .LBBRACKET))
         guard let block = BlockStatementParser(parser, kind: kind).blockStatement else {
-            error(message: "範囲で、範囲式の解析に失敗した。")
+            error(message: "範囲で、範囲式の解析に失敗しました。")
             return nil
         }
         guard block.statements.count == 1,
               let es = block.statements.first as? ExpressionStatement else {
-            error(message: "範囲で、範囲式の解析に失敗した。(式が取り出せない。)")
+            error(message: "範囲で、範囲式の解析に失敗しました。(式が取り出せません。)")
             return nil
         }
         if !parser.options.useSentenceAST {
@@ -1187,11 +1186,11 @@ struct RangeLiteralParser : ExpressionParsable {
                 lowerExprs.append(exp)
             }
             if lowerExprs.isEmpty {
-                error(message: "範囲で、下限の式が見つからない。")
+                error(message: "範囲で、下限の式が見つかりません。")
                 return nil
             }
             guard let sentence = buildSentence(from: Array(lowerExprs)) else {
-                error(message: "範囲で、下限の文の構築に失敗した。")
+                error(message: "範囲で、下限の文の構築に失敗しました。")
                 return nil
             }
             lowerBoundary = BoundaryExpression(token: lowerToken, sentence: sentence)
@@ -1206,23 +1205,23 @@ struct RangeLiteralParser : ExpressionParsable {
                 upperExprs.append(exp)
             }
             if upperExprs.isEmpty {
-                error(message: "範囲で、上限の式が見つからない。")
+                error(message: "範囲で、上限の式が見つかりません。")
                 return nil
             }
             // Check no trailing expressions after upper boundary phrase
             if upperIndex + 1 < restExpressions.count {
-                error(message: "範囲で、上限の形式が間違っている。")
+                error(message: "範囲で、上限の形式が間違っています。")
                 return nil
             }
             guard let sentence = buildSentence(from: Array(upperExprs)) else {
-                error(message: "範囲で、上限の文の構築に失敗した。")
+                error(message: "範囲で、上限の文の構築に失敗しました。")
                 return nil
             }
             upperBoundary = BoundaryExpression(token: upperToken, sentence: sentence)
         } else {
             // No upper boundary found, restExpressions must be empty
             if !restExpressions.isEmpty {
-                error(message: "範囲で、上限の形式が間違っている。")
+                error(message: "範囲で、上限の形式が間違っています。")
                 return nil
             }
         }
@@ -1335,7 +1334,7 @@ struct ComputationLiteralParser : ExpressionParsable {
             _ = getNext(whenNextIs: .PERIOD)        // 設定ブロックの句点を飛ばす
             skipNextEols(blockKind: kind)
         case .failure(let e):
-            error(message: "算出で、「設定が、〜」の解析に失敗した。\(e.message)")
+            error(message: "算出で、「設定が、〜」の解析に失敗しました。\(e.message)")
             return nil
         }
         // Getter block
@@ -1347,7 +1346,7 @@ struct ComputationLiteralParser : ExpressionParsable {
                 _ = getNext(whenNextIs: .PERIOD)    // 取得ブロックの句点を飛ばす
                 skipNextEols(blockKind: kind)
             case .failure(let e):
-                error(message: "算出で、「取得が、〜」の解析に失敗した。\(e.message)")
+                error(message: "算出で、「取得が、〜」の解析に失敗しました。\(e.message)")
                 return nil
             }
             if getters.isEmpty {                    // 「取得は、」が無かった
@@ -1355,7 +1354,7 @@ struct ComputationLiteralParser : ExpressionParsable {
                 case .success(let function):
                     _ = getters.append(function)
                 case .failure(let e):
-                    error(message: "算出の解析に失敗した。\(e.message)")
+                    error(message: "算出の解析に失敗しました。\(e.message)")
                     return nil
                 }
             }
@@ -1379,7 +1378,7 @@ struct ProtocolLiteralParser : ExpressionParsable {
         guard let protocols = parseProtocols() else {return nil}
         // Clauses block
         guard let clauses = parseClauses(kind: kind) else {
-            error(message: "規約で、「条項が、〜」の解析に失敗した。")
+            error(message: "規約で、「条項が、〜」の解析に失敗しました。")
             return nil
         }
         _ = getNext(kind: kind)
@@ -1416,11 +1415,11 @@ struct ProtocolLiteralParser : ExpressionParsable {
             getNext()
             ident = Identifier(from: currentToken)              // <識別子>は、
             if isStatic && ident.value == "要素" {
-                error(message: "規約で、「型の要素は、【〜】」の定義はできない。個別に「型の<識別子>は、〜」の定義が必要。")
+                error(message: "規約で、「型の要素は、【〜】」の定義はできません。個別に「型の<識別子>は、〜」の定義が必要です。")
                 return nil
             }
             guard getNext(whenNextIs: .WA) else {
-                error(message: "規約で、条項「<識別子>は」の解析に失敗した。")
+                error(message: "規約で、条項「<識別子>は」の解析に失敗しました。")
                 return nil
             }
             _ = getNext(whenNextIs: .COMMA)
@@ -1430,11 +1429,11 @@ struct ProtocolLiteralParser : ExpressionParsable {
             token = currentToken
         case .keyword(.INITIALIZATION):
             if isStatic {
-                error(message: "型の初期化はできない(「型の」は不要)。")
+                error(message: "型の初期化はできません(「型の」は不要)。")
                 return nil
             }
         default:
-            error(message: "規約で、条項(トークン：\(token.literal))の解析に失敗した。")
+            error(message: "規約で、条項(トークン：\(token.literal))の解析に失敗しました。")
             return nil
         }
         guard let signatureKinds = parseClauseContents(from: token) else {return nil}
@@ -1457,7 +1456,7 @@ struct ProtocolLiteralParser : ExpressionParsable {
             return [.none]
         case .keyword(.FUNCTION):       // 関数
             guard let parsed = FunctionLiteralParser(parser).parse() as? FunctionLiteral else {
-                error(message: "規約で、関数定義の解析に失敗した。")
+                error(message: "規約で、関数定義の解析に失敗しました。")
                 return nil
             }
             let sig = FunctionSignature(
@@ -1468,7 +1467,7 @@ struct ProtocolLiteralParser : ExpressionParsable {
             return [.function(sig)]
         case .keyword(.COMPUTATION):    // 算出
             guard let parsed = ComputationLiteralParser(parser).parse() as? ComputationLiteral else {
-                error(message: "規約で、算出定義の解析に失敗した。")
+                error(message: "規約で、算出定義の解析に失敗しました。")
                 return nil
             }
             return makeComputationSignatures(from: parsed)
@@ -1486,7 +1485,7 @@ struct ProtocolLiteralParser : ExpressionParsable {
                 return nil
             }
         default:
-            error(message: "規約で、条項の解析に失敗した。(未対応の型: \(token.literal))")
+            error(message: "規約で、条項の解析に失敗しました。(未対応の型: \(token.literal))")
             return nil
         }
     }
@@ -1496,7 +1495,7 @@ struct ProtocolLiteralParser : ExpressionParsable {
         var setters = literal.setters.all.map {Optional($0)}
         let n = max(getters.count, setters.count)
         guard n > 0 else {
-            error(message: "規約の算出には、取得か設定の少なくともいずれかの定義が必要。")
+            error(message: "規約の算出には、取得か設定の少なくともいずれかの定義が必要です。")
             return nil
         }
         // 足りない分をnilで埋める
@@ -1573,7 +1572,7 @@ struct TypeLiteralParser : ExpressionParsable {
         while getNext(whenNextIs: TypeLiteral.katano) {
             getNext()   // DefStatemntParserは、currentTokenで処理をするため、1つ進める
             guard let definition = DefineStatementParser(parser).parse() as? DefineStatement else {
-                error(message: "型で、「型の<識別子>は、〜」の解析に失敗した。")
+                error(message: "型で、「型の<識別子>は、〜」の解析に失敗しました。")
                 return false
             }
             definitions.append(definition)
@@ -1595,7 +1594,7 @@ struct EnumLiteralParser : ExpressionParsable {
         openBlock(kind: kind, with: token)
         // 要素の解析
         guard let elements: [Statement] = parseElements(in: token, kind: kind) else {
-            error(message: "列挙で、「要素が、〜」の解析に失敗した。")
+            error(message: "列挙で、「要素が、〜」の解析に失敗しました。")
             return nil
         }
         guard closeBlock(kind: kind) else {
@@ -1614,7 +1613,7 @@ struct ArrayLiteralParser : ExpressionParsable {
         openBlock(kind: kind, with: token)
         // 要素の解析
         guard let elements: [ExpressionStatement] = parseElements(in: token, kind: kind) else {
-            error(message: "配列で、「要素が、〜」の解析に失敗した。")
+            error(message: "配列で、「要素が、〜」の解析に失敗しました。")
             return nil
         }
         guard closeBlock(kind: kind) else {
@@ -1633,7 +1632,7 @@ struct DictionaryLiteralParser : ExpressionParsable {
         openBlock(kind: kind, with: token)
         // 要素の解析
         guard let pairs: [PairExpression] = parseElements(in: token, kind: kind) else {
-            error(message: "辞書で、「要素が、〜」の解析に失敗した。")
+            error(message: "辞書で、「要素が、〜」の解析に失敗しました。")
             return nil
         }
         guard closeBlock(kind: kind) else {
@@ -1659,7 +1658,7 @@ struct PropertyExpressionParser : ExpressionParsable {
     func parse() -> Expression? {
         let token = currentToken
         guard nextToken.isIdent || nextToken.isKeyword(.TYPE) else {
-            error(message: "「\(nextToken.literal)」は属性名ではない。")
+            error(message: "「\(nextToken.literal)」は属性名ではありません。")
             return nil
         }
         getNext()
@@ -1675,7 +1674,7 @@ struct CaseExpressionParser : ExpressionParsable {
         let token = currentToken                            // 場合
         _ = getNext(whenNextIs: .COMMA)                     // (、)
         guard let consequence = parseConsequenceBlock() else {
-            error(message: "「場合、」に続くブロック解析に失敗した。")
+            error(message: "「場合、」に続くブロック解析に失敗しました。")
             return nil
         }
         _ = getNext(whenNextIs: .COMMA)                     // 読点(、)を読み飛ばす
@@ -1687,7 +1686,7 @@ struct CaseExpressionParser : ExpressionParsable {
             let kind = BlockKind(isExplicit: getNext(whenNextIs: .LBBRACKET))
             alternative = BlockStatementParser(parser, kind: kind).blockStatement
             if alternative == nil {
-                error(message: "場合文の「それ以外」に続くブロック解析に失敗した。")
+                error(message: "場合文の「それ以外」に続くブロック解析に失敗しました。")
                 return nil
             }
         }
@@ -1726,7 +1725,7 @@ struct LogicalExpressionParser : ExpressionParsable {
         let precedence = Precedence[token.type]
         _ = getNext(whenNextIs: .COMMA)                     // (、)
         guard let consequence = parseConditionalBlock(precedance: precedence) else {
-            error(message: "「\(currentToken.literal)、」に続くブロック解析に失敗した。")
+            error(message: "「\(currentToken.literal)、」に続くブロック解析に失敗しました。")
             return nil
         }
         _ = getNext(whenNextIs: .COMMA)                     // (、)のみ読み飛ばす
@@ -1767,24 +1766,24 @@ struct ConditionalOperationParser : ExpressionParsable {
     let parser: Parser
     func parse() -> (any Expression)? {
         guard previousToken.isParticle(.NI) else {
-            error(message: "「よって」の前には助詞「に」が必要。")
+            error(message: "「よって」の前には助詞「に」が必要です。")
             return nil
         }
         let token = currentToken                            // よって
         _ = getNext(whenNextIs: .COMMA)                     // (、)
         getNext()
         guard let consequence = ExpressionParser(parser).parse() else {
-            error(message: "「(か)によって」のに続く式の解析に失敗した。")
+            error(message: "「(か)によって」のに続く式の解析に失敗しました。")
             return nil
         }
         guard getNext(whenNextIs: ConditionalOperation.ka) else {   // か
-            error(message: "「(か)によって」の後続に「か」が見つからない。")
+            error(message: "「(か)によって」の後続に「か」が見つかりません。")
             return nil
         }
         _ = getNext(whenNextIs: .COMMA)                     // (、)
         getNext()
         guard let alternative = ExpressionParser(parser).parse() else {
-            error(message: "「(か)によって」の「か」に続く式の解析に失敗した。")
+            error(message: "「(か)によって」の「か」に続く式の解析に失敗しました。")
             return nil
         }
         return ConditionalOperation(token: token, consequence: consequence, alternative: alternative)
@@ -1809,7 +1808,7 @@ struct LoopExpressionParser : ExpressionParsable {
         do {
             condition = try parseCondition()
         } catch {
-            self.error(message: "反復で、「条件が〜の間、」の解析に失敗した。")
+            self.error(message: "反復で、「条件が〜の間、」の解析に失敗しました。")
             return nil
         }
         // Body block
@@ -1817,7 +1816,7 @@ struct LoopExpressionParser : ExpressionParsable {
         case .success(let block?):
             return LoopExpression(token: token, parameters: identifiers, condition: condition, body: block)
         case .success(nil):
-            error(message: "反復で、処理の解析に失敗した。(本体が見つからない)")
+            error(message: "反復で、処理の解析に失敗しました。(本体が見つりません)")
         default:
             break
         }
@@ -1860,14 +1859,14 @@ struct InfixExpressionParser : ExpressionParsable {
         let token = currentToken
         let op = currentToken.literal
         guard let left = left else {
-            error(message: "中間置式(\(op)で、左辺の解析に失敗した。")
+            error(message: "中間置式(\(op)で、左辺の解析に失敗しました。")
             return nil
         }
         _ = getNext(whenNextIs: .COMMA)
         let precedence = Precedence[currentToken.type]
         getNext()
         guard let right = ExpressionParser(parser, precedence: precedence).parse() else {
-            error(message: "中間置式(\(op)で、右辺の解析に失敗した。")
+            error(message: "中間置式(\(op)で、右辺の解析に失敗しました。")
             return nil
         }
         return OrExpression(token: token, left: left, right: right)
@@ -1881,17 +1880,17 @@ struct CallExpressionParser : ExpressionParsable {
         let token = currentToken
         _ = getNext(whenNextKeywordIs: CallExpression.arguments)   // 引数が(は)、
         guard let caller = left else {
-            error(message: "呼び出し式で、左辺の解析に失敗した。")
+            error(message: "呼び出し式で、左辺の解析に失敗しました。")
             return nil
         }
         guard let block = BlockStatementParser(parser, kind: .explicit).blockStatement else {
-            error(message: "呼び出し式で、引数の解析に失敗した。")
+            error(message: "呼び出し式で、引数の解析に失敗しました。")
             return nil
         }
         var arguments: [DefineStatement] = []
         for statement in block.statements {
             guard let define = statement as? DefineStatement else {
-                error(message: "呼び出し式の引数が定義文で定義されていない。")
+                error(message: "呼び出し式の引数が定義文で定義されていません。")
                 return nil
             }
             arguments.append(define)
@@ -1906,7 +1905,7 @@ struct GenitiveExpressionParser : ExpressionParsable {
     func parse() -> (any Expression)? {
         let token = currentToken
         guard let left = left else {
-            error(message: "属格で、左式の解析に失敗した。")
+            error(message: "属格で、左式の解析に失敗しました。")
             return nil
         }
         if nextToken.isPeriod || nextToken.isEol || nextToken.isEof {
@@ -1915,7 +1914,7 @@ struct GenitiveExpressionParser : ExpressionParsable {
         let precedence = Precedence[currentToken.type]
         getNext()
         guard let right = ExpressionParser(parser, precedence: precedence).parse() else {
-            error(message: "属格で、右式の解析に失敗した。")
+            error(message: "属格で、右式の解析に失敗しました。")
             return nil
         }
         if let exp = right as? CaseExpression {         // 場合文の「それ以外は」のチェック
@@ -1927,7 +1926,7 @@ struct GenitiveExpressionParser : ExpressionParsable {
                 _ = getNext(whenNextIs: .COMMA)
                 getNext()
                 guard let parsed = ExpressionStatementParser(parser).parse() else {
-                    error(message: "属格で、値式の解釈に失敗した。")
+                    error(message: "属格で、値式の解釈に失敗しました。")
                     return nil
                 }
                 guard validateRhsType(from: parsed) else { return nil }
@@ -1957,7 +1956,7 @@ struct PhraseExpressionParser : ExpressionParsable {
         let token = currentToken
         if token.isParticle(.KO) && nextToken.isParticle {getNext()}
         guard let left = left else {
-            error(message: "「\(token.literal)」格の左辺(式)の解析に失敗した。")
+            error(message: "「\(token.literal)」格の左辺(式)の解析に失敗しました。")
             return nil
         }
         return PhraseExpression(token: token, left: left)

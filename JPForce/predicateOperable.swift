@@ -116,7 +116,7 @@ struct Splitter {
         if let left = string.firstRange(of: paren.l) {                      // 左カッコの処理
             let (header, body) = string.divided(without: left)
             guard let right = body.firstIndex(of: paren.r) else {           // 右カッコの処理
-                error = JpfError("識別子を囲う、閉じカッコ「\(paren.r)」が見つからない。")
+                error = JpfError("識別子を囲う、閉じカッコ「\(paren.r)」が見つかりません。")
                 return nil
             }
             let (ident, rest) = body.divided(without: right)
@@ -226,31 +226,31 @@ extension PredicateOperable {
         return FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].path()
     }
     // エラー
-    var numerationParamError1: JpfError {JpfError("には２つの数値入力が必要。")}
-    var numerationParamError2: JpfError {JpfError("には２つ以上の数値入力が必要。")}
-    var numerationParamError3: JpfError {JpfError("には１つの数値入力が必要。")}
-    var atLeastOneParamError: JpfError  {JpfError("には１つ以上の入力が必要。")}
-    var oneParamNeeded: JpfError        {JpfError("には１つの入力が必要。")}
-    var twoParamsNeeded: JpfError       {JpfError("には２つの入力が必要。")}
-    var additionParamError: JpfError    {JpfError("「足す」には、２つ以上の数値、文字列、配列の入力が必要。")}
-    var particleError: JpfError         {JpfError("助詞が間違っている。")}
-    var valueNotFound: JpfError         {JpfError("で判定すべき値が無かった。")}
-    var valueIsEmpty: JpfError          {JpfError("で評価すべき値が空だった。")}
-    var determineError: JpfError        {JpfError("判定の述語が間違っている。述語：「ある」「ない」「等しい」")}
-    var rangeFormatError: JpfError      {JpfError("範囲の判定対象は数値のみ。")}
-    var returnParamError: JpfError      {JpfError("返すべき値がない。")}
-    var cannotDivideByZero: JpfError    {JpfError("0で割ることはできない。")}
-    var cannotCompare: JpfError         {JpfError("では比較できない。")}
-    var functionObjectNotFound: JpfError{JpfError("実行すべき関数が見つからない。")}
-    var cannotJudgeGenuineness: JpfError{JpfError("で、正負を判定できる対象は、数値型のみ。")}
-    var fileReadError: JpfError         {JpfError("ファイルの読み込みに失敗した。")}
-    var availableError: JpfError        {JpfError("利用可能な識別子名でなかった。")}
-    var cannotConform: JpfError         {JpfError("には準拠できない。")}
-    var valueOfEnumeratorNotFound: JpfError {JpfError("指定の値が見つからない。指定値：")}
-    var cannotCreateFromProtocol:  JpfError {JpfError("規約からインスタンスは生成できない。")}
-    var cannotInitialize: JpfError      {JpfError("オブジェクトの初期化ができない。")}
-    var detectParserError: JpfError     {JpfError("構文解析器がエラーを検出した。")}
-    func cannotAssignToIdentifier(_ o: JpfObject?) -> JpfError {JpfError("「\(o?.string ?? "??")」には代入できない。")}
+    var numerationParamError1: JpfError {JpfError("には２つの数値入力が必要です。")}
+    var numerationParamError2: JpfError {JpfError("には２つ以上の数値入力が必要です。")}
+    var numerationParamError3: JpfError {JpfError("には１つの数値入力が必要です。")}
+    var atLeastOneParamError: JpfError  {JpfError("には１つ以上の入力が必要です。")}
+    var oneParamNeeded: JpfError        {JpfError("には１つの入力が必要です。")}
+    var twoParamsNeeded: JpfError       {JpfError("には２つの入力が必要です。")}
+    var additionParamError: JpfError    {JpfError("「足す」には、２つ以上の数値、文字列、配列の入力が必要です。")}
+    var particleError: JpfError         {JpfError("助詞が間違っています。")}
+    var valueNotFound: JpfError         {JpfError("で判定すべき値がありません。")}
+    var valueIsEmpty: JpfError          {JpfError("で評価すべき値が空です。")}
+    var determineError: JpfError        {JpfError("判定の述語が間違っています。述語：「ある」「ない」「等しい」")}
+    var rangeFormatError: JpfError      {JpfError("範囲の判定対象は数値のみです。")}
+    var returnParamError: JpfError      {JpfError("返すべき値がありません。")}
+    var cannotDivideByZero: JpfError    {JpfError("0で割ることはできません。")}
+    var cannotCompare: JpfError         {JpfError("では比較できません。")}
+    var functionObjectNotFound: JpfError{JpfError("実行すべき関数が見つかりません。")}
+    var cannotJudgeGenuineness: JpfError{JpfError("で、正負を判定できる対象は、数値型のみです。")}
+    var fileReadError: JpfError         {JpfError("ファイルの読み込みに失敗ししまた。")}
+    var availableError: JpfError        {JpfError("利用可能な識別子名ではありません。")}
+    var cannotConform: JpfError         {JpfError("には準拠できません。")}
+    var valueOfEnumeratorNotFound: JpfError {JpfError("指定の値が見つかりません。指定値：")}
+    var cannotCreateFromProtocol:  JpfError {JpfError("規約からインスタンスは生成できません。")}
+    var cannotInitialize: JpfError      {JpfError("オブジェクトの初期化ができません。")}
+    var detectParserError: JpfError     {JpfError("構文解析器がエラーを検出しました。")}
+    func cannotAssignToIdentifier(_ o: JpfObject?) -> JpfError {JpfError("「\(o?.string ?? "??")」には代入できません。")}
 }
 // MARK: - 表示/音声
 struct PrintOperator : PredicateOperable {

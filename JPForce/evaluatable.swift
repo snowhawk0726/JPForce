@@ -20,32 +20,32 @@ extension Node {
         return (self.string + "(\(type(of: self)))" + notImplementedError)
     }
     // 評価エラー
-    var notImplementedError: JpfError       {JpfError("の評価を未実装")}
-    var phaseValueNotFound: JpfError        {JpfError("句の値が無かった。(例：関数の返り値が無い。)")}
-    var predicateNotSupported: JpfError     {JpfError("述語に対応する定義が見つからなかった。")}
-    var caseConditionError: JpfError        {JpfError("「場合」の条件(真偽値)が見つからなかった。")}
-    var conditionalOperationError: JpfError {JpfError("「によって」の前には、条件式(真偽値)が必要。")}
-    var conditionalSentenceNeeded: JpfError {JpfError("助詞「か」の前には、条件式(文)が必要。")}
-    func unsupportedNominalizer(_ s: String) -> JpfError   {JpfError("「\(s)」で節は名詞化できない。(未サポート)")}
-    var logicalConditionError: JpfError     {JpfError("の前に条件(真偽値)が見つからなかった。")}
-    var logicalRightEvaluationError: JpfError   {JpfError("の後に条件(真偽値)の評価に失敗した。")}
-    var logicalOperatorError: JpfError      {JpfError("は、論理式の演算に使えない。")}
-    var elementEvalError: JpfError          {JpfError("「配列」の要素の評価に失敗した。要素：")}
-    var unusableAsHashKey: JpfError         {JpfError("「辞書」の要素の索引が、ハッシュキーとして使用できない。索引: ")}
-    var keywordNotSupportedInInfixExpression: JpfError   {JpfError("は、値の選択に使用できない。仕様：<値>または<値>...")}
-    var conditionEvaluationError: JpfError  {JpfError("「反復」の条件が正しくない。")}
-    var loopParameterError: JpfError        {JpfError("「反復」の入力が正しくない。")}
-    var rangeTypeError: JpfError            {JpfError("「範囲」の上下限が、数値でない。：")}
-    var overloadExtentionError: JpfError    {JpfError("「関数」で拡張している。")}
-    var functionOverloadError: JpfError     {JpfError("「関数」を「関数」以外で多重定義している。")}
-    var computationOverloadError: JpfError     {JpfError("「算出」を「算出」以外で多重定義している。")}
-    var typeExtentionError: JpfError        {JpfError("「型」を「型」以外で拡張している。")}
-    var protocolExtentionError: JpfError    {JpfError("「規約」を「型」以外で拡張している。")}
-    var cannotExtend: JpfError              {JpfError("拡張することはできない。")}
-    var enumuratorError: JpfError           {JpfError("「列挙」の列挙子(識別子)が正しくない。：")}
-    var cannotUseAsKeyword: JpfError        {JpfError("は、ラベルの値として使用できない。")}
-    var notSupportedCall: JpfError          {JpfError("呼び出し式は未対応。対象：")}
-    var itsNotFound: JpfError               {JpfError("「その」が指すオブジェクトが無い。(スタックが空)")}
+    var notImplementedError: JpfError       {JpfError("の評価は未実装です。")}
+    var phaseValueNotFound: JpfError        {JpfError("句の値がありません。(例：関数の返り値が無い。)")}
+    var predicateNotSupported: JpfError     {JpfError("述語に対応する定義が見つかりません。")}
+    var caseConditionError: JpfError        {JpfError("「場合」の条件(真偽値)が見つかりません。")}
+    var conditionalOperationError: JpfError {JpfError("「によって」の前には、条件式(真偽値)が必要です。")}
+    var conditionalSentenceNeeded: JpfError {JpfError("助詞「か」の前には、条件式(文)が必要です。")}
+    func unsupportedNominalizer(_ s: String) -> JpfError   {JpfError("「\(s)」で節は名詞化できません。(未サポート)")}
+    var logicalConditionError: JpfError     {JpfError("の前に条件(真偽値)が見つかりません。")}
+    var logicalRightEvaluationError: JpfError   {JpfError("の後に条件(真偽値)の評価に失敗しました。")}
+    var logicalOperatorError: JpfError      {JpfError("は、論理式の演算に使えません。")}
+    var elementEvalError: JpfError          {JpfError("「配列」の要素の評価に失敗しました。要素：")}
+    var unusableAsHashKey: JpfError         {JpfError("「辞書」の要素の索引が、ハッシュキーとして使用できません。。索引: ")}
+    var keywordNotSupportedInInfixExpression: JpfError   {JpfError("は、値の選択に使用できません。。仕様：<値>または<値>...")}
+    var conditionEvaluationError: JpfError  {JpfError("「反復」の条件が正しくありません。")}
+    var loopParameterError: JpfError        {JpfError("「反復」の入力が正しくありません。")}
+    var rangeTypeError: JpfError            {JpfError("「範囲」の上下限は、数値が必要です。：")}
+    var overloadExtentionError: JpfError    {JpfError("「関数」で拡張しています。")}
+    var functionOverloadError: JpfError     {JpfError("「関数」を「関数」以外で多重定義しています。")}
+    var computationOverloadError: JpfError     {JpfError("「算出」を「算出」以外で多重定義しています。")}
+    var typeExtentionError: JpfError        {JpfError("「型」を「型」以外で拡張しています。")}
+    var protocolExtentionError: JpfError    {JpfError("「規約」を「型」以外で拡張しています。")}
+    var cannotExtend: JpfError              {JpfError("拡張することはできません。")}
+    var enumuratorError: JpfError           {JpfError("「列挙」の列挙子(識別子)が正しくありません。：")}
+    var cannotUseAsKeyword: JpfError        {JpfError("は、ラベルの値として使用できません。。")}
+    var notSupportedCall: JpfError          {JpfError("呼び出し式は未対応です。対象：")}
+    var itsNotFound: JpfError               {JpfError("「その」が指すオブジェクトがありません。(スタックが空)")}
     // 仕様表示
     var strideLoopUsage: JpfError           {JpfError("仕様：<数値>から<数値>まで（<数値>ずつ）反復【入力が<識別子(カウント値)>、<処理>】。")}
     var rangeLoopUsage: JpfError            {JpfError("仕様：範囲【<下限><上限>】を反復【入力が<識別子(カウント値)>、<処理>】。")}

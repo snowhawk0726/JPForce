@@ -42,12 +42,12 @@ struct PredicateCompilableFactory {
 // MARK: - predicate compilable implements
 extension PredicateCompilable {
     // 実行
-    var functionToBeExecutedNotFound: JpfError {JpfError("実行する関数が無い。")}
+    var functionToBeExecutedNotFound: JpfError {JpfError("実行する関数がありません。")}
     // 代入
-    var assignIdentiferNotFound: JpfError {JpfError("代入する対象の識別子が見つからない。")}
-    var assignCllectionNotFound: JpfError {JpfError("代入するコレクションが見つからない。")}
-    func assignKeyNotFound(of c: String?) -> JpfError {JpfError("代入する「\(c ?? " ??")」のキーが見つからない。")}
-    func assignValueNotFound(to c: String?, key: String?) -> JpfError {JpfError("「\(c ?? "??")」の「\(key ?? "??")」に、代入する値が見つからない。")}
+    var assignIdentiferNotFound: JpfError {JpfError("代入する対象の識別子が見つかりません。")}
+    var assignCllectionNotFound: JpfError {JpfError("代入するコレクションが見つかりません。")}
+    func assignKeyNotFound(of c: String?) -> JpfError {JpfError("代入する「\(c ?? " ??")」のキーが見つかりません。")}
+    func assignValueNotFound(to c: String?, key: String?) -> JpfError {JpfError("「\(c ?? "??")」の「\(key ?? "??")」に、代入する値が見つかりません。")}
 }
 // MARK: - 補助演算
 /// <式>たもの → <式>

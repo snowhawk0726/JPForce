@@ -17,10 +17,7 @@ extension JpfFunction {
         let local = Environment(outer: self.environment)    // 関数の環境を拡張
         let stackEnv = environment.isEmpty ? self.environment : environment
         defer {_ = environment.push(stackEnv.pullAll())}    // スタックを戻す
-        if let returnValue = stackEnv.execute(overload, with: local) {
-            return returnValue
-        }
-        return nil
+        return stackEnv.execute(overload, with: local)
     }
 }
 extension JpfComputation {
@@ -30,10 +27,7 @@ extension JpfComputation {
     func getter(with environment: Environment) -> JpfObject? {
         guard !getters.isEmpty else {return getterNotFound}
         let local = Environment(outer: self.environment)    // 環境を拡張
-        guard let value = environment.execute(getters, with: local) else {
-            return environment.pull()   // 返り値が無ければスタックから値を取る。
-        }
-        return value
+        return environment.execute(getters, with: local) ?? environment.pull()  // 返り値が無ければスタックから値を取る。
     }
     /// 算出(設定)を行う。
     /// - Parameter environment: 実行中の(通常もしくは算出の)環境

@@ -23,9 +23,9 @@ extension JpfObject {
         }
         return getProperty(by: string.value)
     }
-    var unusableAsIndex: JpfError       {JpfError("は、「配列」の要素の索引として使用できない。")}
-    var unusableAsHashKey: JpfError     {JpfError("は、「辞書」の要素の索引(ハッシュキー)として使用できない。")}
-    var cannotAccessObjectWith: JpfError{JpfError("でアクセスすることはできない。")}
+    var unusableAsIndex: JpfError       {JpfError("は、「配列」の要素の索引として使用できません。。")}
+    var unusableAsHashKey: JpfError     {JpfError("は、「辞書」の要素の索引(ハッシュキー)として使用できません。。")}
+    var cannotAccessObjectWith: JpfError{JpfError("でアクセスすることはできません。")}
 }
 extension JpfArray : Accessible {
     func accesse(by accessor: JpfObject, with environment: Environment) -> (any JpfObject)? {

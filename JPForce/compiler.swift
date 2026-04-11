@@ -60,7 +60,7 @@ class SwitchCase {
     var jumpPositions: [Int]? {positions[currentId]}
     var hasJumpPositions: Bool {positions[currentId]?.isEmpty == false}
     // エラー
-    let defaultError = "「〜の場合」に続く、「それ以外は」が定義されていない。"
+    let defaultError = "「〜の場合」に続く、「それ以外は」が定義されていません。"
 }
 /// 翻訳器
 class Compiler {
@@ -251,7 +251,6 @@ extension Compiler {
         get {environment.identifier}
         set {environment.identifier = newValue}
     }
-    func clearIdentifier() {environment.identifier = nil}
 }
 /// emitヘルパー
 extension Compiler {

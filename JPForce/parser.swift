@@ -150,6 +150,6 @@ func parseProgram(with input: String) -> Program? {
 }
 private func check(_ errors: [String]) {
     if errors.isEmpty {return}
-    print("Parserが、\(errors.count)個のエラーを検出した。")
+    print("Parserが、\(errors.count)個のエラーを検出しました。")
     errors.forEach {print("Parerエラー: \($0)")}
 }

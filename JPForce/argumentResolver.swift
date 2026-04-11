@@ -17,10 +17,10 @@ protocol ArgumentResolver {
 // Common
 // Errors
 extension ArgumentResolver {
-    var argumentsNotFound:      JpfError {JpfError("解析すべき引数がない。")}
-    var countValueNotFouond:    JpfError {JpfError("個数の値が見つからない。")}
-    var wrongValueMode:         JpfError {JpfError("変換は「値」または「数値」を指定。)")}
-    var worngIdentifier:        JpfError {JpfError("識別子の指定が誤っている。")}
+    var argumentsNotFound:      JpfError {JpfError("解析すべき引数がありません。")}
+    var countValueNotFouond:    JpfError {JpfError("個数の値が見つかりません。")}
+    var wrongValueMode:         JpfError {JpfError("変換は「値」または「数値」を指定します。)")}
+    var worngIdentifier:        JpfError {JpfError("識別子の指定が誤っています。")}
 }
 // MARK: - predicates
 /// 得る(pull) / 写す(duplicate)
@@ -116,7 +116,7 @@ struct PullArgumentSpec {
     }
 }
 extension PullArgumentSpec {
-    var multipleLhsWithArray:   JpfError {JpfError("スタック値の配列を複数の識別子に割り当てることはできない。")}
+    var multipleLhsWithArray:   JpfError {JpfError("スタック値の配列を複数の識別子に割り当てることはできません。")}
 }
 enum ValueMode : String {
     case value  = "値"

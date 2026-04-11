@@ -25,7 +25,7 @@ final class CommonTests: XCTestCase {
             ("aは配列【1,2,3】。aの1に2を足し、bに代入する。b。",4),
             ("1をxに代入し、xと１を足し、cに代入。c。",2),
             ("1と2を積む。aとbに得、aとbを足す。",3),
-            ("xと１を足し、cに代入。c。","識別子『x』が定義されていない。"),
+            ("xと１を足し、cに代入。c。","識別子『x』が定義されていません。"),
         ]
         print("評価器テスト開始")
         try evaluateTests(with: testPattern)

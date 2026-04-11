@@ -149,11 +149,6 @@ final class Environment {
         self[getName(from: object)] = value // 識別子に値を登録
         return nil
     }
-    /// 単一の辞書の値(オブジェクト)
-    var hasSingleValue: Bool {store.count == 1}
-    var singleValue: JpfObject? {
-        hasSingleValue ? store.first?.value : nil
-    }
     // パラメータ操作
     func storeArguments(with args: Environment, shouldMerge: Bool = false) {
         args.enumerated.forEach {
@@ -173,12 +168,11 @@ final class Environment {
         guard let instance = peek?.value as? JpfInstance else {return false}
         return instance.available.contains(keyword.rawValue)
     }
-    // 代入用識別子キャッシュ
+    // 代入用識別子キャッシュ TODO: 削除予定(AssignCompiler修正時)
     var identifier: String? {
         get {assignmentIdentifier}
         set {assignmentIdentifier = newValue}
     }
-    var hasIdentifier: Bool {assignmentIdentifier != nil}
     // MARK: - スタック操作
     func push(_ object: JpfObject) -> JpfError?     {stack.push(object)}
     func push(_ objects: [JpfObject]) -> JpfError?  {stack.push(objects)}
@@ -731,17 +725,17 @@ enum InputFormatError : Error {
     /// エラーメッセージ
     var message: JpfError {
         switch self {
-        case .numberOfParameters(let number):   return JpfError("入力の数が足りていない。必要数：\(number)")
-        case .type(let type):                   return JpfError("入力の型が異なる。入力の型：\(type)")
-        case .particle(let particle):           return JpfError("入力の格が異なる。入力の格：\(particle)")
-        case .particleFormat(let s):            return JpfError("格の形式が誤っている。指定：\(s)")
-        case .variable(let type):               return JpfError("可変長識別子の値が配列ではない。型：\(type)")
-        case .notFoundFirstFormat:              return JpfError("可変長識別子に既定値が設定されている。")
-        case .noMatchingSignature:              return JpfError("入力形式が一致する関数が見つからなかった。")
-        case .noParameterValue:                 return JpfError("固定長パラメータの値が取得できなかった。")
-        case .failedToEvaluate:                 return JpfError("既定値の評価に失敗した。")
-        case .typeOfDefaultValue:               return JpfError("既定値の型が指定形式と一致しない。")
-        case .cannotGetDefault:                 return JpfError("既定値が設定されていなかった。")
+        case .numberOfParameters(let number):   return JpfError("入力の数が足りません。必要数：\(number)")
+        case .type(let type):                   return JpfError("入力の型が指定と異なります。入力の型：\(type)")
+        case .particle(let particle):           return JpfError("入力の格が指定と異なります。入力の格：\(particle)")
+        case .particleFormat(let s):            return JpfError("格の形式が誤っています。指定：\(s)")
+        case .variable(let type):               return JpfError("可変長識別子の値が配列ではありません。型：\(type)")
+        case .notFoundFirstFormat:              return JpfError("可変長識別子に既定値が設定されています。")
+        case .noMatchingSignature:              return JpfError("入力形式が一致する関数が見つかりません。")
+        case .noParameterValue:                 return JpfError("固定長パラメータの値が取得できません。")
+        case .failedToEvaluate:                 return JpfError("既定値の評価に失敗しました。")
+        case .typeOfDefaultValue:               return JpfError("既定値の型が指定形式と一致しません。")
+        case .cannotGetDefault:                 return JpfError("既定値が設定されていません。")
         }
     }
 }
@@ -752,10 +746,10 @@ enum ReturnTypesError : Error {
     case unexpectedOutput(String)
     var message: JpfError {
         switch self {
-        case .numberOfTypes(let number):        return JpfError("出力の数が足りていない。必要数：\(number)")
-        case .type(let type):                   return JpfError("出力の型が異なる。実際の型：\(type)")
-        case .illeagalEmptyFormat:              return JpfError("「」の指定形式が間違っている。使い方：出力が「」")
-        case .unexpectedOutput(let type):       return JpfError("期待しない出力。型：\(type)")
+        case .numberOfTypes(let number):        return JpfError("出力の数が足りません。必要数：\(number)")
+        case .type(let type):                   return JpfError("出力の型が指定と異なります。実際の型：\(type)")
+        case .illeagalEmptyFormat:              return JpfError("「」の指定形式が間違っています。使い方：出力が「」")
+        case .unexpectedOutput(let type):       return JpfError("期待しない出力(型：\(type))がありました。")
         }
     }
 }
@@ -777,28 +771,28 @@ enum ConformanceError : Error {
     /// エラーメッセージ
     var error: JpfError {
         switch self {
-        case .notFound(let s):          return JpfError("準拠する規約「\(s)」が見つからない。")
-        case .duplicated(let s):        return JpfError("準拠する規約「\(s)」の定義が重複している。")
-        case .definition(let s):        return JpfError("規約に準拠するためには、「\(s)」の定義が必要。")
+        case .notFound(let s):          return JpfError("準拠する規約「\(s)」が見つかりません。")
+        case .duplicated(let s):        return JpfError("準拠する規約「\(s)」の定義が重複しています。")
+        case .definition(let s):        return JpfError("規約に準拠するためには、「\(s)」の定義が必要です。")
         case .differentType(let i, let t):
-                                        return JpfError("規約に準拠するためには、「\(i)」を、型「\(t)」で定義する必要がある。")
+                                        return JpfError("規約に準拠するためには、「\(i)」を、型「\(t)」で定義する必要があります。")
         case .unexpectedInputDefinition(let i):
-                                        return JpfError("「\(i)」には、入力定義は不要。")
+                                        return JpfError("「\(i)」には、には、入力定義は必要ありません。")
         case .numberOfParams(let n, let i):
-                                        return JpfError("規約に準拠するためには、「\(i)」の入力定義に\(n)個の引数が必要。")
+                                        return JpfError("規約に準拠するためには、「\(i)」の入力定義に\(n)個の引数が必要です。")
         case .nameOfParams(let s, let i):
-                                        return JpfError("規約に準拠するためには、「\(i)」に引数「\(s)」が必要。")
+                                        return JpfError("規約に準拠するためには、「\(i)」に引数「\(s)」が必要です。")
         case .formatOfParams(let f, let i):
-                                        return JpfError("規約に準拠するためには、「\(i)」に入力形式「\(f)」が必要。")
+                                        return JpfError("規約に準拠するためには、「\(i)」に入力形式「\(f)」が必要です。")
         case .numberOfReturns(let n, let i):
-                                        return JpfError("規約に準拠するためには、「\(i)」の出力定義に\(n)個の型が必要。")
+                                        return JpfError("規約に準拠するためには、「\(i)」の出力定義に\(n)個の型が必要です。")
         case .typeOfReturns(let t, let i):
-                                        return JpfError("規約に準拠するためには、「\(i)」に出力型「\(t)」が必要。")
+                                        return JpfError("規約に準拠するためには、「\(i)」に出力型「\(t)」が必要です。")
         case .unexpectedOutputDefinition(let i):
-                                        return JpfError("「\(i)」には、出力定義は不要。")
+                                        return JpfError("「\(i)」には、出力定義は必要ありません。")
         case .targetNotFound(let f, let i):
-                                        return JpfError("規約に準拠するためには、「\(i)」に「\(f)」の定義が必要。")
-        case .undefined:                return JpfError("未定義の規約準拠違反。")
+                                        return JpfError("規約に準拠するためには、「\(i)」に「\(f)」の定義が必要です。")
+        case .undefined:                return JpfError("未定義の規約準拠違反です。")
         }
     }
 }

@@ -110,29 +110,29 @@ extension JpfObject {
     func reversed() -> JpfObject {JpfError(cannotReverse)}
     func assign(_ value: JpfObject, to target: JpfObject?) -> JpfObject {JpfError(cannotAssign)}
     // エラーメッセージ
-    var cannotCount: String     {"\(type)型の要素の数は、数えることができない。"}
-    var cannotAdd: String       {"を足すことはできない。"}
-    var cannotRemove: String    {"を削除することはできない。"}
-    var cannotCompare: String   {"を比較することはできない。"}
-    var cannotCountRange: String{"「範囲」の上下限が数値でないため、数えることができない。"}
-    var rangeFormatError: String{"「範囲」の形式が間違っている。"}
-    var cannotRepeat: String    {"「\(type)」を「関数」で、繰り返すことはできない。仕様：<配列、辞書、範囲>を<関数>で繰り返す。"}
-    var cannotReduce: String    {"「\(type)」を「関数」で、まとめることはできない。仕様：<配列、辞書>を<初期値>と<関数>でまとめる。"}
-    var cannotMapping: String   {"「\(type)」を「関数」で、写像することはできない。仕様：<配列、辞書>を<関数>で写像する。"}
-    var cannotFilter: String   {"「\(type)」を「関数」で、絞り込むことはできない。仕様：<配列、辞書>を<関数>で絞り込む。"}
-    var cannotSortByFunc: String{"「\(type)」を並べ替えることはできない。仕様：<配列>を<関数>で並べ替える。"}
-    var cannotSortByOrder: String{"「\(type)」を並べ替えることはできない。仕様：<配列>を(「昇順」に、または「降順」に)並べ替える。"}
-    var cannotReverse: String   {"「\(type)」は逆順にすることはできない。仕様：<配列、文字列>を逆順にする。"}
-    var cannotAssign: String    {"「\(type)」に代入することはできない。"}
-    var identifierNotAvailable: String  {"(識別子)は利用可能でない。"}
-    var arrayPositionError: String      {"指定位置が、配列内に無い。"}
-    var keyIsNotHashable: String        {"キーが、ハッシュ化可能な型ではない。"}
-    var identifierNotFound: String      {"指定した識別子名が見つからない。"}
-    var typeNotFound: String            {"型「\(type)」の定義が見つからない。"}
-    var notExecutableObject: JpfError   {JpfError("「関数」以外を実行しようとした。型：")}
-    var functionParameterError: JpfError{JpfError("「関数」の入力が指定形式と一致しない。")}
-    var getterNotFound: JpfError        {JpfError("「算出」の取得定義が見つからなかった。")}
-    var setterNotFound: JpfError        {JpfError("「算出」の設定定義が見つからなかった。")}
+    var cannotCount: String     {"\(type)型の要素の数は、数えることができません。"}
+    var cannotAdd: String       {"を足すことはできません。"}
+    var cannotRemove: String    {"を削除することはできません。"}
+    var cannotCompare: String   {"を比較することはできません。"}
+    var cannotCountRange: String{"「範囲」の上下限が数値でないため、数えることができません。"}
+    var rangeFormatError: String{"「範囲」の形式が間違っています。"}
+    var cannotRepeat: String    {"「\(type)」を「関数」で、繰り返すことはできません。仕様：<配列、辞書、範囲>を<関数>で繰り返す。"}
+    var cannotReduce: String    {"「\(type)」を「関数」で、まとめることはできません。仕様：<配列、辞書>を<初期値>と<関数>でまとめる。"}
+    var cannotMapping: String   {"「\(type)」を「関数」で、写像することはできません。仕様：<配列、辞書>を<関数>で写像する。"}
+    var cannotFilter: String   {"「\(type)」を「関数」で、絞り込むことはできません。仕様：<配列、辞書>を<関数>で絞り込む。"}
+    var cannotSortByFunc: String{"「\(type)」を並べ替えることはできません。仕様：<配列>を<関数>で並べ替える。"}
+    var cannotSortByOrder: String{"「\(type)」を並べ替えることはできません。仕様：<配列>を(「昇順」に、または「降順」に)並べ替える。"}
+    var cannotReverse: String   {"「\(type)」は逆順にすることはできません。仕様：<配列、文字列>を逆順にする。"}
+    var cannotAssign: String    {"「\(type)」に値を代入することはできません。"}
+    var identifierNotAvailable: String  {"(識別子)は利用可能ではありません。"}
+    var arrayPositionError: String      {"指定位置が、配列内にありません。"}
+    var keyIsNotHashable: String        {"キーが、ハッシュ化可能な型ではありません。"}
+    var identifierNotFound: String      {"指定した識別子名が見つかりません。"}
+    var typeNotFound: String            {"型「\(type)」の定義が見つかりません。"}
+    var notExecutableObject: JpfError   {JpfError("「関数」以外を実行しようとしました。型：")}
+    var functionParameterError: JpfError{JpfError("「関数」の入力が指定形式と一致しません。")}
+    var getterNotFound: JpfError        {JpfError("「算出」の取得定義が見つかりません。")}
+    var setterNotFound: JpfError        {JpfError("「算出」の設定定義が見つかりません。")}
 }
 extension JpfInteger {
     func add(_ object: JpfObject) -> JpfObject {

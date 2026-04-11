@@ -17,20 +17,20 @@ protocol CodeExecutable {
 // MARK: - implementations for CodeExecutable
 extension CodeExecutable {
     // エラー
-    func unknownError(with error: Error) -> JpfError {JpfError("不明なエラーが発生。\(error)")}
-    var genitiveParamError: JpfError        {JpfError("属格の左右オブジェクトが足りない。")}
-    var callingFunctionNotFound: JpfError   {JpfError("呼び出し先の関数が無い。")}
-    var returnValueNotFound: JpfError       {JpfError("返すべき値が無い。")}
-    var propertyNotFound: JpfError          {JpfError("指定した属性が見つからない。")}
-    var objectNotFound: JpfError            {JpfError("対象のオブジェクトが見つからない。(スタックが空)")}
-    var failedToGetProperty: JpfError       {JpfError("属性の取得に失敗した。")}
-    var failedToGetFunction: JpfError       {JpfError("翻訳済み関数の取得に失敗した。")}
-    var failedToGetClosure: JpfError        {JpfError("クロージャの取得に失敗した。")}
-    var failedToGetFreeVariables: JpfError  {JpfError("自由変数の取得に失敗した。")}
-    var cannotFoundPredicate: JpfError      {JpfError("述語が定義されていない。")}
-    var stackValueIsNotNumber: JpfError     {JpfError("スタックの値が数値でない。")}
+    func unknownError(with error: Error) -> JpfError {JpfError("不明なエラーが発生しました。\(error)")}
+    var genitiveParamError: JpfError        {JpfError("属格の左右オブジェクトが足りません。")}
+    var callingFunctionNotFound: JpfError   {JpfError("呼び出し先の関数がありません。")}
+    var returnValueNotFound: JpfError       {JpfError("返すべき値がありません。")}
+    var propertyNotFound: JpfError          {JpfError("指定した属性が見つかりません。")}
+    var objectNotFound: JpfError            {JpfError("対象のオブジェクトが見つかりません。(スタックが空)")}
+    var failedToGetProperty: JpfError       {JpfError("属性の取得に失敗しました。")}
+    var failedToGetFunction: JpfError       {JpfError("翻訳済み関数の取得に失敗しました。")}
+    var failedToGetClosure: JpfError        {JpfError("クロージャの取得に失敗しました。")}
+    var failedToGetFreeVariables: JpfError  {JpfError("自由変数の取得に失敗しました。")}
+    var cannotFoundPredicate: JpfError      {JpfError("述語が定義されていません。")}
+    var stackValueIsNotNumber: JpfError     {JpfError("スタックの値が数値ではありません。")}
     func dictionaryKeyNotHashable(_ key: JpfObject) -> JpfError {
-        JpfError("辞書のキー「\(key)」がハッシュ可能な型でない。")}
+        JpfError("辞書のキー「\(key)」がハッシュ可能な型ではありません。")}
 }
 // MARK: - instance factory
 struct CodeExecutableFactory {
