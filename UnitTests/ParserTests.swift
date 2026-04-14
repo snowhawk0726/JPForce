@@ -83,6 +83,30 @@ final class ParserTests: XCTestCase {
             print("テスト終了：rhs = \(rhs?.string ?? "<nil>")(\(typeString))")
         }
     }
+    func testComputationDefinitionStatements() throws {
+        let testPatterns: [(input: String, ident: String, isExtended: Bool)] = [
+            ("加えるとは、入力がxとyで、xとyを足すこと。", "加える", false),
+            ("加えるとは、【入力がxとyで、xとyを足す】こと。", "加える", false),
+            ("加えるとは、【入力がxとyで、xとyを足す】。", "加える", false),
+            ("加えるとは、さらに、入力がxとyで、xとyを足すこと。", "加える", true),
+        ]
+        for test in testPatterns {
+            print("テストパターン: \(test.input)")
+            let program = try XCTUnwrap(parseProgram(with: test.input))
+            XCTAssertEqual(program.statements.count, 1)
+            let definition = try XCTUnwrap(program.statements.first as? DefineStatement)
+            XCTAssertEqual(definition.token.literal, "とは")
+            XCTAssertEqual(definition.name.value, test.ident)
+            XCTAssertEqual(definition.isExtended, test.isExtended)
+            let es = try XCTUnwrap(definition.value as? ExpressionStatement)
+            XCTAssertEqual(es.expressions.count, 1)
+            let cl = try XCTUnwrap(es.expressions.first as? ComputationLiteral)
+            XCTAssertTrue(cl.token.isKeyword(.COMPUTATION))
+            let fb = try XCTUnwrap(cl.getters.single)
+            XCTAssertEqual(fb.string, "入力が、xとyであり、本体が、xとyを足す")
+            print("テスト終了: \(definition.string))")
+        }
+    }
     func testReturnExpressions() throws {
         let testPatterns: [(input: String, expectedValue: Any)] = [
             ("5を返す。", 5),

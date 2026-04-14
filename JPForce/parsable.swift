@@ -901,9 +901,11 @@ extension Token {
 struct StatementParserFactory {
     static func create(from parser: Parser) -> StatementParsable {
         if parser.currentToken.isIdent {
-            switch parser.nextToken.literal {
-            case DefineStatement.wa:
+            switch parser.nextToken {
+            case .particle(.WA):
                 return DefineStatementParser(parser)
+            case .particle(.TOWA):
+                return ComputaitionDefinitionStatementParser(parser)
             default:
                 break
             }
@@ -940,6 +942,47 @@ struct DefineStatementParser : StatementParsable {
         return DefineStatement(token: token, name: identifier, value: parsed, isExtended: isExtended)
     }
 }
+    /// - 形式：<識別子>とは、<算出(取得)の定義>。
+    struct ComputaitionDefinitionStatementParser : StatementParsable {
+        init(_ parser: Parser) {self.parser = parser}
+        let parser: Parser
+        func parse() -> Statement? {
+            let identifier = Identifier(from: currentToken.literal)
+            parser.insert(identifier.value)     // 識別子をLexerに登録
+            getNext()
+            let token = currentToken            // 「とは、」
+            _ = getNext(whenNextIs: .COMMA)
+            let isExtended = getNext(whenNextIs: DefineStatement.further)   // 「さらに、」
+            _ = getNext(whenNextIs: .COMMA)
+            // 算出(取得)の定義
+            let header = Token(keyword: .COMPUTATION)
+            let getters = FunctionBlocks()
+            let setters = FunctionBlocks()
+            let kind = BlockKind(isExplicit: getNext(whenNextIs: .LBBRACKET))
+            if kind == .implicit,
+               case .keyword(let keyword) = nextToken,
+               keyword == .COMPUTATION {
+                print("""
+                    警告：算出定義文内で「算出」が指定されています。これは「算出を返す算出」として解釈されます。
+                    　　　通常は「算出」は不要です。
+                """)
+            }
+            switch parseFunctionBlock(in: header.literal, kind: kind) {
+            case .success(let function):
+                _ = getters.append(function)
+            case .failure(let e):
+                error(message: "算出の解析に失敗しました。\(e.message)")
+                return nil
+            }
+            /* 「こと」はLexerによってミュートされるため、以下は機能しない。 */
+            _ = getNext(whenNextIs: DefineStatement.koto)   // 「こと。」
+            _ = getNext(whenNextIs: .PERIOD)
+            //
+            let cl = ComputationLiteral(token: header, setters: setters, getters: getters)
+            let es = ExpressionStatement(token: header, expressions: [cl])
+            return DefineStatement(token: token, name: identifier, value: es, isExtended: isExtended)
+        }
+    }
 /// 文の終わりまで、式を解析する。
 /// 文の終わり：句点、または改行
 /// 解析停止：EOF、ブロックの終わり(】)

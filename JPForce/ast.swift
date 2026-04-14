@@ -166,6 +166,7 @@ final class DefineStatement : Statement {
         value.string}
     static let wa = "は"
     static let further = "さらに"
+    static let koto = "こと"
 }
 final class ExpressionStatement : Sentence {
     let token: Token                // 式の最後のトークン
