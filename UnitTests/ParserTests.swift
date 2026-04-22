@@ -875,6 +875,11 @@ final class ParserTests: XCTestCase {
             ("1以上",             [Token(.GTEQUAL), nil]),
             ("10以下",            [nil, Token(.LTEQUAL)]),
             ("10未満",            [nil, Token(.UNDER)]),
+            ("1〜",             [Token(.GTEQUAL), nil]),
+            ("〜10",            [nil, Token(.LTEQUAL)]),
+            ("〜10未満",         [nil, Token(.UNDER)]),
+            ("1〜10",            [Token(.GTEQUAL), Token(.LTEQUAL)]),
+            ("1〜10未満",        [Token(.GTEQUAL), Token(.UNDER)]),
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
@@ -885,18 +890,34 @@ final class ParserTests: XCTestCase {
                 let integer = try XCTUnwrap(lowerBound.expressions.first as? IntegerLiteral)
                 XCTAssertEqual(integer.value, 1)
                 XCTAssertEqual(lowerBound.token, test.expecteds[0])
+            } else
+            if let lowerBound = range.lowerBoundary {
+                let es = try XCTUnwrap(lowerBound.sentence as? ExpressionStatement)
+                let integer = try XCTUnwrap(es.expressions.first as? IntegerLiteral)
+                XCTAssertEqual(integer.value, 1)
+                XCTAssertEqual(lowerBound.token, test.expecteds[0])
+            } else {
+                XCTAssertNil(test.expecteds[0])
             }
             if let upperBound = range.upperBound {
                 let integer = try XCTUnwrap(upperBound.expressions.first as? IntegerLiteral)
                 XCTAssertEqual(integer.value, 10)
                 XCTAssertEqual(upperBound.token, test.expecteds[1])
+            } else
+            if let upperBound = range.upperBoundary {
+                let es = try XCTUnwrap(upperBound.sentence as? ExpressionStatement)
+                let integer = try XCTUnwrap(es.expressions.first as? IntegerLiteral)
+                XCTAssertEqual(integer.value, 10)
+                XCTAssertEqual(upperBound.token, test.expecteds[1])
+            } else {
+                XCTAssertNil(test.expecteds[1])
             }
             print("テスト終了: \(statement.string)")
         }
     }
     func testRangeExpressions() throws {
         let testPatterns: [(input: String, testFunc: (ExpressionStatement?, ExpressionStatement?) throws -> Void)] = [
-            ("範囲【1に1を足すから、100で10を割るまで】", { lowerBound, upperBound in
+            ("範囲【1に1を足すから、100を10で割るまで】", { lowerBound, upperBound in
                 if lowerBound != nil {
                     let expressions = lowerBound!.expressions
                     XCTAssertEqual(lowerBound!.token, Token(.KARA))
@@ -912,7 +933,7 @@ final class ParserTests: XCTestCase {
                     try self.testKeywordLiteral(expressions[2], "割る")
                 }
             }),
-            ("範囲【1に1を足す以上、100で10を割る未満】", { lowerBound, upperBound in
+            ("範囲【1に1を足す以上、100を10で割る未満】", { lowerBound, upperBound in
                 if lowerBound != nil {
                     let expressions = lowerBound!.expressions
                     XCTAssertEqual(lowerBound!.token, Token(.GTEQUAL))

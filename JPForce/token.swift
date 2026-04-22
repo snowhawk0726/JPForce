@@ -33,6 +33,7 @@ enum Token : Equatable {
         case REFMARK    = "※"   // 米印(reference mark)
         case MINUS      = "-"
         case SPACE      = " "
+        case RANGE      = "〜"
         case ESC        = "\\"
         case TAB        = "\t"
         case CR         = "\r"
@@ -308,6 +309,7 @@ enum Token : Equatable {
             e.rawValue.zenkaku.map {d[$0] = e}
         }
         d["−"] = .MINUS
+        d["~"] = .RANGE;     d["～"] = .RANGE
         d["，"] = .COMMA;    d[","] = .COMMA
         d["．"] = .PERIOD;   d["."] = .PERIOD
         d["«"] = .LDABRACKET

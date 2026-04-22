@@ -26,6 +26,7 @@ final class Parser {
         self.previousToken = other.previousToken
         self.blockStack = other.blockStack
         self.switchCase = other.switchCase
+        self.isInRangeParser = other.isInRangeParser
         self.errors = other.errors
     }
     //
@@ -36,6 +37,7 @@ final class Parser {
     var errors: [String] = []
     var blockStack: [BlockFrame] = []
     var switchCase = SwitchCase()           // Switch-case監視
+    var isInRangeParser: Bool = false
     var leadingIdentifier: Identifier? = nil
     var options = ParserOptions()
     // MARK: - プログラムの解析

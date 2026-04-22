@@ -381,6 +381,10 @@ final class BoundaryExpression : Expression {
         self.token = token
         self.sentence = sentence
     }
+    init(token: Token, expression: Expression) {
+        self.token = token
+        self.sentence = ExpressionStatement(token: expression.token, expressions: [expression])
+    }
     var tokenLiteral: String { token.literal }
     var string: String {
         // 例: 1に1を足すから / 100で10を割るまで
@@ -388,23 +392,25 @@ final class BoundaryExpression : Expression {
     }
 }
 final class RangeLiteral : Expression {
-    let token: Token                // 範囲トークン
+    let token: Token                        // 範囲トークン
     let lowerBound: ExpressionStatement?    // 下限式(例：1以上）
     let upperBound: ExpressionStatement?    // 上限式(例：100以下、100未満)
     // 新形式（移行先）
     let lowerBoundary: BoundaryExpression?
     let upperBoundary: BoundaryExpression?
     // 旧: 既存の init を残しつつ
-    init(token: Token, lowerBound: ExpressionStatement? = nil, upperBound: ExpressionStatement? = nil) {
-        self.token = token
+    init(lowerBound: ExpressionStatement? = nil,
+         upperBound: ExpressionStatement? = nil) {
+        self.token = .keyword(.RANGE)
         self.lowerBound = lowerBound
         self.upperBound = upperBound
         self.lowerBoundary = nil
         self.upperBoundary = nil
     }
     // 新: 新形式用の init
-    init(token: Token, lower: BoundaryExpression? = nil, upper: BoundaryExpression? = nil) {
-        self.token = token
+    init(lower: BoundaryExpression? = nil,
+         upper: BoundaryExpression? = nil) {
+        self.token = .keyword(.RANGE)
         self.lowerBoundary = lower
         self.upperBoundary = upper
         self.lowerBound = nil
@@ -418,7 +424,7 @@ final class RangeLiteral : Expression {
             return token.coloredLiteral + "であって、【" + newFormatString + "】"
         } else {
             // フォールバック: 旧形式（従来の表示を維持）
-            return token.coloredLiteral + "【" +
+            return token.coloredLiteral + "であって、【" +
                 (lowerBound.map { oldFormatString(of: $0) } ?? "") + oldComma +
                 (upperBound.map { oldFormatString(of: $0) } ?? "") + "】"
         }

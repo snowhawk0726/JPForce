@@ -225,21 +225,74 @@ extension Parsable {
         getNext()
         return currentToken
     }
-    /// 式の解析　(例：1以上→範囲【1以上】)
-    /// - Parameter expression: 式(数値、識別子)
-    /// - Returns: 上限もしくは下限の範囲リテラル(もしくは元の式)
-    func parseRangeExpression(with expression: Expression) -> Expression? {
-        let token = nextToken
-        switch token {
-        case Token(.GTEQUAL):
-            getNext()
-            return RangeLiteral(token: .keyword(.RANGE), lowerBound: ExpressionStatement(token: token, expressions: [expression]))
-        case Token(.LTEQUAL),Token(.UNDER):
-            getNext()
-            return RangeLiteral(token: .keyword(.RANGE), upperBound: ExpressionStatement(token: token, expressions: [expression]))
-        default:
-            return expression
+    /// 上限(〜<式>(<未満>)(<格>))解析
+    /// - Returns: 上限式、格(上限に付随する助詞)
+    func parseUpperBoundary() -> (Expression?, Token?) {
+        guard nextToken.isIdent || nextToken.isNumber else { return (nil, nil) }
+        getNext()
+        guard let exp = ExpressionParser(parser).parse() else {
+            error(message: "〜<式>で、式の解釈に失敗しました。")
+            return (nil, nil)
         }
+        var particle: Token?
+        if nextToken.isParticle {   // <式>未満<格>
+            particle = nextToken
+            getNext()
+        }
+        return (exp, particle)
+    }
+    /// 上限式から上限情報(UpperInfo)を構築
+    func normalizeUpper(from exp: Expression?, _ nextParticle: Token?) -> BoundaryInfo? {
+        guard let exp else { return nil }
+        switch exp {
+        case is IntegerLiteral, is Identifier:
+            return BoundaryInfo(
+                boundary: BoundaryExpression(token: .particle(.LTEQUAL), expression: exp),
+                particle: nil,
+                right: nil
+            )
+        case let phrase as PhraseExpression:
+            let boundary: BoundaryExpression
+            let particle: Token?
+            if phrase.token.isParticle(.UNDER) {
+                boundary = BoundaryExpression(token: .particle(.UNDER), expression: phrase.left)
+                particle = nextParticle
+            } else {
+                boundary = BoundaryExpression(token: .particle(.LTEQUAL), expression: phrase.left)
+                particle = phrase.token
+            }
+            return BoundaryInfo(boundary: boundary, particle: particle, right: nil)
+        case let genitive as GenitiveExpression:
+            let boundary = BoundaryExpression(token: .particle(.LTEQUAL), expression: genitive.left)
+            return BoundaryInfo(boundary: boundary, particle: nil, right: genitive.right)
+        default:
+            error(message: "「〜<式>」で範囲を指定できる式は、「数値」または「識別子」のみです。")
+            return nil
+        }
+    }
+    /// 下限情報と上限情報から範囲リテラル(RangeLiteral)と格(Particle)、属格(Genitive)を合成し返す。
+    func buildRange(
+        lowerInfo: BoundaryInfo?,
+        upperInfo: BoundaryInfo?
+    ) -> Expression {
+        // 下限情報確認
+        let lower = lowerInfo?.boundary
+        var range = RangeLiteral(lower: lower, upper: nil)
+        if let right = lowerInfo?.right {       // 下限属格(rangeのright)
+            return GenitiveExpression(token: .particle(.NO), left: range, right: right)
+        }
+        if let particle = lowerInfo?.particle { // 下限格(range particle)
+            return PhraseExpression(token: particle, left: range)
+        }
+        // 上限情報確認
+        range = RangeLiteral(lower: lower, upper: upperInfo?.boundary)
+        if let right = upperInfo?.right {       // 上限属格(rangeのright)
+            return GenitiveExpression(token: .particle(.NO), left: range, right: right)
+        }
+        if let particle = upperInfo?.particle { // 上限格(range particle)
+            return PhraseExpression(token: particle, left: range)
+        }
+        return range                            // 上下限範囲(range)
     }
     /// 式の配列の解析(上下限を範囲リテラルとして切り出す)
     /// - Parameters:
@@ -265,7 +318,7 @@ extension Parsable {
                 return nil
             }
         }
-        return RangeLiteral(token: token, lowerBound: lowerBound, upperBound: upperBound)
+        return RangeLiteral(lowerBound: lowerBound, upperBound: upperBound)
     }
     /// 解析された式の配列から、上限式もしくは下限式を抽出する。
     /// *1* 「<式><キーワード>」は、範囲【<範囲式>】(RangeLiteral)と解析されている。(範囲式は、以上、以下、未満を含む式)
@@ -635,6 +688,19 @@ extension Parsable {
         }
         return .success(functionBlocks)
     }
+    func buildSentence(from expressions: [Expression]) -> Sentence? {
+        guard let last = expressions.last else { return nil }
+        if last.isPredicate {
+            return SimpleSentence(
+                token: last.sentenceToken,
+                auxiliaryVerb: last.auxiliaryVerb,
+                arguments: expressions.dropLast(),
+                predicateKind: last.sentenceToken.isPredicate ? .builtin : .custom,
+                string: expressions.map { $0.string }.joined()
+            )
+        }
+        return ExpressionStatement(token: last.token, expressions: expressions)
+    }
     // MARK: - Statement Parser Common Procs
     /// 単文暗黙ブロックの解析
     func parseImplicitSingleStatementBlock(token: Token, precedence: Precedence?, stopWhen: (Expression, [Expression]) -> Bool) -> BlockStatement? {
@@ -676,6 +742,8 @@ extension Parsable {
             error(message: "文の終端前の読点「、」が正しくありません。")
             return nil
         }
+        foldRangeLiterals(in: &expressions)     // 上下限範囲の合成
+        if !parser.errors.isEmpty { return nil }
         let es = ExpressionStatement(token: token, expressions: expressions, terminator: terminator)
         if parser.options.useSentenceAST {
             return ExpressionStatementParser(parser).parseSentecne(from: es)
@@ -725,6 +793,56 @@ extension Parsable {
             exps.insert(candidate.right, at: candidate.index + 1)
         }
     }
+    private func foldRangeLiterals(in exps: inout [Expression]) {
+        var i = 0
+        while i + 1 < exps.count {
+            guard
+                let r1 = exps[i] as? RangeLiteral,
+                let (r2, phrase) = extractRangeLiteral(from: exps[i+1])
+            else {
+                i += 1
+                continue
+            }
+            // 合成条件: r1 が lower-only、r2 が upper-only
+            if r1.isLowerOnly && r2.isUpperOnly {
+                let merged = RangeLiteral(
+                    lower: r1.lowerBoundary,
+                    upper: r2.upperBoundary
+                )
+                replaceRange(in: &exps, at: i, with: merged, phrase: phrase)
+                // 再評価
+                continue
+            }
+            let isRangeRelated = r1.isLowerOnly || r1.isUpperOnly || r2.isLowerOnly || r2.isUpperOnly
+            if isRangeRelated {
+                error(message: "上下限式は、「<式>以上<式>以下」または「<式>以上<式>未満」の組み合わせのみです。")
+            }
+            i += 1
+        }
+    }
+    private func extractRangeLiteral(from exp: Expression) -> (range: RangeLiteral, phrase: PhraseExpression?)? {
+        if let phrase = exp as? PhraseExpression,
+           let range = phrase.left as? RangeLiteral {
+            return (range, phrase)
+        }
+        if let range = exp as? RangeLiteral {
+            return (range, nil)
+        }
+        return nil
+    }
+    private func replaceRange(
+        in exps: inout [Expression],
+        at index: Int,
+        with merged: RangeLiteral,
+        phrase: PhraseExpression?
+    ) {
+        if let phrase {
+            exps[index] = PhraseExpression(token: phrase.token, left: merged)
+        } else {
+            exps[index] = merged
+        }
+        exps.remove(at: index + 1)
+    }
     // MARK: - Validate AST
     /// 右辺チェック
     func validateRhsType(from stmt: Statement) -> Bool {
@@ -768,6 +886,15 @@ enum ParserError : Error {
             return "ブロックの解析に失敗しました。"
         }
     }
+}
+struct BoundaryInfo {
+    let boundary: BoundaryExpression    // 上/下限式
+    let particle: Token?                // 続く格
+    let right: Expression?              // 続く属格の左式
+}
+extension RangeLiteral {
+    var isLowerOnly: Bool { lowerBoundary != nil && upperBoundary == nil }
+    var isUpperOnly: Bool { lowerBoundary == nil && upperBoundary != nil }
 }
 /// 式文要素の左辺候補の操作を行う。
 extension Array where Element == Expression {
@@ -1115,6 +1242,7 @@ struct PrefixExpressionParserFactory {
         case .keyword(.ELSE):
             parser.errors.append("場合文外で、「それ以外」が使用されています。")
             return nil
+        case .symbol(.RANGE):       return TildeUpperRangeParser(parser)    // 〜式
         case .keyword(_):           return PredicateExpressionParser(parser)
         case .illegal:              break
         default:                    return nil
@@ -1131,15 +1259,11 @@ struct IdentifierParser : ExpressionParsable {
         // 中黒「・」で分離された列挙子
         let names = token.literal.components(separatedBy: EnumeratorLiteral.dot)
         if names.count == 2 {
-            let enumerator = EnumeratorLiteral(token: token, type: names[0], name: names[1])
-            return parseRangeExpression(with: enumerator)
+            return EnumeratorLiteral(token: token, type: names[0], name: names[1])
         }
-        // 範囲への変換を試みる(例：<識別子>以上)
-        return parseRangeExpression(
-            with: Identifier(
+        return Identifier(
                 from: token,
                 with: parseAuxiliaryToken()
-            )
         )
     }
 }
@@ -1156,7 +1280,7 @@ struct IntegerLiteralParser : ExpressionParsable {
             error(message: "整数リテラルの解析で、「\(currentToken.literal)」を整数に変換できません。")
             return nil
         }
-        return parseRangeExpression(with: IntegerLiteral(from: value))
+        return IntegerLiteral(from: value)
     }
 }
 struct BooleanParser : ExpressionParsable {
@@ -1200,6 +1324,8 @@ struct RangeLiteralParser : ExpressionParsable {
     init(_ parser: Parser) {self.parser = parser}
     let parser: Parser
     func parse() -> Expression? {
+        defer {parser.isInRangeParser = false}
+        parser.isInRangeParser = true   // ParticleRangeParserの抑止
         let token = parseHeader()
         let kind = BlockKind(isExplicit: getNext(whenNextIs: .LBBRACKET))
         guard let block = BlockStatementParser(parser, kind: kind).blockStatement else {
@@ -1270,7 +1396,7 @@ struct RangeLiteralParser : ExpressionParsable {
         }
         // If at least one boundary was built, return RangeLiteral with boundaries
         if lowerBoundary != nil || upperBoundary != nil {
-            return RangeLiteral(token: token, lower: lowerBoundary, upper: upperBoundary)
+            return RangeLiteral(lower: lowerBoundary, upper: upperBoundary)
         }
         // Otherwise fall back to old behavior
         return parseRangeExpressions(es.expressions, token: token)
@@ -1293,7 +1419,6 @@ struct RangeLiteralParser : ExpressionParsable {
             if firstBridged.upperBoundary == nil,
                secondBridged.lowerBoundary == nil {
                 return RangeLiteral(
-                    token: headerToken,
                     lower: firstBridged.lowerBoundary,
                     upper: secondBridged.upperBoundary
                 )
@@ -1324,27 +1449,30 @@ struct RangeLiteralParser : ExpressionParsable {
                let us = buildSentence(from: ub.expressions) {
                 upper = BoundaryExpression(token: ub.token, sentence: us)
             }
-            return RangeLiteral(token: token, lower: lower, upper: upper)
+            return RangeLiteral(lower: lower, upper: upper)
         }
         if let ub = legacyRange.upperBound,
            let sentence = buildSentence(from: ub.expressions) {
             let upper = BoundaryExpression(token: ub.token, sentence: sentence)
-            return RangeLiteral(token: token, lower: nil, upper: upper)
+            return RangeLiteral(lower: nil, upper: upper)
         }
         return nil
     }
-    private func buildSentence(from expressions: [Expression]) -> Sentence? {
-        guard let last = expressions.last else { return nil }
-        if last.isPredicate {
-            return SimpleSentence(
-                token: last.sentenceToken,
-                auxiliaryVerb: last.auxiliaryVerb,
-                arguments: expressions.dropLast(),
-                predicateKind: last.sentenceToken.isPredicate ? .builtin : .custom,
-                string: expressions.map { $0.string }.joined()
-            )
+}
+// 上限式: 〜<式>(未満)
+struct TildeUpperRangeParser : ExpressionParsable {
+    init(_ parser: Parser) {self.parser = parser}
+    let parser: Parser
+    func parse() -> Expression? {
+        defer {parser.isInRangeParser = false}
+        parser.isInRangeParser = true   // ParticleRangeParserの抑止
+        let (upper, particle) = parseUpperBoundary()
+        guard let upper else {
+            error(message: "「〜<式>」で範囲を指定できる式は、「数値」または「識別子」のみです。")
+            return nil
         }
-        return ExpressionStatement(token: last.token, expressions: expressions)
+        let normalized = normalizeUpper(from: upper, particle)
+        return buildRange(lowerInfo: nil, upperInfo: normalized)
     }
 }
 struct FunctionLiteralParser : ExpressionParsable {
@@ -1887,14 +2015,14 @@ struct LoopExpressionParser : ExpressionParsable {
 struct InfixExpressionParserFactory {
     static func create(from parser: Parser, with left: Expression?) -> ExpressionParsable? {
         switch parser.nextToken.type {   // nextTokenに続くトークンを解析する解析器
-        case .keyword(.OR):         return InfixExpressionParser(parser, with: left)
+        case .keyword(.OR):         return OrExpressionParser(parser, with: left)
         case .particle(.NO):        return GenitiveExpressionParser(parser, with: left)
         case .symbol(.LBBRACKET):   return CallExpressionParser(parser, with: left)
         default:                    return nil
         }
     }
 }
-struct InfixExpressionParser : ExpressionParsable {
+struct OrExpressionParser : ExpressionParsable {
     init(_ parser: Parser, with left: Expression?) {self.parser = parser; self.left = left}
     let parser: Parser
     let left: Expression?
@@ -1902,14 +2030,14 @@ struct InfixExpressionParser : ExpressionParsable {
         let token = currentToken
         let op = currentToken.literal
         guard let left = left else {
-            error(message: "中間置式(\(op)で、左辺の解析に失敗しました。")
+            error(message: "選択肢「\(op)」で、左項の解析に失敗しました。")
             return nil
         }
         _ = getNext(whenNextIs: .COMMA)
         let precedence = Precedence[currentToken.type]
         getNext()
         guard let right = ExpressionParser(parser, precedence: precedence).parse() else {
-            error(message: "中間置式(\(op)で、右辺の解析に失敗しました。")
+            error(message: "選択肢「\(op)」で、右項の解析に失敗しました。")
             return nil
         }
         return OrExpression(token: token, left: left, right: right)
@@ -1986,7 +2114,11 @@ struct PostfixExpressionParserFactory {
     static func create(from parser: Parser, with left: Expression?) -> ExpressionParsable? {
         switch parser.nextToken.type {   // nextTokenに続くトークンを解析する解析器
         case .particle(.NO):    return nil
+        case .particle(.GTEQUAL),.particle(.LTEQUAL),.particle(.UNDER):
+            if parser.isInRangeParser { fallthrough }
+            return ParticleRangeParser(parser, with: left)
         case .particle(_):      return PhraseExpressionParser(parser, with: left)
+        case .symbol(.RANGE):   return TildeLowerRangeParser(parser, with: left)
         default:                return nil
         }
     }
@@ -2005,4 +2137,73 @@ struct PhraseExpressionParser : ExpressionParsable {
         return PhraseExpression(token: token, left: left)
     }
 }
-
+// 1. 下限式：  <式>〜(<格>)
+// 2. 上下限式： <式>〜<式>(未満)(<格>)
+struct TildeLowerRangeParser : ExpressionParsable {
+    init(_ parser: Parser, with left: Expression?) {self.parser = parser; self.left = left}
+    let parser: Parser
+    let left: Expression?
+    func parse() -> Expression? {
+        defer {parser.isInRangeParser = false}
+        parser.isInRangeParser = true   // ParticleRangeParserの抑止
+        guard let lower = parseLowerBoundary() else { return nil }
+        let (upper, particle) = parseUpperBoundary()
+        let normalized = normalizeUpper(from: upper, particle)
+        return buildRange(lowerInfo: lower, upperInfo: normalized)
+    }
+    // 下限(<式>〜(<格>)解析
+    /// - Returns: 下限情報
+    private func parseLowerBoundary() -> BoundaryInfo? {
+        // 下限式解析
+        guard let left,
+              left is IntegerLiteral || left is Identifier else {
+            error(message: "「<式>〜」で範囲を指定できる式は、「数値」または「識別子」のみです。")
+            return nil
+        }
+        let boundary = BoundaryExpression(token: .particle(.GTEQUAL), expression: left)
+        // <格>解析
+        var particle: Token?
+        if nextToken.isParticle {
+            particle = nextToken
+            getNext()
+        }
+        // <属格>解析
+        var right: Expression?
+        if particle?.isParticle(.NO) == true {
+            getNext()
+            right = ExpressionParser(parser).parse()
+        }
+        // 下限情報組立
+        return BoundaryInfo(boundary: boundary, particle: particle, right: right)
+    }
+}
+struct ParticleRangeParser : ExpressionParsable {
+    init(_ parser: Parser, with left: Expression?) {self.parser = parser; self.left = left}
+    let parser: Parser
+    let left: Expression?
+    func parse() -> Expression? {
+        guard let left,
+              left is IntegerLiteral || left is Identifier else {
+            error(message: "上下限式は、「数値」または「識別子」のみです。(実際： \(type(of: left)))")
+            return nil
+        }
+        let token = currentToken
+        var lower, upper: BoundaryExpression?
+        switch token {
+        case .particle(.GTEQUAL):
+            lower = BoundaryExpression(token: token, expression: left)
+        case .particle(.LTEQUAL), .particle(.UNDER):
+            upper = BoundaryExpression(token: token, expression: left)
+        default:
+            assertionFailure("\(token.literal) is not supported.", )
+            return nil
+        }
+        let range = RangeLiteral(lower: lower, upper: upper)
+        if parser.nextToken.isParticle {    // 上下限助詞に格(Particle)が続く場合
+            let p = PhraseExpressionParser(parser, with: range)
+            getNext()
+            return p.parse()
+        }
+        return range
+    }
+}
