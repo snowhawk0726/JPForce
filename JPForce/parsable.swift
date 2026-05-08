@@ -426,11 +426,11 @@ extension Parsable {
     }
     private func parseElement<T>(of token: Token) -> T? {
         switch token {
-        case .keyword(.ARRAY):
+        case .ARRAY:
             return parseArrayElement() as? T
-        case .keyword(.DICTIONARY):
+        case .DICTIONARY:
             return parseDictionaryElement() as? T
-        case .keyword(.ENUM):
+        case .ENUM:
             return parseEnumElement() as? T
         default:
             return nil
@@ -843,6 +843,16 @@ extension Parsable {
         }
         exps.remove(at: index + 1)
     }
+    /// 定義文の識別子をチェック
+    /// - Parameter token: 識別子トークン
+    /// - Returns: 識別子として正しいか
+    func isValidIdentifier(_ token: Token) -> Bool {
+        guard token.isIdent else { return false }
+        if let token = Token(resolvingKewyword: token.literal) {
+            return token.isRedefinable
+        }
+        return true
+    }
     // MARK: - Validate AST
     /// 右辺チェック
     func validateRhsType(from stmt: Statement) -> Bool {
@@ -1045,7 +1055,11 @@ struct DefineStatementParser : StatementParsable {
     init(_ parser: Parser) {self.parser = parser}
     let parser: Parser
     func parse() -> Statement? {
-        let identifier = Identifier(from: currentToken.literal)
+        guard isValidIdentifier(currentToken) else {
+            error(message: "「\(currentToken.literal)」は、識別子として使用できません。")
+            return nil
+        }
+        let identifier = Identifier(from: currentToken)
         parser.insert(identifier.value)     // 識別子をLexerに登録
         getNext()
         let token = currentToken            // 「は」
@@ -1074,7 +1088,11 @@ struct DefineStatementParser : StatementParsable {
         init(_ parser: Parser) {self.parser = parser}
         let parser: Parser
         func parse() -> Statement? {
-            let identifier = Identifier(from: currentToken.literal)
+            guard isValidIdentifier(currentToken)  else {
+                error(message: "「\(currentToken.literal)」は、識別子として使用できません。")
+                return nil
+            }
+            let identifier = Identifier(from: currentToken)
             parser.insert(identifier.value)     // 識別子をLexerに登録
             getNext()
             let token = currentToken            // 「とは、」
@@ -1087,7 +1105,7 @@ struct DefineStatementParser : StatementParsable {
             let setters = FunctionBlocks()
             let kind = BlockKind(isExplicit: getNext(whenNextIs: .LBBRACKET))
             if kind == .implicit,
-               case .keyword(let keyword) = nextToken,
+               case .keyword(let keyword,_) = nextToken,
                keyword == .COMPUTATION {
                 print("""
                     警告：算出定義文内で「算出」が指定されています。これは「算出を返す算出」として解釈されます。
@@ -1598,7 +1616,7 @@ struct ProtocolLiteralParser : ExpressionParsable {
             _ = getNext(whenNextIs: .COMMA)
             getNext()
             token = currentToken
-        case .keyword(.INITIALIZATION):
+        case .INITIALIZATION:
             if isStatic {
                 error(message: "型の初期化はできません(「型の」は不要)。")
                 return nil
@@ -1625,7 +1643,7 @@ struct ProtocolLiteralParser : ExpressionParsable {
         switch token {
         case .STRING(_):                // 型(文字列)
             return [.none]
-        case .keyword(.FUNCTION):       // 関数
+        case .FUNCTION:                 // 関数
             guard let parsed = FunctionLiteralParser(parser).parse() as? FunctionLiteral else {
                 error(message: "規約で、関数定義の解析に失敗しました。")
                 return nil
@@ -1636,13 +1654,13 @@ struct ProtocolLiteralParser : ExpressionParsable {
                 returnTypes: parsed.function.returnTypes
             )
             return [.function(sig)]
-        case .keyword(.COMPUTATION):    // 算出
+        case .COMPUTATION:              // 算出
             guard let parsed = ComputationLiteralParser(parser).parse() as? ComputationLiteral else {
                 error(message: "規約で、算出定義の解析に失敗しました。")
                 return nil
             }
             return makeComputationSignatures(from: parsed)
-        case .keyword(.INITIALIZATION): // 初期化
+        case .INITIALIZATION:           // 初期化
             switch parseFunctionBlocks(of: token.literal, in: token.literal) {
             case .success(let blocks):
                 return blocks.all.map {

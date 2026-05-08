@@ -12,9 +12,9 @@ enum Token : Equatable {
     case INT(Int = 0)           // 1343456..., -1
     case STRING(String = "文字列") // 文字列
     case symbol(Symbol)
-    case keyword(Keyword)
+    case keyword(Keyword, explicit: Bool = false)
     case particle(Particle)
-    case wrapped(type: TokenType, literal: String)
+    case wrapped(type: TokenType, literal: String, explicit: Bool = false)
     case ILLEGAL(String = "未定義")
     //
     enum Symbol : String, CaseIterable {    // 記号
@@ -170,11 +170,11 @@ enum Token : Equatable {
     /// 文字列を予約語(keyword)トークンに正規化
     init?(resolvingKewyword: String) {
         if let keyword = Keyword(rawValue: resolvingKewyword) {
-            self = .keyword(keyword)
+            self = .keyword(keyword, explicit: true)
             return
         }
         if case .keyword(let k) = ContinuativeForm(resolvingKewyword).plainFormType {
-            self = .wrapped(type: .keyword(k), literal: resolvingKewyword)
+            self = .wrapped(type: .keyword(k), literal: resolvingKewyword, explicit: true)
             return
         }
         return nil
@@ -202,11 +202,13 @@ enum Token : Equatable {
         case .IDENT(_):         return .ident
         case .INT(_):           return .int
         case .STRING(_):        return .string
-        case .keyword(let k):   return .keyword(k)
+        case .keyword(let k, _):
+                                return .keyword(k)
         case .symbol(let s):    return .symbol(s)
         case .particle(let p):  return .particle(p)
         case .ILLEGAL(_):       return .illegal
-        case .wrapped(let type, _): return type
+        case .wrapped(let type,_,_):
+                                return type
         }
     }
     var literal: String {
@@ -214,19 +216,21 @@ enum Token : Equatable {
         case .IDENT(let s):     return s
         case .INT(let int):     return String(int)
         case .STRING(let s):    return s
-        case .keyword(let k):   return k.rawValue
+        case .keyword(let k, _):
+                                return k.rawValue
         case .symbol(let s):    return s.rawValue
         case .particle(let p):  return p.rawValue
         case .ILLEGAL(let s):   return s
-        case .wrapped(_, let literal):  return literal
+        case .wrapped(_,let literal,_):
+                                return literal
         }
     }
     var unwrappedType: TokenType {
-        if case .wrapped(let type,_) = self {return type}
+        if case .wrapped(let type,_,_) = self {return type}
         return self.type
     }
     var unwrappedLiteral: String {
-        guard case .wrapped(let type,let word) = self else {return literal}
+        guard case .wrapped(let type,let word,_) = self else {return literal}
         switch type {
         case .keyword(let k): return k.rawValue
         case .particle(let p): return p.rawValue
@@ -266,8 +270,14 @@ enum Token : Equatable {
         }
     }
     var isKeyword: Bool {if case .keyword(_) = unwrappedType {return true} else {return false}}
+    var isExplicit: Bool {
+        if case .keyword(_, let e) = self { return e }
+        if case .wrapped(let type, _, let e) = self, case .keyword = type { return e }
+        return false
+    }
+    var isImplicit: Bool {!isExplicit}
     var isParticle: Bool {if case .particle(_) = self {return true} else {return false}}
-    var isWrapped: Bool {if case .wrapped(_,_) = self {return true} else {return false}}
+    var isWrapped: Bool {if case .wrapped(_,_,_) = self {return true} else {return false}}
     var isConjunctiveForm: Bool {isWrapped}
     var isPlainForm: Bool {!isWrapped }
     var isIdent: Bool   {type == .ident}
@@ -300,7 +310,14 @@ enum Token : Equatable {
         .PRINT, .ASK, .NEWLINE, .READ, .FILES, .IDENTIFIERS,
         .ASSIGN, .SET, .SWAP,
         .EXECUTE, .CREATE, .INITIALIZATION, .AVAILABLE,
+        .MEMBER,
     ]
+    static func isRedefinableKeyword(_ name: String) -> Bool {
+        Keyword(rawValue: name).map(redefinables.contains) ?? false
+    }
+    var isRedefinable: Bool {
+        Self.isRedefinableKeyword(unwrappedLiteral)
+    }
     // MARK: - 全角半角対応の記号辞書(symbol dictionary for half/fullwidth)
     static var symbols = {
         var d: [String: Symbol] = [:]
@@ -333,6 +350,16 @@ enum Token : Equatable {
     // MARK: - 論理式を入力とする述語
     var consumeLogicalExpression: Bool {
         [.CASE, .OR, .AND].contains {isKeyword($0)}
+    }
+}
+func ~= (pattern: Token.Keyword, value: Token) -> Bool {
+    switch value {
+    case .keyword(let k, _): return k == pattern      // explicit無視
+    case .wrapped(let type,_,_):
+        if case .keyword(let k) = type { return k == pattern }
+        return false
+    default:
+        return false
     }
 }
 /// 述語の分類

@@ -443,8 +443,16 @@ final class VMTests: XCTestCase {
         ]
         try runVmTests(with: testPattern)
     }
+    func testArrayConcats() throws {
+        let testPattern: [VmTestCase] = [
+            ("aは１。aが、1または4である。", true),
+            ("1が、配列【1,2】または配列【3,4】にある。", true),
+            ("10は、範囲【1以上10未満】または範囲【11以上20未満】にある。", false),
+        ]
+        try runVmTests(with: testPattern, isOptimized: false)
+    }
     // MARK: - Helpers
-    private func runVmTests(with tests: [VmTestCase]) throws {
+    private func runVmTests(with tests: [VmTestCase], isOptimized: Bool = false) throws {
         for t in tests {
             print("テスト開始：「\(t.input)」")
             var result: JpfObject?
@@ -455,6 +463,7 @@ final class VMTests: XCTestCase {
                 continue
             }
             let compiler = Compiler(from: program)
+            compiler.optimizeConstantsEnabled = isOptimized
             if let error = compiler.compile() {
                 result = error          // コンパイルエラー
             } else {

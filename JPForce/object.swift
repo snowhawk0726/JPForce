@@ -20,6 +20,7 @@ protocol JpfObject : Accessible {
     var error: JpfError? {get}
     /// nameと格をキーに、関連する値を取り出す(あるいは計算する)。
     subscript(name: String, particle: Token?) -> JpfObject? {get}
+    var toObjects: [JpfObject]? {get}
     // 判定
     var isTrue: Bool {get}
     var isNull: Bool {get}
@@ -79,6 +80,7 @@ extension JpfObject {
     func isEqual(to object: JpfObject) -> Bool {type == object.type && isTrue == object.isTrue}
     func contains(name: String) -> Bool {false}
     func contains(type: String) -> Bool {type == self.type}
+    var toObjects: [JpfObject]? {[self]}
 }
 struct JpfInteger : JpfObject, JpfHashable, Comparable {
     static let type = "数値"
@@ -298,9 +300,9 @@ struct JpfInstance : JpfObject {
     var name: String = ""
     var environment: Environment    // 要素(メンバー)を含む環境
     var protocols: [String]         // 準拠する規約
-    var available: Set<String>      // 外部から利用可能なメンバー
+    var availableMembers: Set<String>   // 外部から利用可能なメンバー
     //
-    var string: String {"型が、\(type)で、要素が、\(environment.enumerated.map {$0.key}.joined(separator: "と、"))。" + available.map {"「\($0)」"}.joined(separator: "と") + "は利用可能。"}
+    var string: String {"型が、\(type)で、要素が、\(environment.enumerated.map {$0.key}.joined(separator: "と、"))。" + availableMembers.map {"「\($0)」"}.joined(separator: "と") + "は利用可能。"}
 }
 struct JpfProtocol : JpfObject {
     static let type = "規約"

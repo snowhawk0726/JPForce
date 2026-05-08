@@ -291,6 +291,12 @@ extension JpfRange : ContainerProtocol {
         return function.execute(with: environment) ??
         environment.pull() ?? initial
     }
+    var toObjects: [any JpfObject]? {
+        guard let min = lowerBoundNumber else {return nil}
+        guard let max = upperBoundNumber else {return nil}
+        let array = Array(min...max)
+        return array.map {JpfInteger(value: $0)}
+    }
 }
 extension JpfString : ContainerProtocol {
     var count: JpfObject {JpfInteger(value: value.count)}
@@ -547,6 +553,7 @@ extension JpfArray : ContainerProtocol {
         return results
     }
     func reversed() -> JpfObject {JpfArray(name: self.name, elements: elements.reversed())}
+    var toObjects: [any JpfObject]? {elements}
 }
 extension JpfDictionary {
     func isEqual(to object: JpfObject) -> Bool {
@@ -642,6 +649,7 @@ extension JpfPhrase {
         guard let lhs = value, let rhs = object.value else {return JpfError("「\(string)」と「\(object.string)」" + cannotAdd)}
         return lhs.add(rhs)
     }
+    var toObjects: [any JpfObject]? {value?.toObjects ?? []}
 }
 extension JpfType {
     func contains(name: String) -> Bool {environment.contains(name)}
@@ -657,14 +665,16 @@ extension JpfType {
     }
 }
 extension JpfInstance {
-    var count: JpfObject {JpfInteger(value: available.count)}   // 利用可能要素(メンバー)数
+    var count: JpfObject {                                      // 利用可能要素(メンバー)数
+        JpfInteger(value: availableMembers.count)
+    }
     func contains(type: String) -> Bool {return type == self.type || protocols.contains(type)}
     func contains(name: String) -> Bool {environment.contains(name)}
     subscript(name: String, particle: Token?) -> JpfObject? {
         // nameが利用可能なメンバー名であれば、オブジェクトを返す。
         let canditate = environment[name] != nil ? name : ContinuativeForm(name).plainForm ?? ""
         if environment.contains(canditate), let member = environment[canditate] {   // outer除く
-            guard available.contains(canditate) else {return JpfError("『\(name)』" + identifierNotAvailable)}
+            guard availableMembers.contains(canditate) else {return JpfError("『\(name)』" + identifierNotAvailable)}
             if member is JpfFunction {
                 if let inputs = environment.outer?.pullAll() {  // 引数をインスタンスに移動(自身を除く)
                     pushParameters(inputs)

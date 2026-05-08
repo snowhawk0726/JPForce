@@ -62,7 +62,12 @@ extension JpfType {
         for p in protocols {    // 規約条項のメンバーリストを利用可能なメンバーリストに追加
             p.clauses.forEach {members.append($0.identifier.value)}
         }
-        return JpfInstance(type: self.name, environment: local, protocols: self.protocols, available: Set(members))
+        return JpfInstance(
+            type: self.name,
+            environment: local,
+            protocols: self.protocols,
+            availableMembers: Set(members)
+        )
     }
 }
 extension JpfInstance {

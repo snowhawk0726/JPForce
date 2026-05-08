@@ -32,7 +32,6 @@ extension Node {
     var logicalOperatorError: JpfError      {JpfError("は、論理式の演算に使えません。")}
     var elementEvalError: JpfError          {JpfError("「配列」の要素の評価に失敗しました。要素：")}
     var unusableAsHashKey: JpfError         {JpfError("「辞書」の要素の索引が、ハッシュキーとして使用できません。。索引: ")}
-    var keywordNotSupportedInInfixExpression: JpfError   {JpfError("は、値の選択に使用できません。。仕様：<値>または<値>...")}
     var conditionEvaluationError: JpfError  {JpfError("「反復」の条件が正しくありません。")}
     var loopParameterError: JpfError        {JpfError("「反復」の入力が正しくありません。")}
     var rangeTypeError: JpfError            {JpfError("「範囲」の上下限は、数値が必要です。：")}
@@ -133,19 +132,14 @@ extension DefineStatement : Evaluatable {
     func evaluate(with environment: Environment) -> JpfObject? {
         if let result = value.evaluate(with: environment), result.isError {return result}
         guard var definition = environment.pull() else {return nil}
-        if let keyword = Token.Keyword(rawValue: name.value),
-           Token.redefinables.contains(keyword) {   // 再定義可能な識別子
-            environment.redefineds.insert(keyword)
-        }
         if isExtended {                             // さらに
             if environment.contains(name.value) {
                 definition = extend(environment, by: name.value, with: definition)
-                if definition.isError {return definition}
             } else
-            if let keyword = Token.Keyword(rawValue: name.value),
-               environment.redefineds.contains(keyword) {
+            if let keyword = Token.Keyword(rawValue: name.value) {
                 definition = extend(definition, with: keyword)
             }
+            if definition.isError {return definition}
         }
         environment[name.value] = definition
         return nil
@@ -269,9 +263,8 @@ extension SentencePredicateKind {
     func evaluate(token: Token, auxiliaryVerb: AuxiliaryVerb, with environment: Environment) -> JpfObject? {
         switch self {
         case .builtin:
-            if let keyword = token.keyword, environment.contains(keyword) { // 再定義済み？
-                let ident = Identifier(from: token)
-                return ident.evaluate(with: environment)
+            if environment.hasRedefined(token) {    // 再定義済み？
+                fallthrough
             }
             let predicate = PredicateOperableFactory.create(from: token, with: environment)
             return predicate.operate()
@@ -448,15 +441,15 @@ extension Identifier : Evaluatable {
     /// - Returns: メソッド
     private func getMethod(name: String, from env: Environment) -> JpfObject? {
         if let target = env.pull(where: {
-            switch $0.value {                       // スタック上のオブジェクト
+            switch $0.value {                               // スタック上のオブジェクト
             case let o as JpfInstance:
-                return o.available.contains(name)   // インスタンスの利用可能メンバ
+                return o.availableMembers.contains(name)    // インスタンスの利用可能メンバ
             case let o as JpfType:
-                return o.environment.contains(name) // 型の要素
+                return o.environment.contains(name)         // 型の要素
             default:
                 return false
             }
-        }), let obj = target.value?[name, target.particle] {    // 対象オブジェクトの要素
+        }), let obj = target.value?[name, target.particle] {// 対象オブジェクトの要素
             return obj
         }
         return nil
@@ -494,7 +487,7 @@ extension PredicateExpression : Evaluatable {
     /// 述語を実行する。(結果があれば返す。= スタックに積まれる。)
     /// self.tokenは述語(Token.Keywordもしくは Token.IDENT(_))
     func evaluate(with environment: Environment) -> JpfObject? {
-        if let keyword = token.keyword, environment.contains(keyword) { // 再定義済み？
+        if environment.hasRedefined(token) {    // 再定義済み？
             let ident = Identifier(from: token)
             return ident.evaluate(with: environment)
         }
@@ -544,18 +537,18 @@ extension OrExpression : Evaluatable {
     /// - Returns: 配列、または配列を含む句、エラー
     func evaluate(with environment: Environment) -> JpfObject? {
         guard token.isKeyword(.OR) else {
-            return "「\(tokenLiteral)」" + keywordNotSupportedInInfixExpression
+            return "「\(tokenLiteral)」" + keywordNotSupportedInOrExpression
         }
         guard let value = left.evaluate(with: environment) else {return nil}
         guard !value.isError else {return value}
-        guard let la = toArray(from: value) else {
-            return "「\(value.string)」" + keywordNotSupportedInInfixExpression
+        guard let la = value.toObjects else {
+            return "「\(value.string)」" + keywordNotSupportedInOrExpression
         }
         //
         guard let value = right.evaluate(with: environment) else {return nil}
         guard !value.isError else {return value}
-        guard let ra = toArray(from: value) else {
-            return "「\(value.string)」" + keywordNotSupportedInInfixExpression
+        guard let ra = value.toObjects else {
+            return "「\(value.string)」" + keywordNotSupportedInOrExpression
         }
         //
         let array = JpfArray(elements: la + ra)
@@ -563,21 +556,6 @@ extension OrExpression : Evaluatable {
             return JpfPhrase(value: array, particle: particle)
         }
         return array
-    }
-    private func toArray(from value: JpfObject) -> [JpfObject]? {
-        switch value {
-        case let phrase as JpfPhrase:
-            return toArray(from: phrase.value!)
-        case let array as JpfArray:
-            return array.elements
-        case let range as JpfRange:
-            guard let min = range.lowerBoundNumber else {return nil}
-            guard let max = range.upperBoundNumber else {return nil}
-            let array = Array(min...max)
-            return array.map {JpfInteger(value: $0)}
-        default:
-            return [value]
-        }
     }
 }
 extension CaseExpression : Evaluatable {

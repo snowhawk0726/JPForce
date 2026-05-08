@@ -18,7 +18,7 @@ protocol Compilable {
     ///   または、スタック(c.emvirionment.stack)に値をpushする。
     func compile(with c: Compiler) -> JpfObject?
 }
-// MARK: - implementations for ast mode compiler
+// MARK: - implementations for ast node compiler
 // [Expression]のコンパイル
 extension Array where Element == Expression {
     /// 複数の式（または引数）を順に翻訳する共通処理
@@ -136,6 +136,9 @@ extension SentencePredicateKind {
     func compile(token: Token, auxiliaryVerb: AuxiliaryVerb, with c: Compiler) -> JpfObject? {
         switch self {
         case .builtin:
+            if c.symbolTable.hasRedefined(token) {
+                fallthrough
+            }
             let predicate = PredicateExpression(token: token, auxiliaryToken: auxiliaryVerb.token)
             return predicate.compile(with: c)
         case .custom:
@@ -439,6 +442,9 @@ private extension GenitiveExpression {
         switch right.compile(with: c) {
         case let rightPhrase as JpfPhrase:
             do {
+                guard left is Identifier else {
+                    return rightPhrase
+                }
                 try emitGenitiveAccess(from: rightPhrase, with: c)
             } catch {
                 return jpfError(from: error)
@@ -619,6 +625,64 @@ extension PairExpression : Compilable {
         return nil
     }
 }
+extension RangeLiteral : Compilable {
+    func compile(with c: Compiler) -> JpfObject? {
+        do {
+            if c.optimizeConstantsEnabled, let const = analyze(with: c) {
+                return const
+            }
+            var count = 0
+            if let lowerBoundary {
+                if let result = lowerBoundary.sentence.compile(with: c), result.isError {return result}
+                try lowerBoundary.token.emitParticle(with: c)
+                count += 1
+            }
+            if let upperBoundary {
+                if let result = upperBoundary.sentence.compile(with: c), result.isError {return result}
+                try upperBoundary.token.emitParticle(with: c)
+                count += 1
+            }
+            _ = c.emit(op: .opRangeConst, operand: count * 2)
+        } catch {
+            return jpfError(from: error)
+        }
+        return nil
+    }
+}
+extension OrExpression : Compilable {
+    func compile(with c: Compiler) -> JpfObject? {
+        if c.optimizeConstantsEnabled, let const = analyze(with: c) {
+            return const
+        }
+        // 翻訳(コード出力)
+        do {
+            try c.emitAllCashe()
+            // Left side
+            try compileAndEmit(left, with: c)
+            // Right side (phrase-aware)
+            if let phrase = right as? PhraseExpression {
+                try compileAndEmit(phrase.left, with: c)
+                _ = c.emit(op: .opArrayConcat)
+                if case .particle(let p) = phrase.token {
+                    _ = c.emit(particle: p)
+                }
+            } else {
+                try compileAndEmit(right, with: c)
+                _ = c.emit(op: .opArrayConcat)
+            }
+        } catch {
+            return jpfError(from: error)
+        }
+        return nil
+    }
+    // Helper to compile an expression and emit its value if needed
+    private func compileAndEmit(_ exp: Expression, with c: Compiler) throws {
+        if let result = exp.compile(with: c) {
+            if result.isError { throw result.error! }
+            try result.emit(with: c)
+        }
+    }
+}
 extension FunctionLiteral : Compilable {
     func compile(with c: Compiler) -> JpfObject? {
         do {try c.emitAllCashe()} catch {return jpfError(from: error)}  // キャッシュをバイトコードに出力
@@ -649,4 +713,3 @@ extension FunctionLiteral : Compilable {
         return nil
     }
 }
-

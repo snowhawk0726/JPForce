@@ -29,6 +29,8 @@ extension CodeExecutable {
     var failedToGetFreeVariables: JpfError  {JpfError("自由変数の取得に失敗しました。")}
     var cannotFoundPredicate: JpfError      {JpfError("述語が定義されていません。")}
     var stackValueIsNotNumber: JpfError     {JpfError("スタックの値が数値ではありません。")}
+    var invalidRangeNumber: JpfError        {JpfError("範囲が数値以外で指定されています。")}
+    var invalidRangeIndex: JpfError         {JpfError("範囲の格インデックスが正しくありせん。")}
     func dictionaryKeyNotHashable(_ key: JpfObject) -> JpfError {
         JpfError("辞書のキー「\(key)」がハッシュ可能な型ではありません。")}
 }
@@ -66,6 +68,8 @@ struct CodeExecutableFactory {
         case .opDropConst:      return DropConstExecuter(vm, with: operandBytes)
         case .opDrop:           return DropStackExecuter(vm)
         case .opMapProperty:    return MapPropertyExecuter(vm, with: operandBytes)
+        case .opRangeConst:     return RangeConstExecuter(vm, with: operandBytes)
+        case .opArrayConcat:    return ArrayConcatExecuter(vm)
         }
     }
 }
@@ -133,6 +137,40 @@ private extension DictionaryConstExecuter {
             pairs[hash.hashKey] = (key, value)
         }
         return JpfDictionary(pairs: pairs)
+    }
+}
+struct RangeConstExecuter : CodeExecutable {
+    init(_ vm: VM, with bytes: [Byte]) {self.vm = vm; self.bytes = bytes}
+    let vm: VM, bytes: [Byte]
+    func execute() throws {
+        let numberOfElements = Int(readUInt8(from: bytes))
+        vm.currentFrame.advanceIp(by: 1)
+        let range = try buildRange(with: numberOfElements)
+        try vm.push(range)
+    }
+}
+private extension CodeExecutable {
+    func buildRange(with n: Int) throws -> JpfRange {
+        guard let objects = vm.peek(n) else {throw notEnoughStackValues}
+        vm.drop(n)
+        var lowerBound, upperBound: (JpfInteger, Token)?
+        for i in stride(from: 0, to: n, by: 2) {
+            guard let integer = objects[i] as? JpfInteger else {
+                throw invalidRangeNumber
+            }
+            guard let index = objects[i+1].number,
+                  index < Token.particles.count else {
+                throw invalidRangeIndex
+            }
+            let particle = Token(Token.particles[index])
+            if particle.isLower {
+                lowerBound = (integer, particle)
+            }
+            if particle.isUpper {
+                upperBound = (integer, particle)
+            }
+        }
+        return JpfRange(lowerBound: lowerBound, upperBound: upperBound)
     }
 }
 struct GenitiveExecuter : CodeExecutable {
@@ -397,6 +435,15 @@ struct MapPropertyExecuter : CodeExecutable {
         guard let object = vm.pull() else {throw objectNotFound}
         let result = try mapProperty(of: object, using: accessor)
         try vm.push(result)
+    }
+}
+struct ArrayConcatExecuter : CodeExecutable {
+    init(_ vm: VM) {self.vm = vm}
+    let vm: VM
+    func execute() throws {
+        guard let rhs = vm.pull()?.toObjects else {throw objectNotFound}
+        guard let lhs = vm.pull()?.toObjects else {throw objectNotFound}
+        try vm.push(JpfArray(elements: lhs + rhs))
     }
 }
 private extension MapPropertyExecuter {

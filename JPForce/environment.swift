@@ -12,9 +12,8 @@ final class Environment {
     let outer: Environment?     // 拡張環境
     static let OUTER = Token.Keyword.OUTER.rawValue // 外部
     var isExecutable: Bool = true                   // false: 実行抑止
-    private var store: [String: JpfObject] = [:]
+    private var store: [String: JpfObject] = [:]    // オブジェクト辞書
     private var stack: Stack
-    var redefineds: Set<Token.Keyword> = []         // 再定義された予約語
     private var parameters: [(key: String, value: JpfObject)] = []  // 引数
     private var assignmentIdentifier: String?       // 代入対象識別子
     // MARK: - 辞書操作
@@ -163,10 +162,24 @@ final class Environment {
         parameters
     }
     // 再定義
-    func contains(_ keyword: Token.Keyword) -> Bool {
-        if redefineds.contains(keyword) {return true}
-        guard let instance = peek?.value as? JpfInstance else {return false}
-        return instance.available.contains(keyword.rawValue)
+    func hasRedefined(_ token: Token) -> Bool {
+        guard token.isImplicit,
+              let name = token.keyword?.rawValue
+        else {
+            return false
+        }
+        // スタックに積まれている述語の引数の環境に再定義されている名前をチェック
+        for arg in getAll() {
+            switch arg.value {
+            case let o as JpfInstance where o.availableMembers.contains(name):
+                return true
+            case let o as JpfType where o.environment.contains(name):
+                return true
+            default:
+                continue
+            }
+        }
+        return contains(name)
     }
     // 代入用識別子キャッシュ TODO: 削除予定(AssignCompiler修正時)
     var identifier: String? {

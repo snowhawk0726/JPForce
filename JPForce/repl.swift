@@ -13,6 +13,7 @@ struct Repl {
     func start() {
         enum Mode {case interpriter, vm}
         var mode: Mode = .interpriter
+        var optimize: Bool = true
         //
         let environment = Environment()     // for Intepriter
         var constants: [JpfObject] = []     // for Compiler & VM
@@ -25,15 +26,28 @@ struct Repl {
             guard let line = readLine(), !line.isEmpty else {
                 return
             }
-            if line.lowercased() == "vm" {
+            switch line.lowercased() {
+            case "vm":
                 mode = .vm
                 print("仮想マシン・モード")
                 continue
-            } else
-            if line.lowercased() == "interpriter" {
+            case "interpriter":
                 mode = .interpriter
                 print("インタプリタ・モード")
                 continue
+            case "optimize":
+                print("定数解析：\(optimize ? "on" : "off")")
+                continue
+            case "optimize off":
+                optimize = false
+                print("定数解析：off")
+                continue
+            case "optimize on":
+                optimize = true
+                print("定数解析：on")
+                continue
+            default:
+                break
             }
             let lexer = Lexer(line)
             let parser = Parser(lexer)
@@ -43,7 +57,7 @@ struct Repl {
                 continue
             }
             if mode == .vm {
-                runVirtualMachine(of: program, &constants, symbolTable, globals, stack)
+                runVirtualMachine(of: program, &constants, symbolTable, globals, stack, optimize: optimize)
             } else {
                 runEvaluator(of: program, with: environment)
             }
@@ -61,9 +75,24 @@ struct Repl {
         evaluated.map {print("評価結果: \($0.string)")}
         print("入力: (\(environment.string))")
     }
-    private func runVirtualMachine(of program: Program, _ constants: inout [JpfObject], _ symbolTable: SymbolTable, _ globals: GlobalStore, _ stack: Stack) {
+    private func runVirtualMachine(of program: Program, _ constants: inout [JpfObject], _ symbolTable: SymbolTable, _ globals: GlobalStore, _ stack: Stack, optimize: Bool = true) {
         // 翻訳部
         let compiler = Compiler(from: program, symbolTable, constants)
+        compiler.optimizeConstantsEnabled = optimize
+
+        if optimize, let analyzed = compiler.analyze() {
+            if let errorMessage = analyzed.error {
+                print("定数解析で、エラーを検出しました。")
+                print("\tエラー: \(errorMessage)")
+                return
+            }
+            print("実行結果(定数解析): \(analyzed.string)")
+            // 定数計算のスタックをVMのスタックに移す
+            _ = stack.push(analyzed)
+            numberOfStack = stack.count
+            print("入力: (\(stack.string))")
+            return
+        }
         if let error = compiler.compile() {
             print("翻訳器が、エラーを検出しました。")
             print("\tエラー: \(error.message)")

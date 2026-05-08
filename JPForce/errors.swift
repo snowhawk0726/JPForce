@@ -45,6 +45,7 @@ func outerUndefinedIdentifier(_ ident: String) -> JpfError {
     JpfError("外部『\(ident)』が定義されていません。")
 }
 var notEnoughStackValues: JpfError      {JpfError("スタックの値の数が不足しています。")}
+var keywordNotSupportedInOrExpression: JpfError   {JpfError("は、値の選択に使用できません。。仕様：<値>または<値>...")}
 // MARK: - ヘルパー
 @discardableResult
 func jpfError(from err: Error) -> JpfError {

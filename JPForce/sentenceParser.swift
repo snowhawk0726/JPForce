@@ -186,10 +186,7 @@ extension PropertyExpression {
 extension Token {
     /// 終止形に接続する語
     var isTerminalConnector: Bool {
-        switch self {
-        case .keyword(.CASE), .keyword(.QUESTION), .keyword(.KOTO), .keyword(.OR), .keyword(.AND), .keyword(.WHILE): return true
-        default : return false
-        }
+        isKeyword(.CASE) || isKeyword(.QUESTION) || isKeyword(.KOTO) || isKeyword(.OR) || isKeyword(.AND) || isKeyword(.WHILE)
     }
     /// 文の区切りを打ち消すもの
     var isBoundaryCanceler: Bool {
@@ -201,7 +198,7 @@ extension Token {
     }
     /// 直前の句読点を「、」にする語(接続詞)
     var isConjunction: Bool {
-        [.keyword(.OR), .keyword(.AND), .keyword(.ASWELLAS)].contains(self)
+        isKeyword(.OR) || isKeyword(.AND) || isKeyword(.ASWELLAS)
     }
 }
 // Sentenceの解析

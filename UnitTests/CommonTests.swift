@@ -80,6 +80,43 @@ final class CommonTests: XCTestCase {
             }
         }
     }
+    func testRedefinedKeywords() throws {
+        let testPattern: [VmTestCase] = [
+            ("『足す』は１。足すと１を《足し》、2を掛ける。", 4),
+        ]
+        print("評価器テスト開始")
+        try evaluateTests(with: testPattern)
+        print("翻訳器・VMテスト開始")
+        try runVmTests(with: testPattern)
+    }
+    func testRangeCheckings() throws {
+        let testPattern: [VmTestCase] = [
+            ("1が範囲【１以下】にある", true),
+            ("1が範囲【１未満】にある", false),
+            ("2が範囲【１以上】にある", true),
+            ("1が範囲【１以上２以下】にある", true),
+            ("１が１以上２以下にある", true),
+            ("1が1~2にある", true),
+            ("1が1~にある", true),
+            ("２が範囲【１以上3未満】にある", true),
+            ("２が範囲【１以上3未満】にない", false),
+            ("２が１以上3未満にない", false),
+            ("2が1~3未満にない", false),
+            ("1が範囲【１から10まで】にある", true),
+            ("11が範囲【１から10まで】にある", false),
+            ("3が範囲【１から2まで】または範囲【４から10まで】にある", false),
+            ("5が範囲【１から2まで】または範囲【４から10まで】にある", true),
+            ("範囲【1から3まで】は範囲【1以上3以下】に等しい", true),
+            ("範囲【1から3まで】は範囲【1以上3未満】に等しい", false),
+            ("1〜3の型が「範囲」である", true),
+            ("1〜3未満の型が「範囲」でない", false),
+            ("1〜の型が「範囲」である", true),
+        ]
+        print("評価器テスト開始")
+        try evaluateTests(with: testPattern)
+        print("翻訳器・VMテスト開始")
+        try runVmTests(with: testPattern)
+    }
     // MARK: - Helpers
     enum CommonTestError: Error {
         case syntax
@@ -112,7 +149,7 @@ final class CommonTests: XCTestCase {
             print("テスト結果：\(evaluated.string)")
         }
     }
-    private func runVmTests(with tests: [VmTestCase]) throws {
+    private func runVmTests(with tests: [VmTestCase], isOptimized: Bool = true) throws {
         for t in tests {
             var result: JpfObject?
             print("テスト開始：「\(t.input)」")
@@ -124,6 +161,7 @@ final class CommonTests: XCTestCase {
                 continue
             }
             let compiler = Compiler(from: program)
+            compiler.optimizeConstantsEnabled = isOptimized
             if let error = compiler.compile() {
                 result = error          // コンパイルエラー
             } else {

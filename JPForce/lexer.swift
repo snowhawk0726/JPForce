@@ -45,18 +45,18 @@ final class Lexer {
         let compoundToken = Token(word: token.literal + nextToken.literal)
         /// 識別子として使用不可:  助詞を含む文字列、記号・数値で始まる文字列、記号で終わる文字列、予約語「する」「こと」「また」「以上」「以下」「未満」で終わる文字列
         switch (token, nextToken, compoundToken) {
-        case (.IDENT(_),.keyword(let keyword),_):       // 識別子 + 予約語 → 合成
+        case (.IDENT(_),.keyword(let keyword,_),_):     // 識別子 + 予約語 → 合成
             if [.SURU,.KOTO,.MATA,.CASE,.QUESTION].contains(keyword) {return token}  // する、こと、また、場合、かを除く
             token = Token(word: token.literal + getNext().literal)
-        case (_,_,.keyword(_)), (_,_,.particle(_)),
-            (.IDENT(_),.IDENT(_),_), (.IDENT(_),.wrapped(.ident,_),_), (.IDENT(_),.INT(_),_),
-            (.wrapped(.ident,_),.IDENT(_),_):
+        case (_,_,.keyword(_,_)), (_,_,.particle(_)),
+            (.IDENT(_),.IDENT(_),_), (.IDENT(_),.wrapped(.ident,_,_),_), (.IDENT(_),.INT(_),_),
+            (.wrapped(.ident,_,_),.IDENT(_),_):
             token = Token(word: token.literal + getNext().literal)  // 識別子を合成
-        case (.keyword(let keyword),.IDENT(_),_):
+        case (.keyword(let keyword,_),.IDENT(_),_):
             if [.ITS,.QUESTION].contains(keyword) {return token}
             token = Token(word: token.literal + getNext().literal)  // 識別子を合成
-        case (.keyword(_),.keyword(let next),_):     // 予約語 + 予約語
-            if next == .KOTO {                          
+        case (.keyword(_,_),.keyword(let next,_),_):    // 予約語 + 予約語
+            if next == .KOTO {
                 _ = getNext()                           //　「こと」は飛ばす
             }
         case (.INT(_),.IDENT(_),_):                     // 数値 + 単位 → 単位を無視する

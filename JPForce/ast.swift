@@ -8,7 +8,7 @@
 import Foundation
 
 // MARK: interfaces
-protocol Node : Evaluatable, Compilable {
+protocol Node : Evaluatable, Compilable, ConstAnalysis {
     var tokenLiteral: String {get}
     var string: String {get}
 }
@@ -303,12 +303,7 @@ final class Identifier : Expression {
         self.isOuter = isOuter
     }
     convenience init(from string: String, with auxiliaryToken: Token? = nil, isOuter: Bool = false) {
-        self.init(
-            token: Token(ident: string),
-            value: string,
-            auxiliaryToken: auxiliaryToken,
-            isOuter: isOuter
-        )
+        self.init(from: Token(ident: string))
     }
     convenience init(from token: Token, with auxiliaryToken: Token? = nil, isOuter: Bool = false) {
         self.init(

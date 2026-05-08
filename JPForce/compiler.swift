@@ -70,13 +70,18 @@ class Compiler {
         self.symbolTable = symbolTable
         self.constants = constants
     }
-    private let node: Node          // コンパイルするASTノード
-    private var constants: [JpfObject] = [] // 定数表
-    var symbolTable = SymbolTable() // シンボルテーブル
-    let environment = Environment() // 定数計算を行うstackを提供する。
+    convenience init(from node: Node, _ symbolTable: SymbolTable, _ constanats: [JpfObject], _ stack: Stack) {
+        self.init(from: node, symbolTable, constanats)
+        _ = self.environment.push(stack.getAll())
+    }
+    private let node: Node                                  // コンパイルするASTノード
+    private var constants: [JpfObject] = []                 // 定数表
+    var symbolTable = SymbolTable()                         // シンボルテーブル
+    var optimizeConstantsEnabled: Bool = true               // 定数最適化オプション
+    let environment = Environment()                         // 定数計算を行うstackを提供する。
     var scopes: [CompilationScope] = [CompilationScope()]   // main scope
     var scopeIndex = 0
-    var switchCase = SwitchCase()   // Switch-caseの監視
+    var switchCase = SwitchCase()                           // Switch-caseの監視
     //
     var bytecode: Bytecode {Bytecode(currentInstructions, constants)}   // バイトコードを返す
     var nextPosition: Int {currentInstructions.count}                   // 最新インストラクション・ポイント
@@ -84,6 +89,13 @@ class Compiler {
     var currentInstructions: Instructions {                             // 現スコープのインストラクション列
         get {currentScope.instructions}
         set {currentScope.instructions = newValue}
+    }
+    /// 指定されたASTノードを定数解析する。
+    /// - Returns: 解析結果
+    ///    正常：定数(JpfObject)またはnil
+    ///    エラー(JpfError)
+    func analyze() -> JpfObject? {
+        return node.analyze(with: self)
     }
     /// 指定されたASTノードをコンパイルする。
     /// - Returns: エラー(無しは、nil)

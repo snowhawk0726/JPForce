@@ -25,6 +25,14 @@ struct Symbol : Equatable {
     let name: String
     let scope: SymbolScope
     let index: Int
+    let isRedefined: Bool
+    //
+    init(name: String, scope: SymbolScope, index: Int, isRedefined: Bool = false) {
+        self.name = name
+        self.scope = scope
+        self.index = index
+        self.isRedefined = isRedefined
+    }
     //
     var isProperty: Bool {scope == .PROPETRY}
     var isPredicate: Bool {scope == .PREDICATE}
@@ -58,21 +66,34 @@ class SymbolTable : Equatable {
         self.outer = outer
     }
     var outer: SymbolTable?
-    private var store: [String: Symbol] = [:]
+    private var userDefinedSymbols: [String: Symbol] = [:]
+    private var builtinSymbols: [String: Symbol] = [:]
     var numberOfDefinitions = 0
     var freeSymbols: [Symbol] = []
     //
     static func == (lhs: SymbolTable, rhs: SymbolTable) -> Bool {
-        lhs.store == rhs.store
+        lhs.userDefinedSymbols == rhs.userDefinedSymbols
+        && lhs.builtinSymbols == rhs.builtinSymbols
         && lhs.numberOfDefinitions == rhs.numberOfDefinitions
     }
     subscript(index: Int) -> String? {  // シンボルテーブルから識別子名を取得
-        store.first(where: {$0.value.isVariable && $0.value.index == index})?.key
+        userDefinedSymbols.first(where: {$0.value.isVariable && $0.value.index == index})?.key
     }
     // シンボル定義
     func define(name: String, index: Int, scope: SymbolScope) -> Symbol {
-        let symbol = Symbol(name: name, scope: scope, index: index)
-        store[name] = symbol
+        var symbol: Symbol
+        if scope == .PREDICATE || scope == .PROPETRY {
+            symbol = Symbol(name: name, scope: scope, index: index)
+            builtinSymbols[name] = symbol
+        } else {
+            symbol = Symbol(
+                name: name,
+                scope: scope,
+                index: index,
+                isRedefined: Token.isRedefinableKeyword(name)
+            )
+            userDefinedSymbols[name] = symbol
+        }
         return symbol
     }
     func define(_ name: String) -> Symbol {
@@ -93,10 +114,24 @@ class SymbolTable : Equatable {
     }
     // シンボルの名前解決
     func resolve(_ name: String) -> Symbol? {
-        if let symbol = store[name] {return symbol}
+        if let symbol = userDefinedSymbols[name] {
+            return symbol
+        }
+        if let symbol = builtinSymbols[name] {
+            return symbol
+        }
         // 外側で解決
         guard let symbol = outer?.resolve(name) else {return nil}
         return (symbol.isFree || symbol.isLocal) ? define(free: symbol) : symbol
     }
-    func resolve(_ token: Token) -> Symbol? {resolve(token.unwrappedLiteral)}
+    func resolve(_ token: Token) -> Symbol? {
+        if token.isExplicit {
+            return builtinSymbols[token.unwrappedLiteral]
+        }
+        return resolve(token.unwrappedLiteral)
+    }
+    func hasRedefined(_ token: Token) -> Bool {
+        guard let symbol = resolve(token) else {return false}
+        return symbol.isRedefined
+    }
 }

@@ -166,7 +166,7 @@ extension JpfArray {
 }
 extension JpfDictionary {
     func emit(with c: Compiler) throws {
-#if DEBUG   // UnitTestのために、要素の順序正を保つ
+#if DEBUG   // UnitTestのために、要素の順序を保つ
         try pairs.values.sorted(by: {$0.key.string < $1.key.string}).forEach {
             try $0.key.emit(with: c)
             try $0.value.emit(with: c)
@@ -181,8 +181,30 @@ extension JpfDictionary {
 #endif
     }
 }
+extension JpfRange {
+    func emit(with c: Compiler) throws {
+        var count = 0
+        if let lowerBound {
+            try lowerBound.0.emit(with: c)              // 下限値をemit
+            try lowerBound.1.emitParticle(with: c)      // 格インデックスをemit
+            count += 1
+        }
+        if let upperBound {
+            try upperBound.0.emit(with: c)              // 上限値をemit
+            try upperBound.1.emitParticle(with: c)      // 格インデックスをemit
+            count += 1
+        }
+        _ = c.emit(op: .opRangeConst, operand: count * 2)
+    }
+}
 // トークンレベル・コンパイルヘルパー
 extension Token {
+    func emitParticle(with c: Compiler) throws {
+        guard let idx = particleIndex else {
+            throw JpfError("格インデックスを生成できません。(トークン: \(literal)")
+        }
+        try JpfInteger(value: idx).emit(with: c)
+    }
     func emitConst(with c: Compiler, operand: Int) {
         _ = c.emit(op: opConst, operand: operand)
     }

@@ -66,6 +66,9 @@
 		50A6829E2C2199CC00754E45 /* code.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50A6829C2C2199CC00754E45 /* code.swift */; };
 		50ABD3A92F0CD7E80014ED59 /* sentenceParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50ABD3A82F0CD7E80014ED59 /* sentenceParser.swift */; };
 		50ABD3AA2F0CD7E80014ED59 /* sentenceParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50ABD3A82F0CD7E80014ED59 /* sentenceParser.swift */; };
+		50B4BEF42F9DC6C1000FBEA8 /* constAnalysis.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50B4BEF32F9DC6C1000FBEA8 /* constAnalysis.swift */; };
+		50B4BEF52F9DC6C1000FBEA8 /* constAnalysis.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50B4BEF32F9DC6C1000FBEA8 /* constAnalysis.swift */; };
+		50B4BEFA2F9E1E5C000FBEA8 /* ConstAnalysisTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50B4BEF92F9E1E5C000FBEA8 /* ConstAnalysisTests.swift */; };
 		50C3CD962C22CBEB006F9957 /* compiler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50C3CD952C22CBEB006F9957 /* compiler.swift */; };
 		50C3CD972C22CBEB006F9957 /* compiler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50C3CD952C22CBEB006F9957 /* compiler.swift */; };
 		50C454DD2C8C89460078C98D /* predicateCompilable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50175F9A2C8C426200DD0F4A /* predicateCompilable.swift */; };
@@ -73,8 +76,8 @@
 		50C9C1D729F3A46A0046C735 /* color.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50C9C1D529F3A46A0046C735 /* color.swift */; };
 		50D72B522C8D6ECD00A3841C /* codeExecutable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50D72B512C8D6ECD00A3841C /* codeExecutable.swift */; };
 		50D72B532C8D6ECD00A3841C /* codeExecutable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50D72B512C8D6ECD00A3841C /* codeExecutable.swift */; };
-		50E9A7D02F1F4336006FB1EB /* ParserOptions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50E9A7CF2F1F4336006FB1EB /* ParserOptions.swift */; };
-		50E9A7D12F1F4336006FB1EB /* ParserOptions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50E9A7CF2F1F4336006FB1EB /* ParserOptions.swift */; };
+		50E9A7D02F1F4336006FB1EB /* parserOptions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50E9A7CF2F1F4336006FB1EB /* parserOptions.swift */; };
+		50E9A7D12F1F4336006FB1EB /* parserOptions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50E9A7CF2F1F4336006FB1EB /* parserOptions.swift */; };
 		50EF3E7A2EFE73E30049DE90 /* functionBlocks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50EF3E792EFE73E30049DE90 /* functionBlocks.swift */; };
 		50EF3E7B2EFE73E30049DE90 /* functionBlocks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50EF3E792EFE73E30049DE90 /* functionBlocks.swift */; };
 		50EF3E7D2EFF8E4D0049DE90 /* executionObjectsExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50EF3E7C2EFF8E4D0049DE90 /* executionObjectsExtension.swift */; };
@@ -133,10 +136,12 @@
 		509D910229CD85C200C22283 /* builtin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = builtin.swift; sourceTree = "<group>"; };
 		50A6829C2C2199CC00754E45 /* code.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = code.swift; sourceTree = "<group>"; };
 		50ABD3A82F0CD7E80014ED59 /* sentenceParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = sentenceParser.swift; sourceTree = "<group>"; };
+		50B4BEF32F9DC6C1000FBEA8 /* constAnalysis.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = constAnalysis.swift; sourceTree = "<group>"; };
+		50B4BEF92F9E1E5C000FBEA8 /* ConstAnalysisTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConstAnalysisTests.swift; sourceTree = "<group>"; };
 		50C3CD952C22CBEB006F9957 /* compiler.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = compiler.swift; sourceTree = "<group>"; };
 		50C9C1D529F3A46A0046C735 /* color.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = color.swift; sourceTree = "<group>"; };
 		50D72B512C8D6ECD00A3841C /* codeExecutable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = codeExecutable.swift; sourceTree = "<group>"; };
-		50E9A7CF2F1F4336006FB1EB /* ParserOptions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParserOptions.swift; sourceTree = "<group>"; };
+		50E9A7CF2F1F4336006FB1EB /* parserOptions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = parserOptions.swift; sourceTree = "<group>"; };
 		50EF3E792EFE73E30049DE90 /* functionBlocks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = functionBlocks.swift; sourceTree = "<group>"; };
 		50EF3E7C2EFF8E4D0049DE90 /* executionObjectsExtension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = executionObjectsExtension.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -187,7 +192,7 @@
 				5042122029B58DAD00D2EA98 /* object.swift */,
 				5042121F29B58DAD00D2EA98 /* lexer.swift */,
 				5042122229B58DAD00D2EA98 /* parser.swift */,
-				50E9A7CF2F1F4336006FB1EB /* ParserOptions.swift */,
+				50E9A7CF2F1F4336006FB1EB /* parserOptions.swift */,
 				5042122629B58DAD00D2EA98 /* parsable.swift */,
 				50ABD3A82F0CD7E80014ED59 /* sentenceParser.swift */,
 				5042122529B58DAD00D2EA98 /* evaluator.swift */,
@@ -198,6 +203,7 @@
 				5070B1A729B61DDA00808FDE /* predicateOperable.swift */,
 				509D910229CD85C200C22283 /* builtin.swift */,
 				50C3CD952C22CBEB006F9957 /* compiler.swift */,
+				50B4BEF32F9DC6C1000FBEA8 /* constAnalysis.swift */,
 				501240E02C23FCBC00CC2F7C /* compilable.swift */,
 				508909CC2CAA752B00032B0A /* symbolTable.swift */,
 				506B442A2CBA11D900C9F929 /* frame.swift */,
@@ -219,6 +225,7 @@
 			isa = PBXGroup;
 			children = (
 				506561E829D937380016923D /* ObjectTests.swift */,
+				50B4BEF92F9E1E5C000FBEA8 /* ConstAnalysisTests.swift */,
 				50267B502EEEBBD8007BA132 /* CommonTests.swift */,
 				5042123B29B58E5900D2EA98 /* AstTests.swift */,
 				501240E32C2587B800CC2F7C /* VMTests.swift */,
@@ -324,12 +331,13 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				50B4BEF42F9DC6C1000FBEA8 /* constAnalysis.swift in Sources */,
 				501240E62C2590C300CC2F7C /* vm.swift in Sources */,
 				50EF3E7E2EFF8E4D0049DE90 /* executionObjectsExtension.swift in Sources */,
 				50A6829D2C2199CC00754E45 /* code.swift in Sources */,
 				5042122F29B58DAD00D2EA98 /* ast.swift in Sources */,
 				5070B1A829B61DDA00808FDE /* predicateOperable.swift in Sources */,
-				50E9A7D02F1F4336006FB1EB /* ParserOptions.swift in Sources */,
+				50E9A7D02F1F4336006FB1EB /* parserOptions.swift in Sources */,
 				50D72B522C8D6ECD00A3841C /* codeExecutable.swift in Sources */,
 				5042122929B58DAD00D2EA98 /* repl.swift in Sources */,
 				50175F9B2C8C426200DD0F4A /* predicateCompilable.swift in Sources */,
@@ -362,6 +370,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				50C9C1D729F3A46A0046C735 /* color.swift in Sources */,
+				50B4BEF52F9DC6C1000FBEA8 /* constAnalysis.swift in Sources */,
 				5042123D29B58E9F00D2EA98 /* ast.swift in Sources */,
 				508909D32CAA793000032B0A /* SymbolTableTests.swift in Sources */,
 				501240E72C2590C300CC2F7C /* vm.swift in Sources */,
@@ -369,6 +378,7 @@
 				50EF3E7D2EFF8E4D0049DE90 /* executionObjectsExtension.swift in Sources */,
 				50552F3E29B5B87D0061CDBE /* environment.swift in Sources */,
 				5070B1AA29BC977500808FDE /* main.swift in Sources */,
+				50B4BEFA2F9E1E5C000FBEA8 /* ConstAnalysisTests.swift in Sources */,
 				500E66B82ED40C270062F5D9 /* errors.swift in Sources */,
 				509D910429CD85C200C22283 /* builtin.swift in Sources */,
 				50ABD3AA2F0CD7E80014ED59 /* sentenceParser.swift in Sources */,
@@ -378,7 +388,7 @@
 				5042124129B58EAE00D2EA98 /* object.swift in Sources */,
 				503E27842CE87D7600300B1B /* Benchmark.swift in Sources */,
 				5042124429B58EBC00D2EA98 /* repl.swift in Sources */,
-				50E9A7D12F1F4336006FB1EB /* ParserOptions.swift in Sources */,
+				50E9A7D12F1F4336006FB1EB /* parserOptions.swift in Sources */,
 				5042123C29B58E5900D2EA98 /* AstTests.swift in Sources */,
 				5006B6EC2C2957E700D34FDD /* accessible.swift in Sources */,
 				5042124529B58EC000D2EA98 /* token.swift in Sources */,

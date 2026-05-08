@@ -44,6 +44,8 @@ enum Opcode : Byte {
     case opDrop
     case opArray
     case opMapProperty      // 30
+    case opRangeConst
+    case opArrayConcat      // ２つの値を配列化し連結
     //
     var definition: (name: String, operandWidths: [Int]) {
         switch self {
@@ -78,6 +80,8 @@ enum Opcode : Byte {
         case .opDropConst:      (name: "OpDrop",          operandWidths: [1])   // 要素数
         case .opDrop:           (name: "OpDrop",          operandWidths: [])    // (スタック値)
         case .opMapProperty:    (name: "OpMapProperty",   operandWidths: [1])   // 属性インデックス
+        case .opRangeConst:     (name: "OpRange",         operandWidths: [1])   // 要素数 x 2
+        case .opArrayConcat:    (name: "OpArrayConcat",   operandWidths: [])
         }
     }
     var name: String {definition.name}                  // オペコード名

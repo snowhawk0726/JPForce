@@ -300,6 +300,34 @@ final class CompilerTests: XCTestCase {
         ]
         try runCompilerTests(testPatterns)
     }
+    func testRangeLiterals() throws {
+        let testPatterns: [CompilerTestCase] = [
+            (input: "範囲【1以上】",
+             expectedConstants: [1,Token(.GTEQUAL)],
+             expectedInstructions: [
+                make(op: .opConstant, operand: 0),
+                make(op: .opConstant, operand: 1),
+                make(op: .opRangeConst, operand: 2),
+             ]),
+            (input: "範囲【10以下】",
+             expectedConstants: [10,Token(.LTEQUAL)],
+             expectedInstructions: [
+                make(op: .opConstant, operand: 0),
+                make(op: .opConstant, operand: 1),
+                make(op: .opRangeConst, operand: 2),
+             ]),
+            (input: "範囲【1以上10以下】",
+             expectedConstants: [1,Token(.GTEQUAL),10,Token(.LTEQUAL)],
+             expectedInstructions: [
+                make(op: .opConstant, operand: 0),
+                make(op: .opConstant, operand: 1),
+                make(op: .opConstant, operand: 2),
+                make(op: .opConstant, operand: 3),
+                make(op: .opRangeConst, operand: 4),
+             ]),
+        ]
+        try runCompilerTests(testPatterns)
+    }
     func testIndexExpressions() throws {
         let testPatterns: [CompilerTestCase] = [
             (input: "iは、1と1を足す。配列【１、２、３】のi",
@@ -1019,11 +1047,12 @@ final class CompilerTests: XCTestCase {
         try runCompilerTests(tests)
     }
     // MARK: - Helpers
-    private func runCompilerTests(_ tests: [CompilerTestCase]) throws {
+    private func runCompilerTests(_ tests: [CompilerTestCase], isOptimized: Bool = false) throws {
         for t in tests {
             print("テスト開始：「\(t.input)」")
             let program = parseProgram(with: t.input)!
             let compiler = Compiler(from: program)
+            compiler.optimizeConstantsEnabled = isOptimized
             XCTAssertNil(compiler.compile())
             let bytecode = compiler.bytecode
             testInstructions(t.expectedInstructions, bytecode.instructions)
@@ -1062,6 +1091,9 @@ final class CompilerTests: XCTestCase {
                 }
                 let actualParticle = try XCTUnwrap(phrase?.particle?.literal)
                 XCTAssertEqual(actualParticle, particle)
+            case let token as Token:
+                let particleIndex = token.particleIndex
+                XCTAssertEqual(particleIndex, actual.number)
             default:
                 break
             }
