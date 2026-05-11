@@ -185,26 +185,28 @@ extension JpfRange {
     func emit(with c: Compiler) throws {
         var count = 0
         if let lowerBound {
-            try lowerBound.0.emit(with: c)              // 下限値をemit
-            try lowerBound.1.emitParticle(with: c)      // 格インデックスをemit
+            try lowerBound.value.emit(with: c)          // 下限値をemit
+            let kind = ComparisonKind(isLower: true, inclusive: lowerBound.inclusive)
+            try kind.emit(with: c)
             count += 1
         }
         if let upperBound {
-            try upperBound.0.emit(with: c)              // 上限値をemit
-            try upperBound.1.emitParticle(with: c)      // 格インデックスをemit
+            try upperBound.value.emit(with: c)          // 上限値をemit
+            let kind = ComparisonKind(isLower: false, inclusive: upperBound.inclusive)
+            try kind.emit(with: c)
             count += 1
         }
         _ = c.emit(op: .opRangeConst, operand: count * 2)
     }
 }
+// 範囲比較種別・コンパイルヘルパー
+extension ComparisonKind {
+    func emit(with c: Compiler) throws {
+        _ = c.emit(op: .opComparisonConst, operand: self.rawValue)
+    }
+}
 // トークンレベル・コンパイルヘルパー
 extension Token {
-    func emitParticle(with c: Compiler) throws {
-        guard let idx = particleIndex else {
-            throw JpfError("格インデックスを生成できません。(トークン: \(literal)")
-        }
-        try JpfInteger(value: idx).emit(with: c)
-    }
     func emitConst(with c: Compiler, operand: Int) {
         _ = c.emit(op: opConst, operand: operand)
     }

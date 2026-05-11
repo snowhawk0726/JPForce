@@ -303,26 +303,26 @@ final class CompilerTests: XCTestCase {
     func testRangeLiterals() throws {
         let testPatterns: [CompilerTestCase] = [
             (input: "範囲【1以上】",
-             expectedConstants: [1,Token(.GTEQUAL)],
+             expectedConstants: [1],
              expectedInstructions: [
                 make(op: .opConstant, operand: 0),
-                make(op: .opConstant, operand: 1),
+                make(op: .opComparisonConst, operand: 1),   // 以上
                 make(op: .opRangeConst, operand: 2),
              ]),
             (input: "範囲【10以下】",
-             expectedConstants: [10,Token(.LTEQUAL)],
+             expectedConstants: [10],
              expectedInstructions: [
                 make(op: .opConstant, operand: 0),
-                make(op: .opConstant, operand: 1),
+                make(op: .opComparisonConst, operand: 3),   // 以下
                 make(op: .opRangeConst, operand: 2),
              ]),
-            (input: "範囲【1以上10以下】",
-             expectedConstants: [1,Token(.GTEQUAL),10,Token(.LTEQUAL)],
+            (input: "範囲【1以上10未満】",
+             expectedConstants: [1,10],
              expectedInstructions: [
                 make(op: .opConstant, operand: 0),
+                make(op: .opComparisonConst, operand: 1),   // 以上
                 make(op: .opConstant, operand: 1),
-                make(op: .opConstant, operand: 2),
-                make(op: .opConstant, operand: 3),
+                make(op: .opComparisonConst, operand: 2),   // 未満
                 make(op: .opRangeConst, operand: 4),
              ]),
         ]

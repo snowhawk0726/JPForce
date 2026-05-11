@@ -70,6 +70,7 @@ struct CodeExecutableFactory {
         case .opMapProperty:    return MapPropertyExecuter(vm, with: operandBytes)
         case .opRangeConst:     return RangeConstExecuter(vm, with: operandBytes)
         case .opArrayConcat:    return ArrayConcatExecuter(vm)
+        case .opComparisonConst:return ComparisonExecuter(vm, with: operandBytes)
         }
     }
 }
@@ -153,24 +154,35 @@ private extension CodeExecutable {
     func buildRange(with n: Int) throws -> JpfRange {
         guard let objects = vm.peek(n) else {throw notEnoughStackValues}
         vm.drop(n)
-        var lowerBound, upperBound: (JpfInteger, Token)?
+        var lowerBound, upperBound: RangeBoundary?
         for i in stride(from: 0, to: n, by: 2) {
             guard let integer = objects[i] as? JpfInteger else {
                 throw invalidRangeNumber
             }
-            guard let index = objects[i+1].number,
-                  index < Token.particles.count else {
+            guard
+                let index = objects[i+1].number,
+                index < ComparisonKind.allCases.count,
+                let kind = ComparisonKind(rawValue: index)
+            else {
                 throw invalidRangeIndex
             }
-            let particle = Token(Token.particles[index])
-            if particle.isLower {
-                lowerBound = (integer, particle)
+            if kind.isLower {
+                lowerBound = RangeBoundary(value: integer, inclusive: kind.hasBoundary)
             }
-            if particle.isUpper {
-                upperBound = (integer, particle)
+            if kind.isUpper {
+                upperBound = RangeBoundary(value: integer, inclusive: kind.hasBoundary)
             }
         }
         return JpfRange(lowerBound: lowerBound, upperBound: upperBound)
+    }
+}
+struct ComparisonExecuter : CodeExecutable {
+    init(_ vm: VM, with bytes: [Byte]) {self.vm = vm; self.bytes = bytes}
+    let vm: VM, bytes: [Byte]
+    func execute() throws {
+        let index = Int(readUInt8(from: bytes))
+        vm.currentFrame.advanceIp(by: 1)
+        try vm.push(JpfInteger(value: index))
     }
 }
 struct GenitiveExecuter : CodeExecutable {

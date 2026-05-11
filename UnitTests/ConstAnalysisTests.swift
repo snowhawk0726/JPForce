@@ -31,8 +31,8 @@ final class ConstAnalysisTests: XCTestCase {
         }
     }
     func testRangeLiterals() throws {
-        let gteOne = (JpfInteger(value: 1), Token(.GTEQUAL))
-        let underTen = (JpfInteger(value: 10), Token(.UNDER))
+        let gteOne = RangeBoundary(value: JpfInteger(value: 1), inclusive: true)
+        let underTen = RangeBoundary(value: JpfInteger(value: 10), inclusive: false)
         let testRange = JpfRange(lowerBound: gteOne, upperBound: underTen)
         let testPatterns: [(input: String, expected: JpfObject?)] = [
             ("1以上10未満", testRange),
@@ -41,7 +41,8 @@ final class ConstAnalysisTests: XCTestCase {
                 aは1。bは10。
                 a以上b未満
             """, testRange),
-            ("範囲【1と0を足す以上、11から1を引く未満】", testRange),
+            ("範囲【1と0を足す以上、10に1を掛ける未満】", testRange),
+            ("1〜10未満", testRange),
         ]
         for t in testPatterns {
             print("テスト開始：\(t.input)")

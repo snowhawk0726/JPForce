@@ -351,15 +351,19 @@ extension RangeLiteral : Evaluatable {
     func evaluate(with environment: Environment) -> JpfObject? {
         if let err = environment.push(JpfNull.object) {return err}  // 範囲の上下限が、配列にアクセスしないための回避策
         defer {if let o = environment.peek, o.isNull {environment.drop()}}
-        var lower, upper: (JpfInteger, Token)?
+        var lower, upper: RangeBoundary?
         do {
-            if let sentence = lowerBoundary?.sentence ?? lowerBound,
-               let token = lowerBoundary?.token ?? lowerBound?.token {
-                lower = (try evaluate(sentence, with: environment), token)
+            if let lowerBoundary {
+                lower = RangeBoundary(
+                    value: try evaluate(lowerBoundary.sentence, with: environment),
+                    inclusive: lowerBoundary.kind.hasBoundary
+                )
             }
-            if let sentence = upperBoundary?.sentence ?? upperBound,
-               let token = upperBoundary?.token ?? upperBound?.token {
-                upper = (try evaluate(sentence, with: environment), token)
+            if let upperBoundary {
+                upper = RangeBoundary(
+                    value: try evaluate(upperBoundary.sentence, with: environment),
+                    inclusive: upperBoundary.kind.hasBoundary
+                )
             }
             return JpfRange(lowerBound: lower, upperBound: upper)
         } catch {
@@ -702,11 +706,15 @@ extension LoopExpression : Evaluatable {
     // <範囲>を反復【入力が<識別子(カウント値)>、<処理>】。
     private func evaluateLoop(of range: JpfRange, with environment: Environment) -> JpfObject? {
         guard parameters.count == 1 else {return loopParameterError + rangeLoopUsage}
-        guard let lowerBound = range.lowerBound?.0.number,
-              var upperBound = range.upperBound?.0.number else {return rangeLoopUsage}
+        guard
+            let lowerBound = range.lowerBound?.value.number,
+            var upperBound = range.upperBound?.value.number
+        else {
+            return rangeLoopUsage
+        }
         if let formatError = range.error {return formatError}
         environment.drop()
-        if range.upperBound?.1 == Token(.UNDER) {upperBound -= 1}       // 未満なので、上限 - 1
+        if range.upperBound?.inclusive == false {upperBound -= 1}                       // 未満なので、上限 - 1
         return evaluateLoop(from: lowerBound, through: upperBound, with: environment)   // 下限から、上限までループ
     }
     // <配列>を反復【入力が<識別子(値)>、<処理>】。

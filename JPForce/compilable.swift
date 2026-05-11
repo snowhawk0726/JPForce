@@ -634,12 +634,12 @@ extension RangeLiteral : Compilable {
             var count = 0
             if let lowerBoundary {
                 if let result = lowerBoundary.sentence.compile(with: c), result.isError {return result}
-                try lowerBoundary.token.emitParticle(with: c)
+                try lowerBoundary.kind.emit(with: c)
                 count += 1
             }
             if let upperBoundary {
                 if let result = upperBoundary.sentence.compile(with: c), result.isError {return result}
-                try upperBoundary.token.emitParticle(with: c)
+                try upperBoundary.kind.emit(with: c)
                 count += 1
             }
             _ = c.emit(op: .opRangeConst, operand: count * 2)

@@ -46,6 +46,7 @@ enum Opcode : Byte {
     case opMapProperty      // 30
     case opRangeConst
     case opArrayConcat      // ２つの値を配列化し連結
+    case opComparisonConst
     //
     var definition: (name: String, operandWidths: [Int]) {
         switch self {
@@ -82,6 +83,7 @@ enum Opcode : Byte {
         case .opMapProperty:    (name: "OpMapProperty",   operandWidths: [1])   // 属性インデックス
         case .opRangeConst:     (name: "OpRange",         operandWidths: [1])   // 要素数 x 2
         case .opArrayConcat:    (name: "OpArrayConcat",   operandWidths: [])
+        case .opComparisonConst:(name: "OpComparison",    operandWidths: [1])   // 比較種別インデックス
         }
     }
     var name: String {definition.name}                  // オペコード名
@@ -232,6 +234,8 @@ struct Instructions : ExpressibleByArrayLiteral {
             s = ObjectProperties().names[index]                             // 属性名
         case .opPredicate:
             s = PredicateOperableFactory.predicates[index].keyword.rawValue // 述語名
+        case .opComparisonConst:
+            s = ComparisonKind(rawValue: index)?.comparisonString ?? "??"   // 比較種別
         default :
             return formattedInstruction(op, operands)
         }

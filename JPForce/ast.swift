@@ -366,71 +366,78 @@ final class Boolean: ValueExpression {
 }
 /// 範囲
 extension Token {
+    var hasBoundary: Bool {isLower || isUpper}
     var isLower: Bool { [Token(.GTEQUAL), Token(.KARA)].contains(self) }
     var isUpper: Bool { [Token(.LTEQUAL), Token(.MADE), Token(.UNDER)].contains(self) }
+    var comparisonKind: ComparisonKind? { ComparisonKind(from: self) }
 }
-final class BoundaryExpression : Expression {
-    let token: Token            // 以上、以下、未満、から、まで、のトークン
+enum ComparisonKind : Int, CaseIterable {
+    case gt                     // より大きい(未使用)
+    case gte                    // 以上(から)
+    case lt                     // 未満
+    case lte                    // 以下(まで)
+    //
+    init?(from token: Token) {
+        guard case .particle(let particle) = token else { return nil }
+        switch particle {
+        case .KARA, .GTEQUAL: self = .gte
+        case .MADE, .LTEQUAL: self = .lte
+        case .UNDER: self = .lt
+        default:
+            return nil
+        }
+    }
+    init(isLower: Bool, inclusive: Bool) {
+        switch (isLower, inclusive) {
+        case (true, true):      self = .gte
+        case (true, false):     self = .gt
+        case (false, true):     self = .lte
+        case (false, false):    self = .lt
+        }
+    }
+    var comparisonToken: Token? {
+        switch self {
+        case .gte: return Token(.GTEQUAL)
+        case .lte: return Token(.LTEQUAL)
+        case .lt:  return Token(.UNDER)
+        default:   return nil
+        }
+    }
+    var comparisonString: String? { comparisonToken?.literal }
+    //
+    var isLower: Bool { self == .gte || self == .gt }
+    var isUpper: Bool { !isLower }
+    var hasBoundary: Bool { self == .gte || self == .lte }
+}
+final class BoundaryExpression {
+    let kind: ComparisonKind    // 上下限の種別
     let sentence: Sentence      // 上下限式
-    init(token: Token, sentence: Sentence) {
-        self.token = token
+    init(kind: ComparisonKind, sentence: Sentence) {
+        self.kind = kind
         self.sentence = sentence
     }
-    init(token: Token, expression: Expression) {
-        self.token = token
+    init(kind: ComparisonKind, expression: Expression) {
+        self.kind = kind
         self.sentence = ExpressionStatement(token: expression.token, expressions: [expression])
-    }
-    var tokenLiteral: String { token.literal }
-    var string: String {
-        // 例: 1に1を足すから / 100で10を割るまで
-        sentence.string.withoutPunctuation + token.coloredLiteral
     }
 }
 final class RangeLiteral : Expression {
     let token: Token                        // 範囲トークン
-    let lowerBound: ExpressionStatement?    // 下限式(例：1以上）
-    let upperBound: ExpressionStatement?    // 上限式(例：100以下、100未満)
-    // 新形式（移行先）
-    let lowerBoundary: BoundaryExpression?
-    let upperBoundary: BoundaryExpression?
-    // 旧: 既存の init を残しつつ
-    init(lowerBound: ExpressionStatement? = nil,
-         upperBound: ExpressionStatement? = nil) {
-        self.token = .keyword(.RANGE)
-        self.lowerBound = lowerBound
-        self.upperBound = upperBound
-        self.lowerBoundary = nil
-        self.upperBoundary = nil
-    }
-    // 新: 新形式用の init
+    let lowerBoundary: BoundaryExpression?  // 下限式(例：1以上）
+    let upperBoundary: BoundaryExpression?  // 上限式(例：10以下、100未満)
+    //
     init(lower: BoundaryExpression? = nil,
          upper: BoundaryExpression? = nil) {
         self.token = .keyword(.RANGE)
         self.lowerBoundary = lower
         self.upperBoundary = upper
-        self.lowerBound = nil
-        self.upperBound = nil
     }
+    //
     var tokenLiteral: String { token.literal }
-    // 新旧両対応の string
     var string: String {
-        if lowerBoundary != nil || upperBoundary != nil {
-            // 新形式が設定されていれば新形式で表示
-            return token.coloredLiteral + "であって、【" + newFormatString + "】"
-        } else {
-            // フォールバック: 旧形式（従来の表示を維持）
-            return token.coloredLiteral + "であって、【" +
-                (lowerBound.map { oldFormatString(of: $0) } ?? "") + oldComma +
-                (upperBound.map { oldFormatString(of: $0) } ?? "") + "】"
-        }
+        token.coloredLiteral + "であって、【" + rangeString + "】"
     }
-    // 旧形式の表示（従来のまま）
-    private func oldFormatString(of es: ExpressionStatement) -> String {
-        es.expressions.reduce("") { $0 + $1.string } + es.tokenLiteral
-    }
-    private var oldComma: String { (lowerBound != nil && upperBound != nil) ? "、" : "" }
-    // 新形式の表示
-    private var newFormatString: String {
+    private var rangeString: String {
         let lhs = lowerBoundary.map { boundaryString($0) } ?? ""
         let rhs = upperBoundary.map { boundaryString($0) } ?? ""
         let comma = (lowerBoundary != nil && upperBoundary != nil) ? "、" : ""
@@ -439,7 +446,7 @@ final class RangeLiteral : Expression {
     private func boundaryString(_ b: BoundaryExpression) -> String {
         // 例: 1以上 / 10未満 / 3まで 等
         // 式の末尾の句読点は避けたいので withoutPunctuation を活用
-        return b.sentence.string.withoutPunctuation + b.token.coloredLiteral
+        return b.sentence.string.withoutPunctuation + b.kind.comparisonToken!.coloredLiteral
     }
 }
 /// 句(式+助詞)。助詞(token)はToken.Particle

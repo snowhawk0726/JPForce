@@ -143,32 +143,23 @@ struct JpfIdentifier : JpfObject {
         self.isLhs = ident.isLhs
     }
 }
+struct RangeBoundary {
+    let value: JpfInteger
+    let inclusive: Bool         // 境界を含む/否
+}
 struct JpfRange : JpfObject {
     static let type = "範囲"
     var name: String = ""
-    var lowerBound: (JpfInteger, Token)?
-    var upperBound: (JpfInteger, Token)?
+    var lowerBound: RangeBoundary?
+    var upperBound: RangeBoundary?
     //
     var string: String {type.color(.magenta) + "【" +
-        (lowerBound.map {$0.string + $1.literal} ?? "") + comma +
-        (upperBound.map {$0.string + $1.literal} ?? "") + "】"}
+        (lowerBound.map {$0.value.string + ($0.inclusive ? "以上" : "より大きい")} ?? "") + comma +
+        (upperBound.map {$0.value.string + ($0.inclusive ? "以下" : "未満")} ?? "") + "】"}
     private var comma: String {(lowerBound != nil && upperBound != nil) ? "、" : ""}
     //
-    var lowerBoundNumber: Int? {
-        guard lowerBound?.1 == .particle(.KARA) || lowerBound?.1 == .particle(.GTEQUAL) else {return nil}
-        return lowerBound?.0.value
-    }
-    var upperBoundNumber: Int? {
-        switch upperBound?.1 {
-        case .particle(.MADE),.particle(.LTEQUAL):
-            return upperBound?.0.value
-        case .particle(.UNDER):
-            guard let n = upperBound?.0 else {return nil}
-            return n.value - 1
-        default:
-            return nil
-        }
-    }
+    var lowerBoundNumber: Int? {lowerBound.map {$0.value.value + ($0.inclusive ? 0 : 1)}}
+    var upperBoundNumber: Int? {upperBound.map {$0.value.value - ($0.inclusive ? 0 : 1)}}
 }
 struct JpfNull : JpfObject {
     static let type = "無"

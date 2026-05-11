@@ -147,87 +147,70 @@ extension JpfInteger {
         }
     }
 }
+extension RangeBoundary {
+    func isEqual(to bound: RangeBoundary) -> Bool {
+        value.value == bound.value.value &&
+        inclusive == bound.inclusive
+    }
+}
 extension JpfRange : ContainerProtocol {
     /// 範囲の比較（未満と他の上限は不一致）
     func isEqual(to object: JpfObject) -> Bool {
         guard let rhs = object as? Self else {return false}
-        return lowerBound?.0.number == rhs.lowerBound?.0.number &&
-        upperBound?.0.number == rhs.upperBound?.0.number &&
-        isEqual(lowerBound?.1, to: rhs.lowerBound?.1) &&
-        isEqual(upperBound?.1, to: rhs.upperBound?.1)
-    }
-    private func isEqual(_ lhs: Token?, to rhs: Token?) -> Bool {
-        if lhs == rhs {return true}
-        guard let lhs = lhs, let rhs = rhs else {return false}
-        return lhs.isParticle(.KARA) && rhs.isParticle(.GTEQUAL) ||
-        lhs.isParticle(.GTEQUAL) && rhs.isParticle(.KARA) ||
-        lhs.isParticle(.MADE) && rhs.isParticle(.LTEQUAL) ||
-        lhs.isParticle(.LTEQUAL) && rhs.isParticle(.MADE)
+        // 下限・上限ともに、「数値」と「inclusive（含む/含まない）」が一致しているかで判定
+        switch (self.lowerBound, rhs.lowerBound, self.upperBound, rhs.upperBound) {
+        case (nil, nil, nil, nil):          // 空
+            return true
+        case let (l1?, l2?, nil, nil):      // 下限のみ
+            return l1.isEqual(to: l2)
+        case let (nil, nil, u1?, u2?):      // 上限のみ
+            return u1.isEqual(to: u2)
+        case let (l1?, l2?, u1?, u2?):      // 上下限
+            return l1.isEqual(to: l2) && u1.isEqual(to: u2)
+        default:
+            return false
+        }
     }
     var count: JpfObject {
-        guard let lower = lowerBoundNumber, let upper = upperBoundNumber else {return JpfError(cannotCountRange)}
-        return JpfInteger(value: upper - lower + 1)
+        guard let lowerBoundNumber, let upperBoundNumber else {return JpfError(cannotCountRange)}
+        return JpfInteger(value: upperBoundNumber - lowerBoundNumber + 1)
     }
     var isEmpty: JpfObject {
-        guard let counter = self.count as? JpfInteger else {return JpfError(cannotCountRange)}
-        return JpfBoolean.object(of: counter.number == 0)
+        JpfBoolean.object(of: self.count.number == 0)
     }
     func contains(_ object: JpfObject) -> JpfObject {
-        guard let value = object.number else {return JpfError("「\(object.type)」と「\(type)」" + cannotCompare)}
-        var result = false
-        switch (lowerBound?.0.number, lowerBound?.1,
-                upperBound?.0.number, upperBound?.1) {
-        case (let lower?, Token(.KARA),    let upper?, Token(.MADE)),
-             (let lower?, Token(.GTEQUAL), let upper?, Token(.LTEQUAL)):
-            result = value >= lower && value <= upper
-        case (let lower?, Token(.GTEQUAL), let upper?, Token(.UNDER)):
-            result = value >= lower && value < upper
-        case (let lower?, Token(.KARA), nil, nil),
-             (let lower?, Token(.GTEQUAL), nil, nil):
-            result = value >= lower
-        case (nil, nil, let upper?, Token(.MADE)),
-             (nil, nil, let upper?, Token(.LTEQUAL)):
-            result = value <= upper
-        case (nil, nil, let upper?, Token(.UNDER)):
-            result = value < upper
-        default:
+        guard let v = object.number else {
+            return JpfError("「\(object.type)」と「\(type)」" + cannotCompare)
+        }
+        switch (lowerBoundNumber, upperBoundNumber) {
+        case let (l?, u?):
+            return JpfBoolean.object(of: l <= v && v <= u)
+        case let (l?, nil):
+            return JpfBoolean.object(of: v >= l)
+        case let (nil, u?):
+            return JpfBoolean.object(of: v <= u)
+        case (nil, nil):
             return JpfError(rangeFormatError)
         }
-        return JpfBoolean.object(of: result)
     }
     /// 範囲の形式チェック(nil: エラー無し)
     var error: JpfError? {
-        switch (lowerBound?.0.number, lowerBound?.1,
-                upperBound?.0.number, upperBound?.1) {
-        case (.some(_), Token(.KARA),    .some(_), Token(.MADE)),
-             (.some(_), Token(.GTEQUAL), .some(_), Token(.LTEQUAL)):
-            break
-        case (.some(_), Token(.GTEQUAL), .some(_), Token(.UNDER)):
-            break
-        case (.some(_), Token(.KARA),    nil, nil),
-             (.some(_), Token(.GTEQUAL), nil, nil):
-            break
-        case (nil, nil, .some(_), Token(.MADE)),
-             (nil, nil, .some(_), Token(.LTEQUAL)):
-            break
-        case (nil, nil, .some(_), Token(.UNDER)):
-            break
-        default:
+        switch (lowerBound, upperBound) {
+        case (nil, nil):
             return JpfError(rangeFormatError)
+        default:
+            return nil
         }
-        return nil
     }
     // 要素アクセス
     func foreach(_ function: JpfFunction, with environment: Environment) -> JpfObject? {
-        switch (lowerBound?.0.number, lowerBound?.1,
-                upperBound?.0.number, upperBound?.1) {
-        case (let l?, Token(.KARA),    let u?, Token(.MADE)),
-            (let l?, Token(.GTEQUAL),  let u?, Token(.LTEQUAL)):
+        switch (lowerBound?.value.number, lowerBound?.inclusive, upperBound?.value.number, upperBound?.inclusive) {
+        case (let l?, true, let u?, true):
             (l...u).forEach { element in
                 if environment.push(JpfInteger(value: element)) != nil {return}
                 _ = function.execute(with: environment)
             }
-        case (let l?, Token(.GTEQUAL), let u?, Token(.UNDER)):
+        case (let l?, true, let u?, false):
             (l..<u).forEach { element in
                 if environment.push(JpfInteger(value: element)) != nil {return}
                 _ = function.execute(with: environment)
@@ -239,12 +222,10 @@ extension JpfRange : ContainerProtocol {
     }
     func map() -> JpfObject {
         var mapped: [JpfObject] = []
-        switch (lowerBound?.0.number, lowerBound?.1,
-                upperBound?.0.number, upperBound?.1) {
-        case (let l?, Token(.KARA),    let u?, Token(.MADE)),
-            (let l?, Token(.GTEQUAL),  let u?, Token(.LTEQUAL)):
+        switch (lowerBound?.value.number, lowerBound?.inclusive, upperBound?.value.number, upperBound?.inclusive) {
+        case (let l?, true, let u?, true):
             mapped = (l...u).map {JpfInteger(value: $0)}
-        case (let l?, Token(.GTEQUAL), let u?, Token(.UNDER)):
+        case (let l?, true, let u?, false):
             mapped = (l..<u).map {JpfInteger(value: $0)}
         default:
             return JpfError(rangeFormatError)
@@ -253,16 +234,14 @@ extension JpfRange : ContainerProtocol {
     }
     func map(_ function: JpfFunction, with environment: Environment) -> JpfObject {
         var mapped: [JpfObject] = []
-        switch (lowerBound?.0.number, lowerBound?.1,
-                upperBound?.0.number, upperBound?.1) {
-        case (let l?, Token(.KARA),    let u?, Token(.MADE)),
-            (let l?, Token(.GTEQUAL),  let u?, Token(.LTEQUAL)):
+        switch (lowerBound?.value.number, lowerBound?.inclusive, upperBound?.value.number, upperBound?.inclusive) {
+        case (let l?, true, let u?, true):
             mapped = (l...u).map { element in
                 if let err = environment.push(JpfInteger(value: element)) {return err}
                 return function.execute(with: environment) ??
                 environment.pull() ?? JpfNull.object
             }
-        case (let l?, Token(.GTEQUAL), let u?, Token(.UNDER)):
+        case (let l?, true, let u?, false):
             mapped = (l..<u).map { element in
                 if let err = environment.push(JpfInteger(value: element)) {return err}
                 return function.execute(with: environment) ??
@@ -274,12 +253,10 @@ extension JpfRange : ContainerProtocol {
         return JpfArray(name: self.name, elements: mapped)
     }
     func reduce(_ initial: JpfObject, _ function: JpfFunction, with environment: Environment) -> JpfObject {
-        switch (lowerBound?.0.number, lowerBound?.1,
-                upperBound?.0.number, upperBound?.1) {
-        case (let l?, Token(.KARA),    let u?, Token(.MADE)),
-            (let l?, Token(.GTEQUAL),  let u?, Token(.LTEQUAL)):
+        switch (lowerBound?.value.number, lowerBound?.inclusive, upperBound?.value.number, upperBound?.inclusive) {
+        case (let l?, true, let u?, true):
             return (l...u).reduce(initial) {f($0, $1, function, with: environment)}
-        case (let l?, Token(.GTEQUAL), let u?, Token(.UNDER)):
+        case (let l?, true, let u?, false):
             return (l..<u).reduce(initial) {f($0, $1, function, with: environment)}
         default:
             return JpfError(rangeFormatError)
@@ -333,20 +310,16 @@ extension JpfString : ContainerProtocol {
         }
     }
     subscript(range: JpfRange) -> JpfObject? {
-        switch (range.lowerBound?.0.number, range.lowerBound?.1,
-                range.upperBound?.0.number, range.upperBound?.1) {
-        case (let l?, Token(.KARA),    let u?, Token(.MADE)),
-            (let l?, Token(.GTEQUAL), let u?, Token(.LTEQUAL)):
+        switch (range.lowerBound?.value.number, range.lowerBound?.inclusive, range.upperBound?.value.number, range.upperBound?.inclusive) {
+        case (let l?, true, let u?, true):
             return JpfString(value: String(value[index(of: l)...index(of: u)]))
-        case (let l?, Token(.GTEQUAL), let u?, Token(.UNDER)):
+        case (let l?, true, let u?, false):
             return JpfString(value: String(value[index(of: l)..<index(of: u)]))
-        case (let l?, Token(.KARA), nil, nil),
-            (let l?, Token(.GTEQUAL), nil, nil):
+        case (let l?, true, nil, nil):
             return JpfString(value: String(value[index(of: l)...]))
-        case (nil, nil, let u?, Token(.MADE)),
-            (nil, nil, let u?, Token(.LTEQUAL)):
+        case (nil, nil, let u?, true):
             return JpfString(value: String(value[...index(of: u)]))
-        case (nil, nil, let u?, Token(.UNDER)):
+        case (nil, nil, let u?, false):
             return JpfString(value: String(value[..<index(of: u)]))
         default:
             break
@@ -412,20 +385,16 @@ extension JpfArray : ContainerProtocol {
         return getProperty(by: name, with: particle)
     }
     subscript(range: JpfRange) -> JpfObject? {
-        switch (range.lowerBound?.0.number, range.lowerBound?.1,
-                range.upperBound?.0.number, range.upperBound?.1) {
-        case (let l?, Token(.KARA),    let u?, Token(.MADE)),
-             (let l?, Token(.GTEQUAL), let u?, Token(.LTEQUAL)):
+        switch (range.lowerBound?.value.number, range.lowerBound?.inclusive, range.upperBound?.value.number, range.upperBound?.inclusive) {
+        case (let l?, true, let u?, true):
             return JpfArray(name: self.name, elements: Array(elements[l...u]))
-        case (let l?, Token(.GTEQUAL), let u?, Token(.UNDER)):
+        case (let l?, true, let u?, false):
             return JpfArray(name: self.name, elements: Array(elements[l..<u]))
-        case (let l?, Token(.KARA), nil, nil),
-             (let l?, Token(.GTEQUAL), nil, nil):
+        case (let l?, true, nil, nil):
             return JpfArray(name: self.name, elements: Array(elements[l...]))
-        case (nil, nil, let u?, Token(.MADE)),
-             (nil, nil, let u?, Token(.LTEQUAL)):
+        case (nil, nil, let u?, true):
             return JpfArray(name: self.name, elements: Array(elements[...u]))
-        case (nil, nil, let u?, Token(.UNDER)):
+        case (nil, nil, let u?, false):
             return JpfArray(name: self.name, elements: Array(elements[..<u]))
         default:
             break
