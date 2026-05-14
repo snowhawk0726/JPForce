@@ -1276,6 +1276,7 @@ struct RangeLiteralParser : ExpressionParsable {
         //
         _ = parseHeader()
         let kind = BlockKind(isExplicit: getNext(whenNextIs: .LBBRACKET))
+        let (boundaryKind, commaIdx) = findCommaAfterParticle() // 範囲リテラル内の境界助詞の後の読点を探す。
         guard let block = BlockStatementParser(parser, kind: kind).blockStatement else {
             error(message: "範囲で、範囲式の解析に失敗しました。")
             return nil
@@ -1285,13 +1286,92 @@ struct RangeLiteralParser : ExpressionParsable {
             error(message: "範囲で、範囲式の解析に失敗しました。(式が取り出せません。)")
             return nil
         }
-        var lower, upper: BoundaryExpression?
         let exprs = es.expressions
+        // 読点があった場合は、優先して区切りとみなす。
+        if let i = commaIdx, i < exprs.count,
+           let kind = boundaryKind {
+            return rangeLiteral(from: exprs, boundaryIdx: i, boundaryKind: kind)
+        }
+        // 述語「引く」を含む場合、片境界の範囲式としての範囲リテラル作成を試みる。
+        if exprs.hasSubstructPhrase,
+           let range = singleBoundaryRangeLiteral(from: exprs) {
+            return range
+        }
+        // 通常の範囲リテラルを生成。
+        return rangeLiteral(from: exprs)
+    }
+    // 読点を区切りとして範囲リテラルを生成する。
+    private func rangeLiteral(from exprs: [Expression], boundaryIdx: Int, boundaryKind: ComparisonKind) -> RangeLiteral? {
+        var lower, upper: BoundaryExpression?
+        let lowerExprs = Array(exprs[...boundaryIdx])
+        // 下限を生成
+        var boundaryExprs = lowerExprs.transformedPrefix(upTo: boundaryIdx) { exp in
+            (exp as? PhraseExpression)?.left ?? exp // 境界助詞を取り除く
+        }
+        if boundaryExprs.isEmpty {
+            error(message: "範囲で、下限の式が見つかりません。")
+            return nil
+        }
+        guard let sentence = buildSentence(from: Array(boundaryExprs)) else {
+            error(message: "範囲で、下限の文の構築に失敗しました。")
+            return nil
+        }
+        guard boundaryKind.isLower else {
+            error(message: "範囲で、上限助詞(以下、未満、まで)の後に読点「、」があります。")
+            return nil
+        }
+        lower = BoundaryExpression(kind: boundaryKind, sentence: sentence)
+        // 上限を生成
+        let upperExprs = Array(exprs[(boundaryIdx+1)...])
+        guard let last = upperExprs.last,
+              let phrase = last as? PhraseExpression,
+              let upperKind = ComparisonKind(from: phrase.token),
+              upperKind.isUpper,
+              let upperIdx = upperExprs.indices.last
+        else {
+            error(message: "範囲で、上限助詞が見つかりません。")
+            return nil
+        }
+        boundaryExprs = upperExprs.transformedPrefix(upTo: upperIdx) { exp in
+            (exp as? PhraseExpression)?.left ?? exp // 境界助詞を取り除く
+        }
+        if boundaryExprs.isEmpty {
+            error(message: "範囲で、上限の式が見つかりません。もしくは、余分な式が含まれています。", at:last.token)
+            return nil
+        }
+        guard let sentence = buildSentence(from: Array(boundaryExprs)) else {
+            error(message: "範囲で、上限の文の構築に失敗しました。")
+            return nil
+        }
+        upper = BoundaryExpression(kind: upperKind, sentence: sentence)
+        //
+        return RangeLiteral(lower: lower, upper: upper)
+    }
+    // 範囲リテラル内の境界助詞の後の読点を探す。
+    private func findCommaAfterParticle() -> (ComparisonKind?, Int?) {
+        let parser = Parser(from: parser)
+        var pos = 0
+        while !parser.nextToken.isEof {
+            parser.getNext()
+            let token = parser.currentToken
+            if token.isParticle {
+                if let kind = ComparisonKind(from: token),
+                   parser.nextToken.isComma {
+                    return (kind, pos)
+                }
+                pos += 1
+            }
+        }
+        return (nil, nil)
+    }
+    // 式([Expression])から、境界助詞を見つけ、範囲リテラルを生成する。
+    private func rangeLiteral(from exprs: [Expression]) -> RangeLiteral? {
+        var lower, upper: BoundaryExpression?
         var idx = 0
         while idx < exprs.count {
             let target = Array(exprs[idx...])
             // 境界助詞を見つける
-            guard let (kind, boundaryIdx) = findBoundary(in: target, with: { $0.hasBoundary }) else {
+            guard let (kind, boundaryIdx) = findBoundary(in: target) else {
                 break
             }
             // 助詞を除いた[Expression]から、単文(Sentence)を作る
@@ -1307,7 +1387,11 @@ struct RangeLiteralParser : ExpressionParsable {
                 return nil
             }
             if sentence.token.isKeyword(.SUBSTRACT) {
-                error(message: "範囲式の単文には、引数に境界助詞を持つ述語「\(sentence.tokenLiteral)」を使用できません。")
+                error(message:
+                """
+                    範囲式の単文には、引数に境界助詞を持つ述語「\(sentence.tokenLiteral)」を使用できません。
+                    \t上下限を含む範囲式の場合、読点「、」で上下を区切ってください。  
+                """)
                 return nil
             }
             // 重複が無ければ、境界種別により、下限、上限の範囲式を作成する
@@ -1338,10 +1422,32 @@ struct RangeLiteralParser : ExpressionParsable {
         }
         return RangeLiteral(lower: lower, upper: upper)
     }
-    private func findBoundary(in exprs: [Expression], with isBoundary: (Token) -> Bool) -> (ComparisonKind, Int)? {
+    // 片境界の範囲リテラルを作成
+    // エラーの場合、メッセージを出さずに、nilリターンでフォールバック
+    private func singleBoundaryRangeLiteral(from exprs: [Expression]) -> RangeLiteral? {
+        guard let phrase = exprs.last as? PhraseExpression,
+              let boundaryKind = ComparisonKind(from: phrase.token),
+              let boundaryIdx = exprs.indices.last
+        else { return nil }
+        let boundaryExprs = exprs.transformedPrefix(upTo: boundaryIdx) {
+            ($0 as? PhraseExpression)?.left ?? $0
+        }
+        if boundaryExprs.isEmpty { return nil }
+        guard let sentence = buildSentence(from: Array(boundaryExprs)) else { return nil }
+        var lower, upper: BoundaryExpression?
+        if boundaryKind.isLower {
+            lower = BoundaryExpression(kind: boundaryKind, sentence: sentence)
+        }
+        if boundaryKind.isUpper {
+            upper = BoundaryExpression(kind: boundaryKind, sentence: sentence)
+        }
+        return RangeLiteral(lower: lower, upper: upper)
+    }
+    // 式([Expression])から、境界助詞を見つける。
+    private func findBoundary(in exprs: [Expression]) -> (ComparisonKind, Int)? {
         var kind: ComparisonKind?
         guard let i = exprs.firstIndex(where: { expr in
-            if let p = expr as? PhraseExpression, isBoundary(p.token) {
+            if let p = expr as? PhraseExpression, p.token.hasBoundary {
                 kind = ComparisonKind(from: p.token)
                 return true
             }
@@ -1358,6 +1464,12 @@ extension Array {
         var result = Array(prefix(index + 1))
         result[index] = transform(result[index])
         return result
+    }
+    // 最後の句が述語「引く」 + 境界助詞
+    var hasSubstructPhrase: Bool {
+        guard let phrase = last as? PhraseExpression else { return false }
+        guard phrase.left.token.isKeyword(.SUBSTRACT) else { return false }
+        return phrase.token.hasBoundary
     }
 }
 // 上限式: 〜<式>(未満)

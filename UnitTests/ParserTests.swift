@@ -923,61 +923,63 @@ final class ParserTests: XCTestCase {
     }
     func testRangeExpressions() throws {
         let testPatterns: [(input: String, testFunc: ((BoundaryExpression?, BoundaryExpression?) throws -> Void)?)] = [
-            ("範囲【1に1を足すから、100を10で割るまで】", { lowerBound, upperBound in
-                if let lowerBound {
-                    XCTAssertEqual(lowerBound.kind, .gte)
-                    let sentence = try XCTUnwrap(lowerBound.sentence as? SimpleSentence)
-                    try self.testPhraseExpression(sentence.arguments[0], with: 1, "に")
-                    try self.testPhraseExpression(sentence.arguments[1], with: 1, "を")
-                    XCTAssertEqual(sentence.predicateKind, .builtin)
-                    XCTAssertEqual(sentence.token.keyword, .ADD)
+            ("範囲【1に1を足すから、100を10で割るまで】", { lower, upper in
+                if let lower {
+                    XCTAssertEqual(lower.kind, .gte)
+                    try self.testSimpleSentence(lower.sentence, predicate: "足す", phrases: "1に","1を")
                 }
-                if let upperBound {
-                    XCTAssertEqual(upperBound.kind, .lte)
-                    let sentence = try XCTUnwrap(upperBound.sentence as? SimpleSentence)
-                    try self.testPhraseExpression(sentence.arguments[0], with: 100, "を")
-                    try self.testPhraseExpression(sentence.arguments[1], with: 10, "で")
-                    XCTAssertEqual(sentence.predicateKind, .builtin)
-                    XCTAssertEqual(sentence.token.keyword, .DIVIDE)
+                if let upper {
+                    XCTAssertEqual(upper.kind, .lte)
+                    try self.testSimpleSentence(upper.sentence, predicate: "割る", phrases: "100を", "10で")
                 }
             }),
-            ("範囲【1に1を足す以上、100を10で割る未満】", { lowerBound, upperBound in
-                if let lowerBound {
-                    XCTAssertEqual(lowerBound.kind, .gte)
-                    let sentence = try XCTUnwrap(lowerBound.sentence as? SimpleSentence)
-                    try self.testPhraseExpression(sentence.arguments[0], with: 1, "に")
-                    try self.testPhraseExpression(sentence.arguments[1], with: 1, "を")
-                    XCTAssertEqual(sentence.predicateKind, .builtin)
-                    XCTAssertEqual(sentence.token.keyword, .ADD)
+            ("範囲【1に1を足す以上、100を10で割る未満】", { lower, upper in
+                if let lower {
+                    XCTAssertEqual(lower.kind, .gte)
+                    try self.testSimpleSentence(lower.sentence, predicate: "足す", phrases: "1に","1を")
                 }
-                if let upperBound {
-                    XCTAssertEqual(upperBound.kind, .lt)
-                    let sentence = try XCTUnwrap(upperBound.sentence as? SimpleSentence)
-                    try self.testPhraseExpression(sentence.arguments[0], with: 100, "を")
-                    try self.testPhraseExpression(sentence.arguments[1], with: 10, "で")
-                    XCTAssertEqual(sentence.predicateKind, .builtin)
-                    XCTAssertEqual(sentence.token.keyword, .DIVIDE)
+                if let upper {
+                    XCTAssertEqual(upper.kind, .lt)
+                    try self.testSimpleSentence(upper.sentence, predicate: "割る", phrases: "100を", "10で")
                 }
             }),
-            ("範囲【甲以上乙以下】", { lowerBound, upperBound in
-                if let lowerBound {
-                    XCTAssertEqual(lowerBound.kind, .gte)
-                    let sentence = try XCTUnwrap(lowerBound.sentence as? SimpleSentence)
-                    XCTAssertEqual(sentence.arguments.count, 0)
-                    XCTAssertEqual(sentence.predicateKind, .custom)
-                    XCTAssertEqual(sentence.token.literal, "甲")
+            ("範囲【甲以上乙以下】", { lower, upper in
+                if let lower {
+                    XCTAssertEqual(lower.kind, .gte)
+                    try self.testSimpleSentence(lower.sentence, identifier: "甲")
                 }
-                if let upperBound {
-                    XCTAssertEqual(upperBound.kind, .lte)
-                    let sentence = try XCTUnwrap(upperBound.sentence as? SimpleSentence)
-                    XCTAssertEqual(sentence.arguments.count, 0)
-                    XCTAssertEqual(sentence.predicateKind, .custom)
-                    XCTAssertEqual(sentence.token.literal, "乙")
+                if let upper {
+                    XCTAssertEqual(upper.kind, .lte)
+                    try self.testSimpleSentence(upper.sentence, identifier: "乙")
                 }
             }),
-            // 構文エラー
-            ("範囲【10から1を引くから、10に1を足すまで】", nil),
-            ("範囲【10から1を引く以上】", nil),
+            // 引く(「から」の重複を回避)
+            ("範囲【2から1を引くから、11から1を引くまで】", { lower, upper in
+                if let lower {
+                    XCTAssertEqual(lower.kind, .gte)
+                    try self.testSimpleSentence(lower.sentence, predicate: "引く", phrases: "2から","1を")
+                }
+                if let upper {
+                    XCTAssertEqual(upper.kind, .lte)
+                    try self.testSimpleSentence(upper.sentence, predicate: "引く", phrases: "11から", "1を")
+                }
+            }),
+            ("範囲【10から1を引くから】",  { lower, upper in
+                if let lower {
+                    XCTAssertEqual(lower.kind, .gte)
+                    try self.testSimpleSentence(lower.sentence, predicate: "引く", phrases: "10から","1を")
+                }
+                XCTAssertNil(upper)
+            }),
+            ("範囲【1を10から引く未満】",  { lower, upper in
+                XCTAssertNil(lower)
+                if let upper {
+                    XCTAssertEqual(upper.kind, .lt)
+                    try self.testSimpleSentence(upper.sentence, predicate: "引く", phrases: "1を", "10から")
+                }
+            }),
+            // エラーパターン
+            ("範囲【10から1を引くから10に1を足すまで】", nil),
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
@@ -1290,13 +1292,6 @@ final class ParserTests: XCTestCase {
         XCTAssertEqual(boolean.value, value)
         XCTAssertEqual(boolean.tokenLiteral, value ? "真" : "偽")
     }
-    private func testSimpleStatement(_ statement: Statement, predicate: String, phrases: String...) throws {
-        let s = try XCTUnwrap(statement as? Sentence)
-        XCTAssertEqual(s.arguments.count, phrases.count, "phrases.count")
-        for (argument, phrase) in zip(s.arguments, phrases) {
-            XCTAssertEqual(argument.string, phrase)
-        }
-    }
     private func testSimpleSentence(_ ss: Sentence?, predicate: String, phrases: String...) throws {
         let s = try XCTUnwrap(ss as? SimpleSentence)
         XCTAssertEqual(s.predicate?.string, predicate)
@@ -1304,6 +1299,10 @@ final class ParserTests: XCTestCase {
         for (argument, phrase) in zip(s.arguments, phrases) {
             XCTAssertEqual(argument.string, phrase)
         }
+    }
+    private func testSimpleSentence(_ ss: Sentence?, identifier: String) throws {
+        let s = try XCTUnwrap(ss as? SimpleSentence)
+        XCTAssertEqual(s.literal?.tokenLiteral, identifier)
     }
     private func testCaseConsequence(_ exp: Expression, with str: String) throws {
         let ce = try XCTUnwrap(exp as? CaseExpression)
