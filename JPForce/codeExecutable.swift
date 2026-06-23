@@ -71,6 +71,7 @@ struct CodeExecutableFactory {
         case .opRangeConst:     return RangeConstExecuter(vm, with: operandBytes)
         case .opArrayConcat:    return ArrayConcatExecuter(vm)
         case .opComparisonConst:return ComparisonExecuter(vm, with: operandBytes)
+        case .opArrayRepeat:    return ArrayRepeatExecuter(vm)
         }
     }
 }
@@ -108,6 +109,21 @@ struct ArrayStackExecuter : CodeExecutable {
         }
         let array = try buildArray(with: numberOfElements)
         try vm.push(array)
+    }
+}
+struct ArrayRepeatExecuter : CodeExecutable {
+    init(_ vm: VM) {self.vm = vm}
+    let vm: VM
+    func execute() throws {
+        guard let element = vm.peek() else {
+            throw objectNotFound
+        }
+        guard let number = vm.peek()?.number else {
+            throw stackValueIsNotNumber
+        }
+        vm.drop(2)
+        let elements = Array(repeating: element, count: number)
+        try vm.push(JpfArray(elements: elements))
     }
 }
 private extension CodeExecutable {

@@ -53,7 +53,7 @@ protocol JpfObject : Accessible {
     var isEmpty: JpfObject {get}
     // コンパイラ用(in compilerObjectsExtension.swift)
     func emit(with c: Compiler) throws
-    var isDefined: Bool {get}   // 識別子が定義済み
+    var symbolKind: SymbolKind {get}    // バインドされたシンボル種別
 }
 protocol JpfHashable {
     var hashKey: JpfHashKey {get}

@@ -38,7 +38,7 @@ final class Parser {
     var blockStack: [BlockFrame] = []
     var switchCase = SwitchCase()           // Switch-case監視
     var isInRangeParser: Bool = false
-    var leadingIdentifier: Identifier? = nil
+    var leadingExpression: Expression? = nil// 文頭式(複合代入用)
     var options = ParserOptions()
     // MARK: - プログラムの解析
     func parseProgram() -> Program? {
@@ -118,6 +118,24 @@ final class Parser {
     func skipEols() {while currentToken.isEol {getNext()}}
     /// Lexerに識別子を登録
     func insert(_ identifier: String) {lexer.insert(identifier)}
+    /// (複合)代入の対象識別子を取り出す
+    var leadingIdentifier: Identifier? {
+        if let phrase = leadingExpression as? PhraseExpression {
+            return phrase.left as? Identifier
+        }
+        if let genitive = leadingExpression as? GenitiveExpression {
+            return genitive.left as? Identifier
+        }
+        return nil
+    }
+    /// 複合代入の対象位置を取り出す
+    var leadingPosition: Expression? {
+        guard let genivie = leadingExpression as? GenitiveExpression else {return nil}
+        if let phrase = genivie.right as? PhraseExpression {
+            return phrase.left
+        }
+        return genivie.right
+    }
 }
 /// ブロック管理
 enum BlockKind {

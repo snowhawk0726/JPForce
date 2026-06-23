@@ -225,7 +225,7 @@ final class SymbolTableTests : XCTestCase {
     func testDefineAndResolveFunctionName() throws {
         let global = SymbolTable()
         _ = global.define(functionName: "a")
-        let exptected = Symbol(name: "a", scope: .FUNCTION, index: 0)
+        let exptected = Symbol(name: "a", scope: .FUNCTION, index: 0, kind: .function)
         let result = try XCTUnwrap(global.resolve(exptected.name))
         XCTAssertEqual(exptected, result)
     }

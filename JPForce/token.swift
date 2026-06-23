@@ -293,7 +293,8 @@ enum Token : Equatable {
         unwrappedType == .keyword(k) ? true : false
     }
     func isParticle(_ p: Token.Particle) -> Bool {
-        self == .particle(p) ? true : false
+        if case .particle(let particle) = self {return particle == p}
+        return false
     }
     func isSymbol(_ s: Token.Symbol) -> Bool {
         self == .symbol(s) ? true : false
@@ -395,7 +396,9 @@ extension String {
     var hankaku: String? {applyingTransform(.fullwidthToHalfwidth, reverse: false)} // 半角変換(Fullwidth to Halfwidth (ascii))
     var zenkaku: String? {applyingTransform(.fullwidthToHalfwidth, reverse: true)}  // 全角変換(Halfwidth to Fullwidth)
     var withoutPeriod: Self {self.replacingOccurrences(of: Token.Symbol.PERIOD.rawValue, with: "")}
+    var withPeriod: Self {self + Token.Symbol.PERIOD.rawValue}
     var withoutComma: Self {self.replacingOccurrences(of: Token.Symbol.COMMA.rawValue, with: "")}
+    var withComma: Self {self + Token.Symbol.COMMA.rawValue}
     var isPlainForm: Bool {                                                         // 終止形？(Check self if palin form)
         PlainForm.hasEnd(of: self) || PlainForm.hasIrregular(self)
     }

@@ -108,12 +108,10 @@ final class VMTests: XCTestCase {
     func testConditionalBranchings() throws {
         let error = "「〜の場合」に続く、「それ以外は」が定義されていません。"
         let testPattern: [VmTestCase] = [
-            // キャッシュ
             ("1が1の場合【10】。", error),
             ("1が1の場合【10】、それ以外は【20】。", 10),
             ("1が2の場合【10】、それ以外は【20】。", 20),
             ("2が1の場合【10】、2の場合【20】、それ以外は【30】。", 20),
-            // コンパイル
             ("xは1。xが1の場合【10】。", error),
             ("xは1。xが1の場合【10】、それ以外は【20】。", 10),
             ("xは1。xが2の場合【10】、それ以外は【20】。", 20),
@@ -130,7 +128,10 @@ final class VMTests: XCTestCase {
             ("xは1。xが1の場合【xが2である場合【10】、それ以外は【20】】、それ以外は【30】。", 20),
             ("xは1。xが1の場合【xが2である場合【10】】、それ以外は【30】。", nil),
         ]
-        try runVmTests(with: testPattern)
+        print("<<< optimize off >>>")
+        try runVmTests(with: testPattern, isOptimized: false)
+        print("<<< optimize on >>>")
+        try runVmTests(with: testPattern, isOptimized: true)
     }
     func testArrayLiterals() throws {
         let testPattern: [VmTestCase] = [
@@ -166,9 +167,9 @@ final class VMTests: XCTestCase {
     }
     func testGenitiveExpressions() throws {
         let testPattern: [VmTestCase] = [
-            ("配列【１、２、３】の1", 2),             // キャッシュ
-            ("配列【１、２、３】の先頭", 1),          // キャッシュ
-            ("1の負数", -1),                       // キャッシュ
+            ("配列【１、２、３】の1", 2),
+            ("配列【１、２、３】の先頭", 1),
+            ("1の負数", -1),
             ("iは1。配列【１、２、３】のi", 2),       // opGenitive
             ("aは配列【１、２、３】。aの1", 2),       // opGenitive
             ("aは配列【１、２、３】。iは１。aのi", 2), // opGenitive

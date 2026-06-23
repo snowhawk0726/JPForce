@@ -84,14 +84,25 @@ extension JpfObject {
     ///   - environment: オブジェクトの環境
     /// - Returns: エラーまたはオブジェクト自身
     func assign(_ value: JpfObject, to target: JpfObject?, with environment: Environment) -> JpfObject {
-        guard let name = target as? JpfString, environment.contains(name.value) else {return JpfError(identifierNotFound + ":\(target?.string ?? "無し")")}
-        if let computation = environment[name.value] as? JpfComputation {   // 算出の設定を行う
+        guard let name = getName(target), environment.contains(name)
+        else {
+            return JpfError(identifierNotFound + ":\(target?.string ?? "無し")")
+        }
+        if let computation = environment[name] as? JpfComputation {         // 算出の設定を行う
             if let err = environment.push(value) {return err}               // 設定値
             if let result = computation.setter(with: environment), result.isError {return result}
         } else {
-            environment[name.value] = value
+            environment[name] = value
         }
         return self
+    }
+    private func getName(_ target: JpfObject?) -> String? {
+        switch target {
+        case let s as JpfString:        return s.value
+        case let i as JpfIdentifier:    return i.value
+        default:
+            return nil
+        }
     }
     // デフォルト実装(エラー)
     var count: JpfObject {JpfError(cannotCount)}

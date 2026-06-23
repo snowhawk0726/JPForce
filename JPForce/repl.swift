@@ -80,22 +80,46 @@ struct Repl {
         let compiler = Compiler(from: program, symbolTable, constants)
         compiler.optimizeConstantsEnabled = optimize
 
-        if optimize, let analyzed = compiler.analyze() {
-            if let errorMessage = analyzed.error {
+        if optimize {
+            // 定数解析(評価)
+            syncGlobalsToEnvironment(from: globals, symbolTable: symbolTable, compiler)
+            syncStackToEnvironment(from: stack, compiler)
+            switch compiler.analyze() {
+            case .error(let errorMessage):
                 print("定数解析で、エラーを検出しました。")
                 print("\tエラー: \(errorMessage)")
                 return
+            case .constant(let analyzed):
+                syncEnvironmentToGlobals(from: compiler, symbolTable: symbolTable, globals: globals)
+                syncEnvironmentToStack(from: compiler, stack: stack)
+                print("実行結果(定数解析): \(analyzed.string)")
+                // 定数計算のスタックをVMのスタックに移す
+                _ = stack.push(analyzed)
+                numberOfStack = stack.count
+                print("入力: (\(stack.string))")
+                return
+            case .nonConstant:
+                break
+            case .evaluated:
+                syncEnvironmentToGlobals(from: compiler, symbolTable: symbolTable, globals: globals)
+                syncEnvironmentToStack(from: compiler, stack: stack)
+                print("実行結果(定数解析): nil")
+                numberOfStack = stack.count
+                print("入力: (\(stack.string))")
+                return
             }
-            print("実行結果(定数解析): \(analyzed.string)")
+        }
+        if let result = compiler.compile() {
+            if let error = result.error {
+                print("翻訳器が、エラーを検出しました。")
+                print("\tエラー: \(error.message)")
+                return
+            }
+            print("実行結果(翻訳): \(result.string)")
             // 定数計算のスタックをVMのスタックに移す
-            _ = stack.push(analyzed)
+            _ = stack.push(result)
             numberOfStack = stack.count
             print("入力: (\(stack.string))")
-            return
-        }
-        if let error = compiler.compile() {
-            print("翻訳器が、エラーを検出しました。")
-            print("\tエラー: \(error.message)")
             return
         }
         constants = compiler.bytecode.constants
@@ -121,5 +145,36 @@ struct Repl {
         }
         numberOfStack = machine.stack.count
         print("入力: (\(machine.string))")
+    }
+    /// (翻訳)環境 -> 大域変数 同期関数
+    private func syncEnvironmentToGlobals(from compiler: Compiler,
+                                          symbolTable: SymbolTable,
+                                          globals: GlobalStore) {
+        // 1) compiler.environment.store（仮）から全エントリを取得
+        // 2) SymbolTable でグローバルシンボルを確保（無ければ define）
+        // 3) 対応 index に値を書き込む
+        for (name, value) in compiler.environment.enumerated {
+            // シンボル解決（グローバル）
+            let sym = symbolTable.resolve(name) ?? symbolTable.define(name)
+            // グローバルに反映
+            globals[sym.index] = value
+        }
+    }
+    /// 大域変数 ->  (翻訳)環境 同期関数
+    private func syncGlobalsToEnvironment(from globals: GlobalStore,
+                                          symbolTable: SymbolTable,
+                                          _ compiler: Compiler) {
+        for index in 0..<globals.count {
+            let name = symbolTable[index]!
+            compiler.environment[name] = globals[index]
+        }
+    }
+    /// (翻訳)環境 -> スタック 同期関数
+    private func syncEnvironmentToStack(from compiler: Compiler, stack: Stack) {
+        compiler.environment.pullAll().forEach { _ = stack.push($0) }
+    }
+    /// スタック -> (翻訳)環境 同期関数
+    private func syncStackToEnvironment(from stack: Stack, _ compiler: Compiler) {
+        stack.pullAll().forEach { _ = compiler.push($0) }
     }
 }

@@ -53,13 +53,13 @@ final class ParserTests: XCTestCase {
             ("aは、1と2を足したもの。", "ExpressionStatement"),
             ("aは、1と2を足し、3で割る", "CompoundStatement"),
             ("aは、1と2を足し、bに代入", nil),
-            ("aは、1と2を足し、bに代入したもの。", "CompoundStatement"), // TODO: - ModifiedNounExpression導入時に、エラーにする
+            ("aは、1と2を足し、bに代入したもの。", "CompoundStatement"),
             ("aのbは、1。", "ExpressionStatement"),
             ("aのbは、1と2を足す。", "SimpleSentence"),
             ("aのbは、1と2を足したもの。", "ExpressionStatement"),
             ("aのbは、1と2を足し、3で割る", "CompoundStatement"),
             ("aのbは、cに代入する。", nil),
-            ("aのbは、1と2を足し、bに代入したもの。", "CompoundStatement"), // TODO: - ModifiedNounExpression導入時に、エラーにする
+            ("aのbは、1と2を足し、bに代入したもの。", "CompoundStatement"),
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")
@@ -72,9 +72,11 @@ final class ParserTests: XCTestCase {
             if let define = program.statements.first as? DefineStatement {
                 rhs = define.value
             } else
-            if let es = program.statements.first as? ExpressionStatement,
-               let genitive = es.expressions.first as? GenitiveExpression {
-                rhs = genitive.value
+            if let cs = program.statements.first as? CompoundStatement {
+                let sentences = cs.sentences.dropLast()
+                // GenitiveExpression.valueをCompoundStatement.sentencesに変換しているので、
+                // 複文の場合は、CompoundStatement
+                rhs = sentences.count > 1 ? cs : sentences.first
             } else {
                 XCTFail("右辺が存在しない型：\(String(describing: type(of: program.statements.first!)))")
             }
@@ -753,6 +755,20 @@ final class ParserTests: XCTestCase {
              1。
              """, "甲の"),
             ("甲の", "甲の"),
+            ("配列【1,2,3】の１を表示", "配列であって、【要素が、1と、2と、3】の1を表示"),
+        ]
+        for test in testPatterns {
+            print("テストパターン: \(test.input)")
+            let program = try XCTUnwrap(parseProgram(with: test.input))
+            let statement = try XCTUnwrap(program.statements.first)
+            XCTAssertEqual(statement.string.withoutPeriod, test.expected)
+            print("テスト(\(statement.string))終了")
+        }
+    }
+    func testConditionalOperations() throws {
+        let testPatterns: [(input: String, expected: String)] = [
+            ("結果は、条件によって1か2", "結果は、条件によって、1か、2"),
+            ("条件によって1か2を表示", "条件によって、1か、2を表示"),
         ]
         for test in testPatterns {
             print("テストパターン: \(test.input)")

@@ -701,8 +701,8 @@ extension Parsable {
         var candidate: (index: Int, left: PhraseExpression, right: PhraseExpression)? = nil
         for i in startIndex..<exps.count {
             if candidate != nil,
-               let predicate = exps[i] as? PredicateExpression {
-                if predicate.isAssignment {
+               exps[i] is PredicateExpression {
+                if needToSplit(exps, at: i) {
                     break
                 } else {
                     candidate = nil // 分割候補をキャンセル
@@ -721,6 +721,21 @@ extension Parsable {
             exps[candidate.index] = candidate.left
             exps.insert(candidate.right, at: candidate.index + 1)
         }
+    }
+    private func needToSplit(_ exps: [Expression], at i: Int) -> Bool {
+        // 代入する
+        guard let predicate = exps[i] as? PredicateExpression,
+              predicate.isAssignment
+        else {
+            return false
+        }
+        // 〜て → 複合要素代入なので、分割しない
+        if i > 0, let phrase = exps[i-1] as? PhraseExpression,
+           phrase.hasParticle(.TE) {
+            return false
+        }
+        // 分割する
+        return true
     }
     private func foldRangeLiterals(in exps: inout [Expression]) {
         var i = 0

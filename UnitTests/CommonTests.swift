@@ -26,6 +26,8 @@ final class CommonTests: XCTestCase {
             ("1をxに代入し、xと１を足し、cに代入。c。",2),
             ("1と2を積む。aとbに得、aとbを足す。",3),
             ("xと１を足し、cに代入。c。","識別子『x』が定義されていません。"),
+            ("aは配列【1,2,3】。vは2。aの１にvを足して代入。a", [1,4,3]), // 複合代入
+            ("dは辞書【真が１,偽が2】。dの真から1を引いて代入。dの真", 0),
         ]
         print("評価器テスト開始")
         try evaluateTests(with: testPattern)
@@ -117,6 +119,16 @@ final class CommonTests: XCTestCase {
         print("翻訳器・VMテスト開始")
         try runVmTests(with: testPattern)
     }
+    func testArrayInitialization() throws {
+        let testPattern: [VmTestCase] = [
+            ("配列であって、要素が、3個の３。", [3,3,3]),
+            ("nは4。vは「い」。配列【n個のv。】", ["い","い","い","い"]),
+        ]
+        print("評価器テスト開始")
+        try evaluateTests(with: testPattern)
+        print("翻訳器・VMテスト開始")
+        try runVmTests(with: testPattern)
+    }
     // MARK: - Helpers
     enum CommonTestError: Error {
         case syntax
@@ -129,8 +141,8 @@ final class CommonTests: XCTestCase {
     }
     private func compileAndRun(_ statements: [Statement]) -> JpfObject? {
         let compiler = Compiler(from: Program(statements: statements))
-        if let error = compiler.compile() {
-            return error // コンパイルエラー
+        if let result = compiler.compile() {
+            return result
         } else {
             let vm = VM(with: compiler.bytecode)
             // run() が nil なら stackTop を使うが、いずれも JpfObject? に正規化
@@ -162,6 +174,21 @@ final class CommonTests: XCTestCase {
             }
             let compiler = Compiler(from: program)
             compiler.optimizeConstantsEnabled = isOptimized
+            if isOptimized {
+                switch compiler.analyze() {
+                case .error(let error):
+                    XCTFail("\(error)")
+                case .constant(let analyzed):
+                    try testExpectedObject(t.expected, analyzed)
+                    print("テスト結果：\(analyzed.string)")
+                    continue
+                case .nonConstant:
+                    break
+                case .evaluated:
+                    print("テスト結果：評価済み")
+                    continue
+                }
+            }
             if let error = compiler.compile() {
                 result = error          // コンパイルエラー
             } else {

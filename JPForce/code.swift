@@ -47,6 +47,7 @@ enum Opcode : Byte {
     case opRangeConst
     case opArrayConcat      // ２つの値を配列化し連結
     case opComparisonConst
+    case opArrayRepeat
     //
     var definition: (name: String, operandWidths: [Int]) {
         switch self {
@@ -84,6 +85,7 @@ enum Opcode : Byte {
         case .opRangeConst:     (name: "OpRange",         operandWidths: [1])   // 要素数 x 2
         case .opArrayConcat:    (name: "OpArrayConcat",   operandWidths: [])
         case .opComparisonConst:(name: "OpComparison",    operandWidths: [1])   // 比較種別インデックス
+        case .opArrayRepeat:    (name: "OpArrayRepeat",   operandWidths: [])    // 要素数指定配列
         }
     }
     var name: String {definition.name}                  // オペコード名
@@ -134,11 +136,18 @@ func make(op: Opcode, operands: [Int]) -> Instruction {
 func make(op: Opcode, operand: Int...) -> Instruction {
     return make(op: op, operands: operand)
 }
+func make(constant: Int) -> Instruction {
+    make(op: .opConstant, operand: constant)
+}
 func make(predicate keyword: Token.Keyword) -> Instruction {
     make(op: .opPredicate, operand: PredicateOperableFactory.index(of: keyword)!)
 }
-func make(phraseWith particle: Token.Particle) -> Instruction {
+func make(particle: Token.Particle) -> Instruction {
     make(op: .opPhrase, operand: Token(particle).particleIndex!)
+}
+func make(property: String) -> Instruction {
+    let index = ObjectProperties().names.firstIndex(of: property)!
+    return make(op: .opGetProperty, operand: index)
 }
 /// バイト列から、16/8ビットをビッグエンディアンで読み込む。
 /// - Parameter bytes: バイト列

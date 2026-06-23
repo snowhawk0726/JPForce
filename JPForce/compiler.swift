@@ -92,16 +92,17 @@ class Compiler {
     }
     /// 指定されたASTノードを定数解析する。
     /// - Returns: 解析結果
-    ///    正常：定数(JpfObject)またはnil
-    ///    エラー(JpfError)
-    func analyze() -> JpfObject? {
+    ///    定数(.constant)
+    ///    非定数(.nonConstant)
+    ///    評価済み(.evaluated)
+    ///    エラー(.error)
+    func analyze() -> AnalysisResult {
         return node.analyze(with: self)
     }
     /// 指定されたASTノードをコンパイルする。
     /// - Returns: エラー(無しは、nil)
-    func compile() -> JpfError? {
-        if let error = node.compile(with: self) as? JpfError {return error}
-        return nil
+    func compile() -> JpfObject? {
+        return node.compile(with: self)
     }
     /// インストラクションを出力し、新たなインストラクション位置を返す。
     /// - Parameters:
@@ -129,6 +130,13 @@ class Compiler {
     }
     func emit(particle: Token.Particle) -> Int {
         emit(op: .opPhrase, operand: Token(particle).particleIndex!)
+    }
+    func optimizedEmit(particle: Token.Particle) {
+        if lastOpcode == .opConstant {
+            wrapLastConstantAsPhrase(with: Token(particle))
+        } else {
+            _ = emit(particle: particle)
+        }
     }
     /// インストラクションを記録(追加)し、新たなインストラクション位置を返す。
     /// - Parameter ins: 追加するバイト列
@@ -166,17 +174,44 @@ class Compiler {
         let instruction = make(op: op, operands: operands)
         replaceInstruction(at: opPosition, newInstruction: instruction)
     }
+    /// 指定位置の定数を書き換える。
     func changeConstant(at pos: Int, with constant: JpfObject) {
+        guard pos < constants.count else {return}
         constants[pos] = constant
     }
+    /// 最終位置の定数を書き換える。
     func changeLastConstant(with constant: JpfObject) {
-        guard !constants.isEmpty else {return}
-        constants[constants.count - 1] = constant
+        changeConstant(at: constants.count - 1, with: constant)
     }
+    /// 最終位置の定数に格(particle)を付ける。
+    func wrapLastConstantAsPhrase(with particle: Token) {
+        guard lastOpcode == .opConstant,
+              !constants.isEmpty
+        else { return }
+        let phrase = JpfPhrase(value: constants[constants.count - 1], particle: particle)
+        changeLastConstant(with: phrase)
+    }
+    /// 最終位置の句(phrase)から格(particle)を除く。
+    func unwrapLastConstantFromPhrase() {
+        guard lastOpcode == .opConstant,
+              !constants.isEmpty,
+              let phrase = constants[constants.count - 1] as? JpfPhrase,
+              let const = phrase.value
+        else { return }
+        switch const {
+        case is JpfBoolean, is JpfNull:
+            removeLastInstruction()
+            try! const.emit(with: self)     // opTrue, opFalse, opNullをemit
+        default :
+            changeLastConstant(with: const) // 定数を句から値に変更
+        }
+    }
+    /// 最終位置の定数に名前を付ける。
     func setLastConstant(name: String) {
         guard !constants.isEmpty else {return}
         constants[constants.count - 1].name = name
     }
+    /// 最終インストラクションを削除する。
     func removeLastInstruction() {
         guard let lastEmittied = currentScope.lastInstruction else {return}
         let previousEmitted = currentScope.previousInstruction
@@ -242,10 +277,6 @@ extension Compiler {
     func emitAllCashe() throws {
         for obj in pullAll() {
             if let ident = obj.value as? JpfIdentifier, !ident.hasSymbol {
-                if ident.value == self.identifier {
-                    let _ = self.symbolTable.define(ident.value)
-                    continue
-                }
                 if !ident.isLhs {
                     throw undefinedIdentifier(ident.value)
                 }
@@ -255,13 +286,6 @@ extension Compiler {
     }
     var hasIdentInCashe: Bool   {
         getAll().contains(where: {$0.value is JpfIdentifier})
-    }
-}
-/// 複合代入識別子用ヘルパー
-extension Compiler {
-    var identifier: String? {
-        get {environment.identifier}
-        set {environment.identifier = newValue}
     }
 }
 /// emitヘルパー

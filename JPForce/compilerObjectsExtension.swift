@@ -11,23 +11,26 @@ import Foundation
 // MARK: - Objectレベル・コンパイルヘルパー
 extension JpfObject {
     func emit(with c: Compiler) throws {throw JpfError("型「\(self.type)」の翻訳で、コードを出力する方法が未実装")}
-    var isDefined: Bool {true}
+    var symbolKind: SymbolKind {.unknown}
     var formattedString: String {String(format: "%@(%@)", string, type)}
 }
 extension JpfInteger {
     func emit(with c: Compiler) throws {
         _ = c.emit(op: .opConstant, operand: c.addConstant(self))
     }
+    var symbolKind: SymbolKind {.constant}
 }
 extension JpfBoolean {
     func emit(with c: Compiler) throws {
         _ = c.emit(op: isTrue ? .opTrue : .opFalse)
     }
+    var symbolKind: SymbolKind {.constant}
 }
 extension JpfString {
     func emit(with c: Compiler) throws {
         _ = c.emit(op: .opConstant, operand: c.addConstant(self))
     }
+    var symbolKind: SymbolKind {.constant}
 }
 extension JpfIdentifier {
     // 初期化
@@ -73,7 +76,6 @@ extension JpfIdentifier {
         try self.init(resolving: name, with: c, isLhs: isLhs, isOuter: isOuter)
         defineIfNeeded(with: c)
     }
-
     // コンパイル
     func emit(with c: Compiler) throws {
         guard let symbol = self.symbol else {
@@ -92,7 +94,6 @@ extension JpfIdentifier {
     mutating func defineSymbol(with c: Compiler) {
         self.symbol = c.symbolTable.define(value)
     }
-    var isDefined: Bool {return hasSymbol}
     var hasSymbol: Bool {self.symbol != nil}
     var isProperty: Bool {symbol?.scope == .PROPETRY}
     var isVariable: Bool {symbol?.isVariable ?? false}
@@ -130,6 +131,7 @@ private extension JpfIdentifier {
 }
 extension JpfNull {
     func emit(with c: Compiler) throws {_ = c.emit(op: .opNull)}
+    var symbolKind: SymbolKind {.constant}
 }
 extension JpfPhrase {
     func emit(with c: Compiler) throws {
@@ -148,8 +150,8 @@ extension JpfPhrase {
         }
         _ = c.emit(op: .opConstant, operand: c.addConstant(self))
     }
-    var isDefined: Bool {
-        (value as? JpfIdentifier)?.hasSymbol ?? false
+    var symbolKind: SymbolKind {
+        value?.symbolKind ?? .unknown
     }
 }
 extension JpfReturnValue {
@@ -163,6 +165,7 @@ extension JpfArray {
         try elements.forEach {try $0.emit(with: c)}
         _ = c.emit(op: .opArrayConst, operand: elements.count)
     }
+    var symbolKind: SymbolKind {.constant}
 }
 extension JpfDictionary {
     func emit(with c: Compiler) throws {
@@ -173,13 +176,14 @@ extension JpfDictionary {
         }
         _ = c.emit(op: .opDictionaryConst, operand: pairs.count * 2)
 #else
-        pairs.values.forEach {
-            $0.key.emit(with: c)
-            $0.value.emit(with: c)
+        try pairs.values.forEach {
+            try $0.key.emit(with: c)
+            try $0.value.emit(with: c)
         }
         _ = c.emit(op: .opDictionary, operand: pairs.count * 2)
 #endif
     }
+    var symbolKind: SymbolKind {.constant}
 }
 extension JpfRange {
     func emit(with c: Compiler) throws {
@@ -198,6 +202,7 @@ extension JpfRange {
         }
         _ = c.emit(op: .opRangeConst, operand: count * 2)
     }
+    var symbolKind: SymbolKind {.constant}
 }
 // 範囲比較種別・コンパイルヘルパー
 extension ComparisonKind {

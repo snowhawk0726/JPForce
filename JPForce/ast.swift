@@ -220,13 +220,16 @@ extension BlockStatement {
 final class CompoundStatement : Statement {
     let token: Token
     let sentences: [Sentence]
-    init(token: Token, sentences: [Sentence]) {
+    let givenString: String?
+    init(token: Token, sentences: [Sentence], string: String? = nil) {
         self.token = token
         self.sentences = sentences
+        self.givenString = string
     }
     //
     var tokenLiteral: String {token.literal}
     var string: String {
+        if let givenString { return givenString }
         var string = ""
         for (i, sentence) in sentences.enumerated() {
             string += sentence.baseString
@@ -266,19 +269,22 @@ final class AssignmentSentence : Sentence {
     let auxiliaryVerb: AuxiliaryVerb
     let kind: AssignmentKind
     let target: Identifier          // 左辺
-    let arguments: [Expression]     // 右辺候補
+    let position: Expression?       // 代入要素位置
+    let rhs: Expression?            // 右辺
     init(token: Token,
          auxiliaryVerb: AuxiliaryVerb = .none,
          kind: AssignmentKind,
          target: Identifier,
-         arguments: [Expression],
+         position: Expression?,
+         rhs: Expression?,
          string: String
     ) {
         self.token = token
         self.auxiliaryVerb = auxiliaryVerb
         self.kind = kind
         self.target = target
-        self.arguments = arguments
+        self.position = position
+        self.rhs = rhs
         self.baseString = string
     }
     //

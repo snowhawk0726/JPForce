@@ -93,9 +93,12 @@ extension ExpressionStatement {
         return first.token
     }
     var auxiliaryVerb: AuxiliaryVerb {.none}
-    var leadingIdentifier: Identifier? {
-        guard let phrase = expressions.first as? PhraseExpression else {return nil}
-        return phrase.left as? Identifier
+    var leadingExpression: Expression? {
+        if expressions.first is PhraseExpression ||     // 複合代入
+           expressions.first is GenitiveExpression {    // 複合要素代入
+            return expressions.first
+        }
+        return nil
     }
     var isTerminalConnector: Bool {
         firstToken?.isTerminalConnector == true
@@ -167,8 +170,8 @@ extension LogicalExpression {
     var isConjunction: Bool {true}
 }
 extension ConditionalOperation {
-    var isTerminalCandidate: Bool {true}
-    var isConjunctiveForm: Bool {false}
+    var isTerminalCandidate: Bool {alternative.isTerminalCandidate}
+    var isConjunctiveForm: Bool {alternative.isConjunction}
 }
 extension LoopExpression {
     var isTerminalCandidate: Bool {body.isTerminalCandidate}
@@ -204,8 +207,13 @@ extension Token {
 // Sentenceの解析
 extension ExpressionStatementParser {
     func parseSentecne(from es: ExpressionStatement) -> Statement? {
-        defer {parser.leadingIdentifier = nil}
-        parser.leadingIdentifier = es.leadingIdentifier // 文頭の識別子を記憶
+        // 属格代入(〜の〜は、value)
+        if let genitive = es.expressions.first as? GenitiveExpression,
+           genitive.value != nil {
+            return buildGenitiveAssignment(from: genitive)
+        }
+        defer {parser.leadingExpression = nil}
+        parser.leadingExpression = es.leadingExpression // 文頭の式を記憶
         // 式が空の場合は、終端のみの空文として扱う
         if es.expressions.isEmpty {
             return ExpressionStatement(token: es.token, expressions: [])
@@ -237,13 +245,15 @@ extension ExpressionStatementParser {
             token: first.token,
             sentences: sentences)               // 複文
     }
+}
+private extension ExpressionStatementParser {
     /// スライスした expressions
-    private struct SentenceSlice {
+    struct SentenceSlice {
         let expressions: [Expression]
         let trailingParticle: Token.Particle?   // 節末の助動詞(て)
     }
     /// Sentence境界で式文を分割する
-    private func splitIntoSentenceSlices(from es: ExpressionStatement) -> [SentenceSlice] {
+    func splitIntoSentenceSlices(from es: ExpressionStatement) -> [SentenceSlice] {
         var slices: [SentenceSlice] = []
         var current: [Expression] = []
         
@@ -267,11 +277,11 @@ extension ExpressionStatementParser {
         return slices
     }
     /// Sentenceの境界判定
-    private func isSentenceBoundary(current: Expression, next: Expression?) -> Bool {
+    func isSentenceBoundary(current: Expression, next: Expression?) -> Bool {
         return current.isTerminalCandidate && (next?.token.isBoundaryCanceler == false)
     }
     /// Sentence構築
-    private func buildSentence(from slice: [Expression]) -> Sentence? {
+    func buildSentence(from slice: [Expression]) -> Sentence? {
         guard let last = slice.last else {return nil}
         var slice = slice
         if last.isAssignment && !slice.hasImmutableLhs {
@@ -301,30 +311,119 @@ extension ExpressionStatementParser {
         )
     }
     /// 代入節構築
-    private func buildAssignmentSentence(from slice: [Expression]) -> AssignmentSentence? {
+    func buildAssignmentSentence(from slice: [Expression]) -> AssignmentSentence? {
         guard let last = slice.last else {return nil}
+        // 左辺抽出
         let lhs = slice.extractLhsIdentifier()
         guard let target = lhs ?? parser.leadingIdentifier else {
             error(message: "代入先が見つかりません。", at: last.sentenceToken)
             return nil
         }
+        // 種別決定
         let kind: AssignmentKind = (lhs == nil) ? .compound : .simple
         if kind == .simple {
             target.isLhsCandidate = false
             target.isLhs = true
         }
-        let arguments = slice.dropLast().filter {!$0.isLhsExpression}   // 代入右辺(候補)を抽出
-        
+        // 代入位置抽出(なければnil)
+        let positionExpr = (kind == .compound) ? parser.leadingPosition : extractPosition(from: slice)
+        if let ident = positionExpr as? Identifier {
+            ident.isLhsCandidate = false
+            ident.isLhs = true
+        }
+        let position = positionExpr.map { PhraseExpression(token: Token(.NI), left: $0) }
+        // 右辺抽出(「〜を」または「〜」(格無し))
+        let rhs = slice.dropLast().first {
+            if let phrase = $0 as? PhraseExpression {
+                return phrase.hasParticle(.WO)
+            }
+            return true
+        }
+
         return AssignmentSentence(
             token: last.sentenceToken,
             auxiliaryVerb: last.auxiliaryVerb,
             kind: kind,
             target: target,
-            arguments: arguments,
+            position: position,
+            rhs: rhs,
             string: slice.toStringWithComma
         )
     }
-    private func rebuild(_ sentences: [Sentence]) -> [Sentence] {
+    func extractPosition(from slice: [Expression]) -> Expression? {
+        // 要素代入「〜の〜に」である場合は、「〜に」の left を返す
+        var particleNo = false
+        for exp in slice {
+            guard let phrase = exp as? PhraseExpression else {
+                continue
+            }
+            if phrase.hasParticle(.NO) {
+                particleNo = true
+                continue
+            }
+            if particleNo, phrase.hasParticle(.NI) {
+                return phrase.left
+            }
+        }
+        return nil
+    }
+    /// 要素代入(Genitive Expressionを正規化)
+    func buildGenitiveAssignment(from genitive: GenitiveExpression) -> Statement? {
+        // 代入値のStatementを[Setence]に変換
+        var sentences: [Sentence] = convertToSeteneces(from: genitive.value)
+        // 指定位置(〜は → 〜に)
+        guard let phrase = genitive.right as? PhraseExpression else {return nil}
+        let position = PhraseExpression(token: Token(.NI), left: phrase.left)
+        if let ident = position.left as? Identifier {
+            ident.isLhsCandidate = false
+            ident.isLhs = true
+        }
+        //
+        if let target = genitive.left as? Identifier {
+            target.isLhsCandidate = false
+            target.isLhs = true
+            // 変数に代入
+            let assignSentence = AssignmentSentence(
+                token: genitive.token,
+                kind: .simple,
+                target: target,
+                position: position,
+                rhs: nil,
+                string: genitive.string
+            )
+            sentences.append(assignSentence)
+        } else {
+            // 代入したオブジェクトを返す
+            let left = PhraseExpression(token: Token(.NO), left: genitive.left)
+            let simpleSentence = SimpleSentence(
+                token: Token(.ASSIGN),
+                auxiliaryVerb: .none,
+                arguments: [left, position],
+                predicateKind: .builtin,
+                string: genitive.string
+            )
+            sentences.append(simpleSentence)
+        }
+        guard let token = sentences.first?.token else {return nil}
+        return CompoundStatement(
+            token: token,
+            sentences: sentences,
+            string: genitive.string.withPeriod
+        )
+    }
+    func convertToSeteneces(from valueStatement: Statement?) -> [Sentence] {
+        switch valueStatement {
+        case let es as ExpressionStatement:
+            return [es]
+        case let ss as SimpleSentence:
+            return [ss]
+        case let cs as CompoundStatement:
+            return cs.sentences
+        default:
+            return []
+        }
+    }
+    func rebuild(_ sentences: [Sentence]) -> [Sentence] {
         var result = sentences
         if result.count >= 2 {
             for i in stride(from: result.count - 1, through: 1, by: -1) {
@@ -350,7 +449,7 @@ extension ExpressionStatementParser {
         return result
     }
     /// 〜かによって、のチェック
-    private func validateQuestionPlacement(from es: ExpressionStatement) {
+    func validateQuestionPlacement(from es: ExpressionStatement) {
         let exprs = es.expressions
         guard exprs.count >= 2 else { return }
         if let phrase = exprs[1] as? PhraseExpression,
@@ -359,7 +458,7 @@ extension ExpressionStatementParser {
         }
     }
     /// 文中制約チェック
-    private func validateSentenceSequence(_ sentences: [Sentence]) {
+    func validateSentenceSequence(_ sentences: [Sentence]) {
         for (i, sentence) in sentences.dropLast().enumerated() {
             let isNextTerminalConnector = i < sentences.count - 1 && sentences[i + 1].isTerminalConnector   // 次の語が終端(Terminal)に繋がる
             if sentence.terminality == .terminal && !isNextTerminalConnector {
@@ -376,7 +475,7 @@ extension ExpressionStatementParser {
         }
     }
     /// 文末チェック
-    private func validateSentenceEnd(_ sentences: [Sentence], terminator: SentenceTerminator) {
+    func validateSentenceEnd(_ sentences: [Sentence], terminator: SentenceTerminator) {
         guard
             terminator.isExplicit,
             let sentence = sentences.last,
@@ -387,7 +486,7 @@ extension ExpressionStatementParser {
         error(message: "連用形の文を「\(terminator.rawValue)」で終えることはできません。", at: sentence.token)
     }
     /// 複合代入文のチェック
-    private func validateCompoundAssignment(sentences: [Sentence], slices: [SentenceSlice]) {
+    func validateCompoundAssignment(sentences: [Sentence], slices: [SentenceSlice]) {
         guard let assignment = sentences.last as? AssignmentSentence else {return}
         // 単文代入の構文エラーチェック
         if sentences.count == 1 && assignment.kind == .compound {

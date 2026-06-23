@@ -28,8 +28,6 @@ struct PredicateCompilableFactory {
         case .keyword(.SURU):       return PerformCompiler(compiler)    // 〜にする、〜をする
         case .keyword(.RETURN):     return ReturnCompiler(compiler)     // (〜を)返す
         case .keyword(.NULL):       return NullCompiler(compiler)
-        case .keyword(.BE),.keyword(.NOT):
-                                    return LogicalOperationCompiler(compiler, by: token)
         case .keyword(.ASSIGN):     return AssignOperationCompiler(compiler, by: token)
         case .keyword(.PULL),.keyword(.DUPLICATE):
                                     return PullOperationCompiler(compiler, by: token)
@@ -58,8 +56,13 @@ struct UnwrapCompiler : PredicateCompilable {
     init(_ compiler: Compiler, by token: Token) {self.compiler = compiler; self.op = token}
     let compiler: Compiler, op: Token
     func compile() -> JpfObject? {
-        guard compiler.isEmpty else {
-            return UnwrapOperator(compiler.environment, by: op).operate()
+         if let value = compiler.unwrappedPeek {
+             do {
+                 try value.emit(with: compiler)
+             } catch {
+                 return jpfError(from: error)
+             }
+             compiler.drop()
         }
         if compiler.lastOpcode == .opPhrase {
             compiler.removeLastInstruction()
@@ -143,7 +146,6 @@ private extension PerformCompiler {
     }
 }
 /// 「(〜を)返す」を翻訳する。
-/// ・キャッシュがあれば計算(operate())し、opReturnValueを出力する。
 /// ・出力する前に、句をチェックし、
 ///  「〜を」または「無し」であれば、出力を行う。(格が違う(「を」でない)場合はusageを返す)
 ///   opPhraseが出力されていたら、それを取り除く。
@@ -151,17 +153,22 @@ struct ReturnCompiler : PredicateCompilable {
     init(_ compiler: Compiler) {self.compiler = compiler}
     let compiler: Compiler
     func compile() -> JpfObject? {
-        let op = ReturnOperator(compiler.environment)
-        if !compiler.isEmpty, let result = op.operate() {   // キャッシュで計算
-            if result.isError {return result}
+        if !compiler.isEmpty {
+            guard compiler.isPeekParticle(.WO) ||
+                  compiler.environment.isPeekParticle == false
+            else {
+                return returnValueUsage
+            }
             do {
-                try result.value?.emit(with: compiler)      // resultはJpfReturnValue
+                try compiler.unwrappedPeek?.emit(with: compiler)
             } catch {
                 return jpfError(from: error)
             }
+            compiler.drop()
         } else {                                            // 直前の出力で計算
-            guard compiler.lastOpcode != .opPhrase ||
-                  compiler.removeLastOpPhrase(particle: .WO) else {
+            guard compiler.removeLastOpPhrase(particle: .WO) ||
+                  compiler.lastOpcode != .opPhrase
+            else {
                 return returnValueUsage                     // 前句の助詞が間違っている
             }
         }
@@ -173,18 +180,6 @@ struct NullCompiler : PredicateCompilable {
     init(_ compiler: Compiler) {self.compiler = compiler}
     let compiler: Compiler
     func compile() -> JpfObject? {JpfNull.object}
-}
-struct LogicalOperationCompiler : PredicateCompilable {
-    init(_ compiler: Compiler, by token: Token) {self.compiler = compiler; self.op = token}
-    let compiler: Compiler, op: Token
-    func compile() -> JpfObject? {
-        if compiler.count >= 2 && !compiler.hasIdentInCashe {   // キャッシュで計算可
-            let booleanOperator = BooleanOperator(compiler.environment, by: op)
-            return booleanOperator.operate()
-        }
-        do {try compiler.emitAllCashe()} catch {return jpfError(from: error)}
-        return compiler.emit(predicate: op)                     // opPredicate
-    }
 }
 /// 識別子名に関する例外
 private enum NameError : Error {case notFound}
@@ -209,9 +204,6 @@ struct AssignOperationCompiler : PredicateCompilable {
                 try emitAssignment(value: second, target: third)
             case (.none, Token(.NI), Token(.WO)):
                 try emitAssignment(value: third, target: second)
-                // 複合代入
-            case (.none, _, Token(.TE)):
-                try emitCompoundAssignment(value: third?.value, ident: second?.value)
                 // 実行時(コード出力済み)処理
             default:
                 try emitAssignment()
@@ -260,14 +252,6 @@ private extension AssignOperationCompiler {
         let ident = try JpfIdentifier(ensuring: target, with: compiler)
         try ident.emitOpSet(with: compiler)
     }
-    func emitCompoundAssignment(value: JpfObject?, ident: JpfObject?) throws {
-        if let name = compiler.identifier {
-            let ident = try JpfIdentifier(ensuring: name, with: compiler)
-            try emitAssignment(value: value, target: ident)
-            return
-        }
-        try emitAssignment(value: value, target: ident)
-    }
     func emitCollectionAssignment(value: JpfObject?, collection: JpfObject?, key: JpfObject?) throws {
         // 引数を適切な順序で、emit
         try emitCollectionAssignmentWithOrder(value: value, collection: collection, key: key)
@@ -293,17 +277,7 @@ private extension AssignOperationCompiler {
         try key?.emit(with: compiler)           // <キー>に
     }
     func emitAssignment() throws {              // 引数が翻訳済みの場合の代入
-        guard let name = compiler.identifier else {
-            throw assignIdentiferNotFound
-        }
-        if compiler.isLastOpPhrase(particle: .TE) {         // 直前の出力「て」でを取り除く
-            _ = compiler.removeLastOpPhrase(particle: .TE)
-            compiler.identifier = nil                       // 複合代入用識別子をクリア
-        } else {
-            _ = compiler.emit(predicate: .ASSIGN)   // 代入する
-        }
-        let ident = try JpfIdentifier(ensuring: name, with: compiler)
-        try ident.emitOpSet(with: compiler)
+        _ = compiler.emit(predicate: .ASSIGN)   // 代入する
     }
     //
     func normalizeParams(from stack: Compiler) -> (JpfObject?, JpfObject?, JpfObject?) {
@@ -447,13 +421,16 @@ struct DropCompiler : PredicateCompilable {
     init(_ compiler: Compiler) {self.compiler = compiler}
     let compiler: Compiler
     func compile() -> JpfObject? {
-        var number = 1
-        if compiler.environment.isPeekParticle(.KO),
-            let n = compiler.environment.unwrappedPeek?.number {
-            number = n
+        if compiler.environment.isPeekParticle(.KO),        // 指定個数(固定)
+           let number = compiler.environment.unwrappedPeek?.number {
             compiler.drop()
+            _ = compiler.emit(op: .opDropConst, operand: number)
+        } else if compiler.isLastOpPhrase(particle: .KO) {  // 動的個数をdrop
+            compiler.removeLastInstruction()                // opPhraseは削除
+            _ = compiler.emit(op: .opDrop)
+        } else {                                            // 個数指定省略
+            _ = compiler.emit(op: .opDropConst, operand: 1)
         }
-        _ = compiler.emit(op: .opDropConst, operand: number)
         return nil
     }
 }

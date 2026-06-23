@@ -21,17 +21,24 @@ enum SymbolScope: String {
         }
     }
 }
+enum SymbolKind {
+    case unknown
+    case constant
+    case function
+}
 struct Symbol : Equatable {
     let name: String
     let scope: SymbolScope
     let index: Int
     let isRedefined: Bool
+    let kind: SymbolKind
     //
-    init(name: String, scope: SymbolScope, index: Int, isRedefined: Bool = false) {
+    init(name: String, scope: SymbolScope, index: Int, isRedefined: Bool = false, kind: SymbolKind = .unknown) {
         self.name = name
         self.scope = scope
         self.index = index
         self.isRedefined = isRedefined
+        self.kind = kind
     }
     //
     var isProperty: Bool {scope == .PROPETRY}
@@ -40,6 +47,7 @@ struct Symbol : Equatable {
     var isGlobal: Bool {scope == .GLOBAL}
     var isLocal: Bool {scope == .LOCAL}
     var isFree: Bool {scope == .FREE}
+    var isConstant: Bool {kind == .constant}
     /// シンボルに応じた命令語を出力する。
     func emitOpGet(with c: Compiler) {
         _ = c.emit(
@@ -80,7 +88,7 @@ class SymbolTable : Equatable {
         userDefinedSymbols.first(where: {$0.value.isVariable && $0.value.index == index})?.key
     }
     // シンボル定義
-    func define(name: String, index: Int, scope: SymbolScope) -> Symbol {
+    func define(name: String, index: Int, scope: SymbolScope, kind: SymbolKind = .unknown) -> Symbol {
         var symbol: Symbol
         if scope == .PREDICATE || scope == .PROPETRY {
             symbol = Symbol(name: name, scope: scope, index: index)
@@ -90,17 +98,19 @@ class SymbolTable : Equatable {
                 name: name,
                 scope: scope,
                 index: index,
-                isRedefined: Token.isRedefinableKeyword(name)
+                isRedefined: Token.isRedefinableKeyword(name),
+                kind: kind
             )
             userDefinedSymbols[name] = symbol
         }
         return symbol
     }
-    func define(_ name: String) -> Symbol {
+    func define(_ name: String, kind: SymbolKind = .unknown) -> Symbol {
         let symbol = define(
             name: name,
             index: numberOfDefinitions,
-            scope: outer != nil ? .LOCAL : .GLOBAL
+            scope: outer != nil ? .LOCAL : .GLOBAL,
+            kind: kind
         )
         numberOfDefinitions += 1
         return symbol
@@ -110,7 +120,7 @@ class SymbolTable : Equatable {
         return define(name: orignal.name, index: freeSymbols.count - 1, scope: .FREE)
     }
     func define(functionName: String) -> Symbol {
-        define(name: functionName, index: 0, scope: .FUNCTION)
+        define(name: functionName, index: 0, scope: .FUNCTION, kind: .function)
     }
     // シンボルの名前解決
     func resolve(_ name: String) -> Symbol? {
@@ -129,6 +139,9 @@ class SymbolTable : Equatable {
             return builtinSymbols[token.unwrappedLiteral]
         }
         return resolve(token.unwrappedLiteral)
+    }
+    func hasSymbol(name: String) -> Bool {
+        resolve(name) != nil
     }
     func hasRedefined(_ token: Token) -> Bool {
         guard let symbol = resolve(token) else {return false}

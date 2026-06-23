@@ -10,13 +10,18 @@ import Foundation
 final class GlobalStore {
     private let globalsSize = 65536
     private var globals: [JpfObject]
+    private var max: Int = -1
     init() {
         self.globals = [JpfObject](repeating: JpfNull.object, count: globalsSize)
     }
     subscript(index: Int) -> JpfObject {
         get {globals[index]}
-        set {globals[index] = newValue}
+        set {
+            globals[index] = newValue
+            max = Swift.max(index, max)
+        }
     }
+    var count: Int {max + 1}
 }
 
 final class Stack {

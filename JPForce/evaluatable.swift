@@ -276,23 +276,26 @@ extension SentencePredicateKind {
 }
 extension AssignmentSentence : Evaluatable {
     func evaluate(with environment: Environment) -> JpfObject? {
-        if let exit = arguments.evaluate(with: environment),
-           exit.isBreakFactor {
-            return exit
+        var rhs: JpfObject
+        // 右辺評価
+        if let result = self.rhs?.evaluate(with: environment), let value = result.value {
+            if result.isError {return result}
+            rhs = value
+        } else
+        if let value = environment.peek {  // スタックにあるデータを右辺とする。
+            rhs = value
+            environment.drop()
+        } else {
+            return assignUsage              // 右辺が無い
         }
-        guard let params = getPrarms(from: environment) else {
-            return assignUsage
-        }
-        guard let data = params.0 else {    // 代入対象
-            return assignUsage
-        }
-        var rhs = data
-        // 要素代入
-        if let position = params.1 {        // 代入位置
+        // 代入位置評価
+        if let result = self.position?.evaluate(with: environment), let position = result.value {
+            if result.isError {return result}
             guard let container = environment.get(target: target) else {
                 return assignUsage
             }
-            rhs = container.assign(data, to: position)
+            // 要素代入
+            rhs = container.assign(rhs, to: position)
             if rhs.isError {return rhs}
         }
         // 値代入
@@ -302,27 +305,6 @@ extension AssignmentSentence : Evaluatable {
         } catch {
             return jpfError(from: error)
         }
-    }
-    private func getPrarms(from env: Environment) -> (JpfObject?, JpfObject?)? {
-        if var params = env.peek(2) {
-            switch (params[0].particle, params[1].particle) {
-            case (Token(.NI), Token(.WO)), (Token(.NI), nil):
-                params.swapAt(0, 1)
-                fallthrough
-            case (Token(.WO), Token(.NI)), (nil, Token(.NI)):
-                env.drop(2)
-                return (params[0].value, params[1].value)
-            default:
-                break
-            }
-        }
-        if let param = env.peek {
-            if param.particle == Token(.WO) || param.particle == nil {
-                env.drop()
-                return (param.value, nil)
-            }
-        }
-        return nil
     }
 }
 // MARK: Expression evaluators

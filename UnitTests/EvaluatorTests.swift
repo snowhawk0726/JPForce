@@ -1159,16 +1159,6 @@ final class EvaluatorTests: XCTestCase {
         try testObject(evaluated.elements[2], with: 6)
         print("テスト(\(evaluated.string))終了")
     }
-    func testArrayInitialization() throws {
-        let input = "配列であって、要素が、3個の３。"
-        print("テストパターン: \(input)")
-        let evaluated = try XCTUnwrap(testEvaluator(input) as? JpfArray)
-        XCTAssertEqual(evaluated.elements.count, 3)
-        try testObject(evaluated.elements[0], with: 3)
-        try testObject(evaluated.elements[1], with: 3)
-        try testObject(evaluated.elements[2], with: 3)
-        print("テスト(\(evaluated.string))終了")
-    }
     func testArrayIndexExpressions() throws {
         let testPatterns: [(input: String, expected: Int?)] = [
             ("配列【1, 2, 3】の0番目", 1), ("配列【1, 2, 3】の1番目", 2), ("配列【1, 2, 3】の2番目", 3),

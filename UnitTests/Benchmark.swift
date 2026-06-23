@@ -52,8 +52,9 @@ final class Benchmark : XCTestCase {
         print("インタープリタ:\t結果は、\(result)、実行時間は、\(duration)秒")
         // compiler
         let compiler = Compiler(from: program)
+        compiler.optimizeConstantsEnabled = true
         start = Date()
-        if let error = compiler.compile() {
+        if let error = compiler.compile() as? JpfError {
             XCTFail("コンパイルエラー：\(error.message)")
             return
         }

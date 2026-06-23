@@ -19,6 +19,20 @@ protocol Compilable {
     func compile(with c: Compiler) -> JpfObject?
 }
 // MARK: - implementations for ast node compiler
+extension Compilable {
+    // compileの結果得られた定数をemitする。
+    // 定数がエラー、またはemitが失敗したら、JpfErrorを返す。
+    func emit(_ const: JpfObject?, with c: Compiler) -> JpfError? {
+        guard let const else { return JpfError("出力するオブジェクトがありません。") }
+        if const.isError { return const.error }
+        do {
+            try const.emit(with: c)
+        } catch {
+            return jpfError(from: error)
+        }
+        return nil
+    }
+}
 // [Expression]のコンパイル
 extension Array where Element == Expression {
     /// 複数の式（または引数）を順に翻訳する共通処理
@@ -47,8 +61,27 @@ extension Node {
 extension Program : Compilable {
     func compile(with c: Compiler) -> JpfObject? {
         c.switchCase.enter()
+        if c.optimizeConstantsEnabled {
+            switch analyze(with: c) {
+            case .constant(let const):
+                do {
+                    try const.emit(with: c)
+                    return nil
+                } catch {
+                    return jpfError(from: error)
+                }
+            case .evaluated:
+                return nil
+            case .nonConstant:
+                break
+            case .error(let message):
+                return JpfError(message)
+            }
+        }
         for statement in statements {
-            if let object = statement.compile(with: c), object.isError {return object}
+            if let error = statement.compile(with: c) {
+                return error
+            }
         }
         if c.switchCase.hasJumpPositions {return JpfError(c.switchCase.defaultError)}
         c.switchCase.leave()
@@ -58,32 +91,33 @@ extension Program : Compilable {
 extension ExpressionStatement : Compilable {
     func compile(with c: Compiler) -> JpfObject? {
         expressions.finalizeLhsCandidates() // TODO: parseSentenceに移行後削除予定
-        casheLeadingIdentifer(with: c)      // 文頭の識別子をキャッシュ TODO: 削除予定
         if let exit = expressions.compile(with: c) {
             return exit
         }
-        c.identifier = nil                  // TODO: 削除予定
-        do {try c.emitAllCashe()} catch {return jpfError(from: error)}
         return nil
-    }
-}
-private extension ExpressionStatement {
-    /// 文頭の識別子をキャッシュする
-    func casheLeadingIdentifer(with c: Compiler) {
-        if let phrase = expressions.first as? PhraseExpression,
-           let ident = phrase.left as? Identifier {
-                c.identifier = ident.value
-        }
     }
 }
 extension CompoundStatement : Compilable {
     func compile(with c: Compiler) -> JpfObject? {
+        if c.optimizeConstantsEnabled {
+            switch analyze(with: c) {
+            case .constant(let const):
+                do {
+                    try const.emit(with: c)
+                    return nil
+                } catch {
+                    return jpfError(from: error)
+                }
+            case .evaluated:
+                return nil
+            case .nonConstant:
+                break
+            case .error(let message):
+                return JpfError(message)
+            }
+        }
         for sentence in sentences {
             if let error = sentence.compile(with: c) {
-                guard error.isError else {
-                    assertionFailure("キャッシュが出力された。")
-                    fatalError()
-                }
                 return error
             }
         }
@@ -95,10 +129,6 @@ extension BlockStatement : Compilable {
         c.switchCase.enter()
         for statement in statements {
             if let error = statement.compile(with: c) {
-                guard error.isError else {
-                    assertionFailure("キャッシュが出力された。")
-                    fatalError()
-                }
                 return error
             }
         }
@@ -109,10 +139,34 @@ extension BlockStatement : Compilable {
 }
 extension DefineStatement : Compilable {
     func compile(with c: Compiler) -> JpfObject? {
+        if c.optimizeConstantsEnabled  {
+            switch value.analyze(with: c) {
+            case .constant(_), .nonConstant:
+                if !c.symbolTable.hasSymbol(name: name.value) { // 二重定義回避
+                    if case .error(let message) = analyze(with: c) {
+                        return JpfError(message)
+                    }
+                }
+            case .evaluated:
+                return nil
+            case .error(let message):
+                return JpfError(message)
+            }
+        }
         let symbol = c.symbolTable.define(name.value)
-        if let object = value.compile(with: c), object.isError {return object}
+        // 右辺をコンパイル
+        if let result = value.compile(with: c) {
+            if result.isError {return result}
+            do {
+                // 右辺を強制emit
+                try c.emitAllCashe()
+                try result.emit(with: c)
+            } catch {
+                return jpfError(from: error)
+            }
+        }
         if c.lastOpcode == .opConstant {
-            c.setLastConstant(name: name.value)
+            c.setLastConstant(name: name.value) // オブジェクトのnameに左辺のname.valueを設定
         }
         symbol.emitOpSet(with: c)
         return nil
@@ -121,6 +175,18 @@ extension DefineStatement : Compilable {
 // MARK: Sentence compilers
 extension SimpleSentence : Compilable {
     func compile(with c: Compiler) -> JpfObject? {
+        if c.optimizeConstantsEnabled {
+            switch analyze(with: c) {
+            case .constant(let const):
+                return const
+            case .evaluated:
+                return nil
+            case .nonConstant:
+                break
+            case .error(let message):
+                return JpfError(message)
+            }
+        }
         if let exit = arguments.compile(with: c) {
             return exit
         }
@@ -142,6 +208,7 @@ extension SentencePredicateKind {
             let predicate = PredicateExpression(token: token, auxiliaryToken: auxiliaryVerb.token)
             return predicate.compile(with: c)
         case .custom:
+            do {try c.emitAllCashe()} catch {return jpfError(from: error)}
             let identifier = Identifier(from: token, with: auxiliaryVerb.token)
             return identifier.compile(with: c)
         }
@@ -149,10 +216,41 @@ extension SentencePredicateKind {
 }
 extension AssignmentSentence : Compilable {
     func compile(with c: Compiler) -> JpfObject? {
-        do {
-            if !arguments.isEmpty {
-                try compileRhs(arguments, with: c)
+        if c.optimizeConstantsEnabled {
+            switch analyze(with: c) {
+            case .evaluated:
+                guard let const = c.environment[target.value] else {
+                    break
+                }
+                _ = c.symbolTable.define(target.value, kind: const.symbolKind)
+                return nil
+            case .error(let message):
+                return JpfError(message)
+            default:
+                break
             }
+        }
+        do {
+            // 右辺の翻訳・出力
+            if let value = (rhs as? PhraseExpression)?.left ?? rhs {
+                if let result = value.compile(with: c) {
+                    if result.isError { return result }
+                    try result.emit(with: c)
+                }
+            }
+            // 代入位置の翻訳
+            if let position {
+                let ident = try JpfIdentifier(ensuring: target, with: c)
+                try ident.emit(with: c)
+                _ = c.emit(particle: .NO)
+                if let result = position.compile(with: c) {
+                    if result.isError { return result }
+                    try result.emit(with: c)
+                }
+                // 要素代入
+                _ = c.emit(predicate: .ASSIGN)
+            }
+            // 左辺の出力(値代入)
             let ident = try JpfIdentifier(ensuring: target, with: c)
             try ident.emitOpSet(with: c)
         } catch {
@@ -160,145 +258,147 @@ extension AssignmentSentence : Compilable {
         }
         return nil
     }
-    private func compileRhs(_ exprs: [Expression], with c: Compiler) throws {
-        let params = try getParams(from: exprs)
-        guard let data = params.0 else {    // 代入対象
-            throw assignUsage
-        }
-        if let result = data.compile(with: c) {
-            if result.isError { throw result.error! }
-            try result.emit(with: c)
-        }
-        if let pos = params.1 {             // 要素代入
-            _ = c.emit(particle: .WO)
-            let ident = try JpfIdentifier(ensuring: target, with: c)
-            try ident.emit(with: c)         // 代入先
-            _ = c.emit(particle: .NO)
-            if let result = pos.compile(with: c) {
-                if result.isError { throw result.error! }
-                try result.emit(with: c)
-            }
-            _ = c.emit(particle: .NI)
-            _ = c.emit(predicate: .ASSIGN)
-        }
-    }
-    private func getParams(from exprs: [Expression]) throws -> (Expression?, Expression?) {
-        if exprs.isEmpty { return (nil, nil) }  // 翻訳済み
-        var params: [(Token?, Expression)] = []
-        for expr in exprs {
-            if let phrase = expr as? PhraseExpression {
-                params.append((phrase.token, phrase.left))
-            } else
-            if let genitive = expr as? GenitiveExpression,
-               let phrase = genitive.right as? PhraseExpression {
-                let expr = GenitiveExpression(token: genitive.token, left: genitive.left, right: phrase.left)
-                params.append((phrase.token, expr))
-            } else {
-                params.append((nil, expr))
-            }
-        }
-        if params.count == 2 {
-            switch (params[0].0, params[1].0) {
-            case (Token(.NI), Token(.WO)), (Token(.NI), nil):
-                params.swapAt(0, 1)
-                fallthrough
-            case (Token(.WO), Token(.NI)), (nil, Token(.NI)):
-                return (params[0].1, params[1].1)
-            default:
-                throw assignUsage
-            }
-        }
-        if params.count == 1, (params[0].0 == nil || params[0].0 == Token(.WO)) {
-            return (params[0].1, nil)
-        }
-        throw assignUsage
-    }
 }
 // MARK: Expression compilers
 extension Identifier : Compilable {
     func compile(with c: Compiler) -> JpfObject? {
+        if c.optimizeConstantsEnabled {
+            switch analyze(with: c) {
+            case .constant(let const):
+                return const
+            case .nonConstant:
+                break
+            case .evaluated:
+                return nil
+            case .error(let message):
+                return JpfError(message)
+            }
+        }
         do {
             let ident = try JpfIdentifier(resolving: self, with: c)
             guard ident.hasSymbol || ident.isLhs else { // 登録済み、または左辺識別子
                 return undefinedIdentifier(value)
             }
-            if auxiliaryToken != nil {
-                try emitCall(ident: ident, with: c)
-                return nil
+            if ident.isLhs {            // 左辺の場合、識別子オブジェクトを返す
+                return ident
             }
-            if !c.isEmpty, ident.isProperty  {
-                return try compilePropertyAccess(ident: ident, with: c)
+            try c.emitAllCashe()
+            try ident.emit(with: c)     // scopeに応じたコードを出力
+            if auxiliaryToken != nil {  // サ変動詞による呼び出し
+                _ = c.emit(op: .opCall)
             }
-            return ident
+            return nil
         } catch {
             return jpfError(from: error)
         }
     }
-}
-private extension Identifier {
-    // 呼び出しコードを出力する
-    func emitCall(ident: JpfIdentifier, with c: Compiler) throws {
-        try c.emitAllCashe()
-        try ident.emit(with: c)
-        _ = c.emit(op: .opCall)
-    }
-    // プロパティアクセスをコンパイル
-    func compilePropertyAccess(ident: JpfIdentifier, with c: Compiler) throws -> JpfObject? {
-        if let cache = c.peek as? JpfIdentifier {
-            // キャッシュを識別子(属性)でアクセス
-            c.drop()
-            try cache.emit(with: c)             // opGetXXX
-            try ident.emit(with: c)             // opGetProperty
-            return nil
-        }
-        // キャッシュが識別子でない場合は、コンパイル時に評価を試みる
-        return evaluate(with: c.environment)
+    var isProperty: Bool {
+        ObjectProperties.hasName(value)
     }
 }
 extension PredicateExpression : Compilable {
     func compile(with c: Compiler) -> JpfObject? {
+        if c.optimizeConstantsEnabled {
+            switch analyze(with: c) {
+            case .constant(let const):
+                return const
+            case .evaluated:
+                return nil
+            case .nonConstant:
+                break
+            case .error(let message):
+                return JpfError(message)
+            }
+        }
         if let predicate = PredicateCompilableFactory.create(from: token, with: c) {
             return predicate.compile()                  // opPredicate以外の翻訳
         }
-        if !c.isEmpty && !c.hasIdentInCashe {
-            guard let result = evaluate(with: c.environment) else {return nil}
-            if !result.isError {
-                return result
-            }   // キャッシュでの計算が失敗した場合は、キャッシュを出力(実行時まで実行を先延ばし)
+        do {
+            try c.emitAllCashe()
+        } catch {
+            return jpfError(from: error)
         }
-        do {try c.emitAllCashe()} catch {return jpfError(from: error)}
         return c.emit(predicate: token)
     }
 }
 extension PhraseExpression : Compilable {
     func compile(with c: Compiler) -> JpfObject? {
-        switch left.compile(with: c) {
-        case let ident as JpfIdentifier:
-            return JpfPhrase(value: ident, particle: token)
-        case let err as JpfError:
-            return err
-        case let cashe?:
-            // キャッシュとして出力
-            return JpfPhrase(value: cashe, particle: token)
-        default:
-            break
+        if c.optimizeConstantsEnabled {
+            switch left.analyze(with: c) {
+            case .constant(let const):
+                return JpfPhrase(value: const, particle: token)
+            case .nonConstant, .error(_):
+                break
+            case .evaluated:
+                return nil
+            }
         }
-        // キャッシュ無し = 翻訳済み
+        switch left {
+        case is PredicateExpression,
+             is NominalizedExpression,
+             is FunctionLiteral,
+             is ComputationLiteral,
+             is Identifier:             // 定数化しないノード
+            if let result = left.compile(with: c) {
+                if result.isError {return result}
+                return JpfPhrase(value: result, particle: token)
+            }
+        default:
+            // 定数であればJpfPhraseに
+            if case .constant(let const) = left.analyze(with: c) {
+                return JpfPhrase(value: const, particle: token)
+            }
+            // コンパイルフェーズ
+            if let result = left.compile(with: c) {
+                if result.isError {return result}
+                return JpfPhrase(value: result, particle: token)
+            }
+        }
+        // 格をemitまたは差し替え
+        if changeConstantToPhrase(with: c) {    // 出力が定数であれば、定数を句に差し替える
+            return nil
+        }
         let particleIndex = token.particleIndex!
-        if c.lastOpcode != .opPhrase {
-            _ = c.emit(op: .opPhrase, operand: particleIndex)
-        } else {    // 直前が opPhrase であれば、直前は省略(格を替える)
+        if c.lastOpcode == .opPhrase {          // 直前の格を差し替える
             c.changeOperand(at: c.lastPosition!, operand: particleIndex)
+        } else {
+            _ = c.emit(op: .opPhrase, operand: particleIndex)
         }
         return nil
+    }
+    private func changeConstantToPhrase(with c: Compiler) -> Bool {
+        switch c.lastOpcode {
+        case .opConstant:
+            c.wrapLastConstantAsPhrase(with: token)
+        case .opTrue:
+            c.removeLastInstruction()
+            let phrase = JpfPhrase(value: JpfBoolean.TRUE, particle: token)
+            try! phrase.emit(with: c)
+        case .opFalse:
+            c.removeLastInstruction()
+            let phrase = JpfPhrase(value: JpfBoolean.FALSE, particle: token)
+            try! phrase.emit(with: c)
+        default:
+            return false
+        }
+        return true
     }
 }
 extension CaseExpression : Compilable {
     /// 条件処理(場合分け)。
     /// - Returns: ReturnValueまたはnil、エラー
     func compile(with c: Compiler) -> JpfObject? {
-        guard c.isEmpty else {
-            return evaluate(with: c.environment)
+        if c.optimizeConstantsEnabled {
+            switch analyze(with: c) {
+            case .constant(let const):
+                return const
+            case .nonConstant:
+                break
+            case .evaluated:
+                return nil
+            case .error(let message):
+                return JpfError(message)
+            }
         }
         return c.switchCase.isActive ? switchCaseCompile(with: c) : ifThenCompile(with: c)
     }
@@ -339,189 +439,89 @@ extension GenitiveExpression : Compilable {
     /// - Parameter c: コンパイラ
     /// - Returns: 評価結果
     func compile(with c: Compiler) -> JpfObject? {
-        if let err = compileLeft(with: c) {     // 左項コンパイル
-            return err
+        if c.optimizeConstantsEnabled {
+            switch analyze(with: c) {
+            case .constant(let value):
+                return value
+            case .nonConstant, .error(_):
+                break
+            case .evaluated:
+                return nil
+            }
+        }
+        if right is CaseExpression {            // 〜が<左項>の場合
+            do {
+                try c.emitAllCashe()
+            } catch {
+                return jpfError(from: error)
+            }
+            _ = c.emit(op: .opDuplicateConst, operand: 1)   // 実行スタックの「〜が」をコピー
+        }
+        if let result = left.compile(with: c) {  // 左項コンパイル
+            return emit(result, with: c)
         }
         return compileRight(with: c)            // 右項コンパイル
     }
 }
 private extension GenitiveExpression {
-    /// 左項を翻訳
-    /// - Parameter c: コンパイラ
-    /// - Returns: nil: 翻訳継続、それ以外は、エラー
-    func compileLeft(with c: Compiler) -> JpfObject? {
-        switch left.compile(with: c) {
-        case let ident as JpfIdentifier:
-            return c.push(ident)        // 変数の翻訳を先送り
-        case let err as JpfError:
-            return err
-        case let cashe?:                // 計算済み右項
-            return c.push(cashe)        // 翻訳継続
-        default:
-            break
-        }
-        return nil
-    }
     /// 右項を翻訳
-    /// - Parameter c: コンパイラ
-    /// - Returns: nil: 翻訳完了、それ以外はエラーもしくは評価結果(評価を継続)
     func compileRight(with c: Compiler) -> JpfObject? {
-        if right is CaseExpression {                    // 〜の場合、(switch-case)
-            return compileCaseExpression(with: c)
-        }
-        if right is Identifier {                        // 〜の<識別子>
-            return compileIdentifier(with: c)
-        }
-        if right is PhraseExpression {                  // 〜の<句>
-            return compilePhraseExpression(with: c)
-        }
-        // 左項チェック
-        do {
-            switch c.pull() {
-            case let ident as JpfIdentifier:            // 左項が変数
-                try emitGenitiveAccess(from: ident, with: c)
-                return nil
-            case nil:                                   // 左項は翻訳済み
-                try emitGenitiveAccess(with: c)
-                return nil
-            default:
-                return evaluate(with: c.environment)    // キャッシュで評価
+        // 右項の種類により必要なコードをemit
+        var needOpGenitive = false
+        switch right {
+        case  is CaseExpression:                // 〜の場合、(switch-case)
+            c.switchCase.isActive = true
+            c.optimizedEmit(particle: .DE)      // <左項>で
+            _ = c.emit(predicate: .BE)          // ある
+        case let ident as Identifier
+            where ident.isProperty:             // 〜の<属性>
+            break
+        case let phrase as PhraseExpression:    // 〜の<句>
+            if let value = phrase.left.compile(with: c) {
+                if let error = emit(value, with: c) { return error }
             }
-        } catch {return jpfError(from: error)}
-    }
-    
-    /// 右項の変数を翻訳
-    /// 翻訳結果が定数であれば、評価継続。変数であれば、属格アクセスコードを出力
-    private func compileIdentifier(with c: Compiler) -> JpfObject? {
-        switch right.compile(with: c) {
-        case let ident as JpfIdentifier:
-            do {
-                try c.emitAllCashe()
-                guard ident.hasSymbol else {
-                    return "属格の右項" + undefinedIdentifier(ident.value)
-                }
-                try ident.emit(with: c)
-                if ident.isVariable {
-                    _ = c.emit(op: .opGenitive)             // 右項変数で索引アクセス
-                }
-            } catch {return jpfError(from: error)}
+            _ = c.emit(op: .opGenitive)
+            // 格を付け加える
+            _ = c.emit(particle: phrase.token)
             return nil
-        case let err as JpfError:
-            return err
-        case let const?:                                    // 定数の属性 → 定数
-            return const
-        case nil:
-            return nil
-        }
-    }
-    /// 右項の場合文(〜の場合)を翻訳
-    /// 両辺が定数の場合、評価、それ以外はコードを出力
-    private func compileCaseExpression(with c: Compiler) -> JpfObject? {
-        switch normalizedParams(from: c) {
-        case (_ as JpfIdentifier, _), (_, _ as JpfIdentifier):
-            break                                       // 変数は、emit
-        case (_?, _?):                                  // 「〜が」がキャッシュにある
-            c.drop()                                    // 「〜の」を捨てる
-            return evaluate(with: c.environment)        // キャッシュで評価
-        case (nil, _?):
+        case is PredicateExpression:            // 〜の<述語> (例：負数)
             break
         default:
-            return JpfError("場合文の翻訳ができない。")
-        }
-        c.switchCase.isActive = true
-        do {
-            try emitCaseCode(with: c)                   // 「(〜が)〜である場合」を出力
-        } catch {
-            return jpfError(from: error)
-        }
-        return right.compile(with: c)
-    }
-    /// 右項の句を翻訳
-    /// 左項を右項で属格アクセスし、格をつけるコードを出力
-    private func compilePhraseExpression(with c: Compiler) -> JpfObject? {
-        switch right.compile(with: c) {
-        case let rightPhrase as JpfPhrase:
-            do {
-                guard left is Identifier else {
-                    return rightPhrase
-                }
-                try emitGenitiveAccess(from: rightPhrase, with: c)
-            } catch {
-                return jpfError(from: error)
-            }
-        default:
+            needOpGenitive = true
             break
         }
-        return nil
-    }
-    /// コードを出力
-    /// 「(〜が)〜の場合」(case)を「(〜が)〜である場合」としてコードを出力
-    private func emitCaseCode(with c: Compiler) throws {
-        let phrase = JpfPhrase(value: c.pull(), particle: Token(.DE))
-        if let left = c.pull() {
-            try left.emit(with: c)                          // 「<オブジェクト>が」を出力
+        // 右項を翻訳
+        if let result = right.compile(with: c) {
+            return emit(result, with: c)
         }
-        _ = c.emit(op: .opDuplicateConst, operand: 1)       // 実行スタックの「〜が」をコピー
-        try phrase.emit(with: c)                            // 「<値>で」を出力
-        _ = c.emit(predicate: .BE)                          // 「ある」を出力
-    }
-    /// 句の値で属格アクセスを行い、元の格で句を再構築
-    private func emitGenitiveAccess(from phrase: JpfPhrase, with c: Compiler) throws {
-        try c.emitAllCashe()
-        guard let right = phrase.value, let particle = phrase.particle else {
-            throw JpfError("属格の右項翻訳で、句の値または格が無い。")
-        }
-        try right.emit(with: c)
-        _ = c.emit(op: .opGenitive)
-        _ = c.emit(particle: particle)
-        return
-    }
-    /// 左項と右項で属格アクセス
-    private func emitGenitiveAccess(from left: JpfObject, with c: Compiler) throws {
-        try left.emit(with: c)
-        try emitGenitiveAccess(with: c)
-    }
-    /// (翻訳済み)左項と右項で属格アクセス
-    private func emitGenitiveAccess(with c: Compiler) throws {
-        if let value = right.compile(with: c) {
-            try value.emit(with: c)
+        if needOpGenitive {
             _ = c.emit(op: .opGenitive)
         }
-    }
-    ///
-    /// スタックの引数を正規化する。(２個、アンラップした値を後詰めにする。)
-    private func normalizedParams(from stack: Compiler) -> (JpfObject?, JpfObject?) {
-        let params = stack.getAll()
-        switch params.count {
-        case 0: return (nil, nil)
-        case 1: return (nil, params[0].value)
-        default:
-            return (params[params.count-2].value, params[params.count-1].value)
-        }
+        return nil
     }
 }
 extension ConditionalOperation : Compilable {
     func compile(with c: Compiler) -> JpfObject? {
-        do {
-            if let bool = c.environment.unwrappedPeek, bool is JpfBoolean {   // 条件が真偽値ならば、評価を継続
-                if let result = evaluate(with: c.environment), !result.isError {
-                    return result
-                }
-                // フォールバック
-                guard let value = bool.isTrue ?
-                        consequence.compile(with: c) :
-                        alternative.compile(with: c) else {
-                    return nil
-                }
-                try emitValue(value, with: c)
+        if c.optimizeConstantsEnabled {
+            switch analyze(with: c) {
+            case .constant(let value):
+                return value
+            case .nonConstant, .error(_):
+                break
+            case .evaluated:
                 return nil
             }
-            if let value = c.environment.unwrappedPeek  {   // 条件をemit
-                try emitValue(value, with: c)
-                c.environment.drop()
-            } else {
-                _ = c.removeLastOpPhrase(particle: .NI)
+        }
+        do {
+            // (条件)に → 「に」を取り除く
+            if let condition = c.environment.unwrappedPeek {
+                c.drop()
+                try condition.emit(with: c)
+            } else
+            if c.removeLastOpPhrase(particle: .NI) == false {
+                c.unwrapLastConstantFromPhrase()
             }
+            // emit
             let opJumpNotTruthyPosition = c.emit(op: .opJumpNotTruthy, operand: 9999)
             if let value = consequence.compile(with: c) {
                 try emitValue(value, with: c)
@@ -546,33 +546,44 @@ extension ConditionalOperation : Compilable {
 }
 extension NominalizedExpression : Compilable {
     func compile(with c: Compiler) -> JpfObject? {
-        guard c.isEmpty else {
-            return evaluate(with: c.environment)
-        }
         guard token.isKeyword(.QUESTION) else {
             return unsupportedNominalizer(token.literal)
         }
-        switch sentence.compile(with: c) {
-        case let err as JpfError:
-            return err
-        case let chashe?:
-            guard chashe is JpfBoolean else {
-                return conditionalSentenceNeeded
+        if c.optimizeConstantsEnabled {
+            switch sentence.analyze(with: c) {
+            case .constant(let value):
+                guard value is JpfBoolean else {
+                    return conditionalSentenceNeeded
+                }
+                return value
+            case .nonConstant, .error(_):
+                break
+            case .evaluated:
+                return nil
             }
-            return chashe
-        default:
-            if c.isEmpty {return nil}
-            guard c.environment.peek is JpfBoolean else {
-                return conditionalSentenceNeeded
-            }
-            return c.environment.pull()
         }
+        if let error = sentence.compile(with: c) {
+            return error
+        }
+        return nil
     }
 }
 extension PropertyExpression : Compilable {
     func compile(with c: Compiler) -> JpfObject? {
-        guard c.isEmpty else {return evaluate(with: c.environment)}
-        do {try c.emitGetProperty(name: property.literal)}
+        if c.optimizeConstantsEnabled {
+            switch analyze(with: c) {
+            case .constant(let const):
+                return const
+            case .nonConstant:
+                break
+            case .evaluated:
+                return nil
+            case .error(let message):
+                return JpfError(message)
+            }
+        }
+        do {
+            try c.emitGetProperty(name: property.literal)}
         catch {
             return jpfError(from: error)
         }
@@ -581,35 +592,124 @@ extension PropertyExpression : Compilable {
 }
 extension IntegerLiteral : Compilable {
     func compile(with c: Compiler) -> JpfObject? {
-        JpfInteger(value: value)
+        if c.optimizeConstantsEnabled {
+            switch analyze(with: c) {
+            case .constant(let const):
+                return const
+            case .nonConstant:
+                break
+            case .evaluated:
+                return nil
+            case .error(let message):
+                return JpfError(message)
+            }
+        }
+        try! JpfInteger(value: value).emit(with: c)
+        return nil
     }
 }
 extension Boolean : Compilable {
     func compile(with c: Compiler) -> JpfObject? {
-        JpfBoolean(value: value)
+        if c.optimizeConstantsEnabled {
+            switch analyze(with: c) {
+            case .constant(let const):
+                return const
+            case .nonConstant:
+                break
+            case .evaluated:
+                return nil
+            case .error(let message):
+                return JpfError(message)
+            }
+        }
+        try! JpfBoolean(value: value).emit(with: c)
+        return nil
     }
 }
 extension StringLiteral : Compilable {
     func compile(with c: Compiler) -> JpfObject? {
-        JpfString(value: value)
+        if c.optimizeConstantsEnabled {
+            switch analyze(with: c) {
+            case .constant(let const):
+                return const
+            case .nonConstant:
+                break
+            case .evaluated:
+                return nil
+            case .error(let message):
+                return JpfError(message)
+            }
+        }
+        try! JpfString(value: value).emit(with: c)
+        return nil
     }
 }
 extension ArrayLiteral : Compilable {
     func compile(with c: Compiler) -> JpfObject? {
-        if let result = evaluate(with: c.environment) {
-            if !result.isError {return result}  // 正常: JpfObject(JpfArray)に変換
+        if c.optimizeConstantsEnabled {
+            switch analyze(with: c) {
+            case .constant(let const):
+                return const
+            case .nonConstant:
+                break
+            case .evaluated:
+                return nil
+            case .error(let message):
+                return JpfError(message)
+            }
         }
-        for exps in elements {
-            if let err = exps.compile(with: c), err.isError {return err}
+        if let (number, element) = getRepeatingArrayParameters(from: elements) {
+            return compileRepeatingArray(number, element, with: c)
+        }
+        for element in elements {
+            if let err = element.compile(with: c), err.isError {return err}
         }
         _ = c.emit(op: .opArrayConst, operand: elements.count)
+        return nil
+    }
+    private func getRepeatingArrayParameters(from exps: [ExpressionStatement]) -> (Expression, Expression)? {
+        guard exps.count == 1,
+              let expressions = exps.first?.expressions,
+              expressions.count == 2,
+              let phrase = expressions.first as? PhraseExpression,
+              phrase.token.isParticle(.KO),
+              let element = expressions.last
+        else {return nil}
+        return (phrase.left, element)
+    }
+    private func compileRepeatingArray(_ count: Expression, _ element: Expression, with c: Compiler) -> JpfObject? {
+        do {
+            if let result = count.compile(with: c) {    // 個数
+                if result.isError {return result}
+                print("\(count.string)がemitされていない。")
+                try result.emit(with: c)
+            }
+            if let result = element.compile(with: c) {  // 要素
+                if result.isError {return result}
+                print("\(element.string)がemitされていない。")
+                try result.emit(with: c)
+            }
+        }
+        catch {
+            return jpfError(from: error)
+        }
+        _ = c.emit(op: .opArrayRepeat)
         return nil
     }
 }
 extension DictionaryLiteral : Compilable {
     func compile(with c: Compiler) -> JpfObject? {
-        if let result = evaluate(with: c.environment) {
-            if !result.isError {return result}  // 正常: JpfObject(JpfDictionary)に変換
+        if c.optimizeConstantsEnabled {
+            switch analyze(with: c) {
+            case .constant(let const):
+                return const
+            case .nonConstant:
+                break
+            case .evaluated:
+                return nil
+            case .error(let message):
+                return JpfError(message)
+            }
         }
         for pair in pairs {
             if let err = pair.compile(with: c), err.isError {return err}
@@ -628,8 +728,17 @@ extension PairExpression : Compilable {
 extension RangeLiteral : Compilable {
     func compile(with c: Compiler) -> JpfObject? {
         do {
-            if c.optimizeConstantsEnabled, let const = analyze(with: c) {
-                return const
+            if c.optimizeConstantsEnabled {
+                switch analyze(with: c) {
+                case .constant(let const):
+                    return const
+                case .nonConstant:
+                    break
+                case .evaluated:
+                    return nil
+                case .error(let message):
+                    return JpfError(message)
+                }
             }
             var count = 0
             if let lowerBoundary {
@@ -651,8 +760,17 @@ extension RangeLiteral : Compilable {
 }
 extension OrExpression : Compilable {
     func compile(with c: Compiler) -> JpfObject? {
-        if c.optimizeConstantsEnabled, let const = analyze(with: c) {
-            return const
+        if c.optimizeConstantsEnabled {
+            switch analyze(with: c) {
+            case .constant(let const):
+                return const
+            case .nonConstant:
+                break
+            case .evaluated:
+                return nil
+            case .error(_):
+                break
+            }
         }
         // 翻訳(コード出力)
         do {
