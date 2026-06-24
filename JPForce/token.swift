@@ -335,7 +335,7 @@ enum Token : Equatable {
         return d
     }()
     // MARK: - 左辺識別子を持つ述語
-    static let assignmentPredicates: Set<Token.Keyword> = [.ASSIGN, .PULL, .DUPLICATE]
+    static let assignmentPredicates: Set<Token.Keyword> = [.ASSIGN, .PULL, .DUPLICATE, .SET]
     var hasLhsIdentifier: Bool {Self.assignmentPredicates.contains {self.isKeyword($0)}}
     // MARK: - 助詞一覧とそのインデックス
     static let particles = Particle.allCases

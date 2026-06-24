@@ -61,7 +61,7 @@ extension Statement {
 }
 extension Expression {
     var isPredicate: Bool {false}
-    var isAssignment: Bool {hasKeyword(.ASSIGN)}
+    var isAssignment: Bool {hasKeyword(.ASSIGN) || hasKeyword(.SET)}
     func hasParticle(_ p: Token.Particle) -> Bool {false}
     var sentenceParticle: Token.Particle? {nil}
 }

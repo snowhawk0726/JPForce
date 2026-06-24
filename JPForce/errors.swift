@@ -36,7 +36,7 @@ let assignArrayUsage =      JpfError("仕様：〜(を)<配列>の位置<数値>
 let swapUsage =             JpfError("仕様：<識別子１>と<識別子２>を入れ替える。または、<識別子１>を<識別子２>と入れ替える。")
 let createUsage =           JpfError("仕様：(「<識別子>」を)(<引数>で)<型>から生成する。または、<型>から(<引数>で)「<識別子>」を生成する。")
 let createEnumeratorUsage = JpfError("仕様：(「<識別子>」を)<値>で<列挙型>から生成する。または、<列挙型>から<値>で「<識別子>」を生成する。")
-let setUsage =              JpfError("仕様：<値>(を)<オブジェクト>の要素「<識別子>」に設定する。または、<オブジェクト>の要素「<識別子>」に<値>を設定する。")
+let setUsage =              JpfError("仕様：<値>(を)<オブジェクト>の<識別子>に設定する。または、<オブジェクト>の<識別子>に<値>を設定する。")
 // MARK: - 共通エラー
 func undefinedIdentifier(_ ident: String) -> JpfError {
     JpfError("識別子『\(ident)』が定義されていません。")

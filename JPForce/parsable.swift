@@ -709,10 +709,10 @@ extension Parsable {
                 }
             }
             guard let genitive = exps[i] as? GenitiveExpression,
-                  let rightPhrase = genitive.right as? PhraseExpression,
-                  rightPhrase.hasParticle(.NI)  else {
-                continue
-            }
+                  let rightPhrase = genitive.right as? PhraseExpression
+            else { continue }
+            guard rightPhrase.hasParticle(.NI) || rightPhrase.hasParticle(.WO)
+            else { continue }
             // 分割候補を設定
             candidate = (i, PhraseExpression(token: Token(.NO), left: genitive.left), rightPhrase)
         }
@@ -723,10 +723,8 @@ extension Parsable {
         }
     }
     private func needToSplit(_ exps: [Expression], at i: Int) -> Bool {
-        // 代入する
-        guard let predicate = exps[i] as? PredicateExpression,
-              predicate.isAssignment
-        else {
+        // 代入(設定)する
+        guard exps[i].isAssignment else {
             return false
         }
         // 〜て → 複合要素代入なので、分割しない
@@ -870,23 +868,22 @@ extension Array where Element == Expression {
             .compactMap { $0.left as? Identifier }
             .first { $0.isLhsCandidate }
     }
-    /// 代入先が不変(immutable)かをチェック
+    /// 代入の対象があるかチェック
     /// - Returns:
-    ///     1. 「aのbに」で、aが識別子でない場合、true (immutable)
-    ///     2. 「aに」で、aが識別子でない場合、true (immutable)
-    var hasImmutableLhs: Bool {
+    ///     true: 「aのbに」「aのbを」「aに」
+    ///     false: その他
+    var hasAssignmentTarget: Bool {
         for (i, element) in self.enumerated() {
-            // 〜に
-            guard let lhsPhrase = element as? PhraseExpression,
-                  lhsPhrase.hasParticle(.NI) else {
+            guard let phrase = element as? PhraseExpression else {
                 continue
             }
-            // 〜の〜に
-            if i > 0, let genitivePhrase = self[i-1] as? PhraseExpression,
-               genitivePhrase.hasParticle(.NO) {
-                return !(genitivePhrase.left is Identifier)
+            if i > 0, let previous = self[i-1] as? PhraseExpression,
+               previous.hasParticle(.NO) {
+                return phrase.hasParticle(.NI) || phrase.hasParticle(.WO)
             }
-            return !(lhsPhrase.left is Identifier)
+            if phrase.hasParticle(.NI) {
+                return true
+            }
         }
         return false
     }

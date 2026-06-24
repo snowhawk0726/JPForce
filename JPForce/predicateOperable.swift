@@ -39,32 +39,31 @@ struct PredicateOperableFactory {
         (.PULL,         {PullOperator($0, by: Token(.PULL))}),
         (.PUSH,         {PushOperator($0, by: Token(.PUSH))}),
         (.ASSIGN,       {AssignOperator($0)}),                          // 20
-        (.SET,          {SetOperator($0, by: Token(.SET))}),
         (.SWAP,         {SwapOperator($0, by: Token(.SWAP))}),
         (.IDENTIFIERS,  {IdentifiersOperator($0, by: Token(.IDENTIFIERS))}),
         (.ADD,          {AddOperator($0)}),
-        (.MULTIPLY,     {MultiplyOperator($0, by: Token(.MULTIPLY))}),  // 25
-        (.SUBSTRACT,    {SubstractOperator($0, by: Token(.SUBSTRACT))}),
+        (.MULTIPLY,     {MultiplyOperator($0, by: Token(.MULTIPLY))}),
+        (.SUBSTRACT,    {SubstractOperator($0, by: Token(.SUBSTRACT))}),// 25
         (.DIVIDE,       {DivideOperator($0, by: Token(.DIVIDE))}),
         (.NEGATE,       {NegateOperator($0, by: Token(.NEGATE))}),
         (.LT,           {CompareOperator($0, by: Token(.LT))}),
-        (.GT,           {CompareOperator($0, by: Token(.GT))}),         // 30
-        (.EQUAL,        {BooleanOperator($0, by: Token(.EQUAL))}),
+        (.GT,           {CompareOperator($0, by: Token(.GT))}),
+        (.EQUAL,        {BooleanOperator($0, by: Token(.EQUAL))}),      // 30
         (.BE,           {BooleanOperator($0, by: Token(.BE))}),
         (.NOT,          {BooleanOperator($0, by: Token(.NOT))}),
         (.RETURN,       {ReturnOperator($0)}),
-        (.GOBACK,       {GobackOperator($0)}),                          // 35
-        (.BREAK,        {LoopControlOperator($0, by: Token(.BREAK))}),
+        (.GOBACK,       {GobackOperator($0)}),
+        (.BREAK,        {LoopControlOperator($0, by: Token(.BREAK))}),  // 35
         (.CONTINUE,     {LoopControlOperator($0, by: Token(.CONTINUE))}),
         (.MONO,         {UnwrapOperator($0, by: Token(.MONO))}),        // 〜たもの
         (.NULL,         {NullOperator($0)}),
-        (.EXECUTE,      {ExecuteOperator($0)}),                         // 40 (関数)を実行
-        (.CREATE,       {CreateOperator($0)}),                          // (型)から生成
+        (.EXECUTE,      {ExecuteOperator($0)}),                         // (関数)を実行
+        (.CREATE,       {CreateOperator($0)}),                          // 40 (型)から生成
         (.INITIALIZATION,   {InitializeOperator($0)}),
         (.SURU,         {PerformOperator($0)}),                         // 〜にする、〜をする
         (.AVAILABLE,    {AvailableOperator($0)}),
-        (.KOTO,         {NopOperator($0)}),                             // 45
-        (.IT,           {ItOperator($0)}),
+        (.KOTO,         {NopOperator($0)}),
+        (.IT,           {ItOperator($0)}),                              // 45
     ]
     static let dictionary: [Token.Keyword : (Environment) -> PredicateOperable] = {
         Dictionary(uniqueKeysWithValues: predicates.map {($0.keyword, $0.operator)})
@@ -751,37 +750,6 @@ struct AssignOperator : PredicateOperable {
             }
         }
         return assignUsage
-    }
-}
-/// オブジェクトの要素に値を設定する。
-/// <値>(を)<オブジェクト>の要素「<識別子>」に設定する。
-/// <オブジェクト>の要素「<識別子>」に<値>を設定する。
-/// <オブジェクト>の要素「<識別子>」を<値>に設定する。
-struct SetOperator : PredicateOperable {
-    init(_ environment: Environment, by op: Token) {self.environment = environment; self.op = op}
-    let environment: Environment, op: Token
-    func operate() -> JpfObject? {
-        if var params = environment.peek(3) {
-            switch (params[0].particle, params[1].particle, params[2].particle) {
-            case (Token(.NO),Token(.NI),Token(.WO)),    // 対象の要素「m」に値を設定
-                 (Token(.NO),Token(.WO),Token(.NI)):    // 対象の要素「m」を値に設定
-                params.swapAt(0, 1)
-                params.swapAt(0, 2)
-                fallthrough
-            case (Token(.WO),Token(.NO),Token(.NI)):    // 値を、対象の要素「m」に設定
-                guard let value = params[0].value, let object = params[1].value else {break}
-                guard let label = params[2].value?.name,
-                      label == Token.Keyword.MEMBER.rawValue else {break}
-                environment.remove(name: label)         // ラベル「要素」を削除
-                let result = object.assign(value, to: params[2].value)
-                guard !result.isError else {return result}
-                environment.drop(3)
-                return nil
-            default:
-                break
-            }
-        }
-        return setUsage
     }
 }
 struct AppendOperator : PredicateOperable {

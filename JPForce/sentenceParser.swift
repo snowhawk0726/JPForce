@@ -284,10 +284,17 @@ private extension ExpressionStatementParser {
     func buildSentence(from slice: [Expression]) -> Sentence? {
         guard let last = slice.last else {return nil}
         var slice = slice
-        if last.isAssignment && !slice.hasImmutableLhs {
-            return buildAssignmentSentence(
-                from: slice
-            )
+        if last.isAssignment {
+            if let target = slice.extractLhsIdentifier() {  // 単純代入
+                return buildAssignmentSentence(target: target, kind: .simple, with: slice)
+            } else
+            if let target = parser.leadingIdentifier {      // 複合代入
+                return buildAssignmentSentence(target: target, kind: .compound, with: slice)
+            }
+            guard slice.hasAssignmentTarget else {
+                error(message: "代入先が見つかりません。", at: last.sentenceToken)
+                return nil
+            }                                               // immutable代入
         }
         // sliceのLHS候補の確定処理
         if last.sentenceToken.hasLhsIdentifier {
@@ -311,34 +318,23 @@ private extension ExpressionStatementParser {
         )
     }
     /// 代入節構築
-    func buildAssignmentSentence(from slice: [Expression]) -> AssignmentSentence? {
+    func buildAssignmentSentence(target: Identifier, kind: AssignmentKind, with slice: [Expression]) -> AssignmentSentence? {
         guard let last = slice.last else {return nil}
-        // 左辺抽出
-        let lhs = slice.extractLhsIdentifier()
-        guard let target = lhs ?? parser.leadingIdentifier else {
-            error(message: "代入先が見つかりません。", at: last.sentenceToken)
-            return nil
-        }
-        // 種別決定
-        let kind: AssignmentKind = (lhs == nil) ? .compound : .simple
+        // 代入先属性設定(compoundの場合は、代入先は既存(代入前に評価される))
         if kind == .simple {
             target.isLhsCandidate = false
             target.isLhs = true
         }
         // 代入位置抽出(なければnil)
         let positionExpr = (kind == .compound) ? parser.leadingPosition : extractPosition(from: slice)
-        if let ident = positionExpr as? Identifier {
+        if let ident = positionExpr as? Identifier,
+           kind == .simple {
             ident.isLhsCandidate = false
             ident.isLhs = true
         }
         let position = positionExpr.map { PhraseExpression(token: Token(.NI), left: $0) }
-        // 右辺抽出(「〜を」または「〜」(格無し))
-        let rhs = slice.dropLast().first {
-            if let phrase = $0 as? PhraseExpression {
-                return phrase.hasParticle(.WO)
-            }
-            return true
-        }
+        // 右辺抽出
+        let rhs = getRhs(from: slice.dropLast())
 
         return AssignmentSentence(
             token: last.sentenceToken,
@@ -352,6 +348,7 @@ private extension ExpressionStatementParser {
     }
     func extractPosition(from slice: [Expression]) -> Expression? {
         // 要素代入「〜の〜に」である場合は、「〜に」の left を返す
+        // (「〜の〜を」も許容)
         var particleNo = false
         for exp in slice {
             guard let phrase = exp as? PhraseExpression else {
@@ -361,8 +358,33 @@ private extension ExpressionStatementParser {
                 particleNo = true
                 continue
             }
-            if particleNo, phrase.hasParticle(.NI) {
+            if particleNo,
+               phrase.hasParticle(.NI) || phrase.hasParticle(.WO) {
                 return phrase.left
+            }
+        }
+        return nil
+    }
+    /// 代入対象(〜を)を抽出する
+    func getRhs(from phrases: [Expression]) -> Expression? {
+        for (i, target) in phrases.enumerated() {
+            // 1. 〜、(〜の)〜に(代入)
+            guard let phrase = target as? PhraseExpression else {
+                return PhraseExpression(token: Token(.WO), left: target)
+            }
+            // 2. 〜を(〜の)〜に(代入)
+            // 3. 〜の〜に〜を(代入, 設定)
+            if phrase.hasParticle(.WO) {
+                if i == 0 { return phrase }
+                if i > 0, phrases[i-1].hasParticle(.NI) {
+                    return phrase
+                }
+            }
+            // 4. 〜の〜を〜に(設定)
+            if phrase.hasParticle(.NI) {
+                if i > 0, phrases[i-1].hasParticle(.WO) {
+                    return PhraseExpression(token: Token(.WO), left: phrase.left)
+                }
             }
         }
         return nil

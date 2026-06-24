@@ -136,7 +136,8 @@ extension JpfObject {
     var cannotReverse: String   {"「\(type)」は逆順にすることはできません。仕様：<配列、文字列>を逆順にする。"}
     var cannotAssign: String    {"「\(type)」に値を代入することはできません。"}
     var identifierNotAvailable: String  {"(識別子)は利用可能ではありません。"}
-    var arrayPositionError: String      {"指定位置が、配列内にありません。"}
+    var arrayPositionError: String      {"代入指定位置が、配列内にありません。"}
+    var arrayPositionIsNotNumber: String{"代入指定位置が、数値ではありません。"}
     var keyIsNotHashable: String        {"キーが、ハッシュ化可能な型ではありません。"}
     var identifierNotFound: String      {"指定した識別子名が見つかりません。"}
     var typeNotFound: String            {"型「\(type)」の定義が見つかりません。"}
@@ -413,9 +414,11 @@ extension JpfArray : ContainerProtocol {
         return JpfError(rangeFormatError)
     }
     func assign(_ value: JpfObject, to target: JpfObject?) -> JpfObject {
-        guard let position = target?.number,
-              case 0..<elements.count = position else {
-            return JpfError(arrayPositionError) + "位置：\(target?.string ?? "無し")"
+        guard let position = target?.number else {
+            return JpfError(arrayPositionIsNotNumber) + "(指定：\(target?.string ?? "無し"))"
+        }
+        guard case 0..<elements.count = position else {
+            return JpfError(arrayPositionError) + "(位置：\(target?.string ?? "無し"))"
         }
         var array = self
         array.elements[position] = value
