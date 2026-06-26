@@ -212,13 +212,12 @@ final class Environment {
         return false
     }
     var unwrappedPeek: JpfObject? {
-        if peek is JpfPhrase {return peek?.value}
-        return peek
+        peek?.value
     }
     var unwrappedValue: JpfObject? {
-        guard let phrase = peek as? JpfPhrase else {return nil}
+        guard let value = unwrappedPeek else {return nil}
         drop()
-        return phrase.value
+        return value
     }
     func getName(from object: JpfObject?) -> String {
         if let s = object?.value as? JpfString {

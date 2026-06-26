@@ -621,10 +621,10 @@ extension Parsable {
         guard let last = expressions.last else { return nil }
         if last.isPredicate {
             return SimpleSentence(
-                token: last.sentenceToken,
+                token: last.valueToken,
                 auxiliaryVerb: last.auxiliaryVerb,
                 arguments: expressions.dropLast(),
-                predicateKind: last.sentenceToken.isPredicate ? .builtin : .custom,
+                predicateKind: last.valueToken.isPredicate ? .builtin : .custom,
                 string: expressions.map { $0.string }.joined()
             )
         }

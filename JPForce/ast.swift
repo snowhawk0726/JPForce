@@ -22,7 +22,7 @@ protocol Statement : Node {
 }
 
 protocol Expression : Node {
-    var token: Token {get}
+    var token: Token {get}                  // 式の特徴を表すトークン(句の場合は格)
     var isPredicate: Bool {get}
     var isAssignment: Bool {get}
     var isTerminalCandidate: Bool {get}
@@ -30,20 +30,20 @@ protocol Expression : Node {
     var auxiliaryVerb: AuxiliaryVerb {get}
     func hasKeyword(_ k: Token.Keyword) -> Bool
     func hasParticle(_ p: Token.Particle) -> Bool
-    var sentenceToken: Token {get}
-    var sentenceParticle: Token.Particle? {get}
+    var valueToken: Token {get}             // 式の値を表すトークン
+    var particle: Token.Particle? {get}     // 式の格を表すトークン
     var isConjunction: Bool {get}
 }
 protocol Sentence : Statement {
-    var token: Token {get}
-    var firstToken: Token? {get}
+    var token: Token {get}                  // 節のトークン(主に述語)
+    var firstToken: Token? {get}            // 節の最初のトークン
     var auxiliaryVerb: AuxiliaryVerb {get}
     var terminality: SentenceTerminality { get }
     var baseString: String {get}
     var isIdentifierOnlySentence: Bool {get}
     var isTerminalConnector: Bool {get}
 }
-//
+// 要素valueを持つ式
 protocol ValueExpression : Expression, Equatable {
     associatedtype ValueType : Equatable
     var token: Token {get}
@@ -63,7 +63,8 @@ extension Expression {
     var isPredicate: Bool {false}
     var isAssignment: Bool {hasKeyword(.ASSIGN) || hasKeyword(.SET)}
     func hasParticle(_ p: Token.Particle) -> Bool {false}
-    var sentenceParticle: Token.Particle? {nil}
+    var valueToken: Token {token}
+    var particle: Token.Particle? {nil}
 }
 extension ValueExpression {
     var tokenLiteral: String {token.literal}

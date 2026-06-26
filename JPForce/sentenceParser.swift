@@ -114,7 +114,6 @@ extension ExpressionStatement {
 }
 // Expression(式)層
 extension Expression {
-    var sentenceToken: Token {token}
     var auxiliaryVerb: AuxiliaryVerb {.none}
     var isTerminalCandidate: Bool {false}
     var isConjunctiveForm: Bool {false}
@@ -150,11 +149,11 @@ extension Identifier {
 extension PhraseExpression {
     var isPredicate: Bool {(hasParticle(.TE) || hasParticle(.TA)) && left.isPredicate}
     var isTerminalCandidate: Bool {isConjunctiveForm}
-    var isConjunctiveForm: Bool {hasParticle(.TE)}
+    var isConjunctiveForm: Bool {hasParticle(.TE) || hasParticle(.TA)}
     var auxiliaryVerb: AuxiliaryVerb {left.auxiliaryVerb}
     func hasKeyword(_ k: Token.Keyword) -> Bool {left.hasKeyword(k)}
-    var sentenceToken: Token {left.sentenceToken}
-    var sentenceParticle: Token.Particle? {
+    var valueToken: Token {left.valueToken}
+    var particle: Token.Particle? {
         if case .particle(let p) = token.type {return p}
         return nil
     }
@@ -193,7 +192,7 @@ extension Token {
     }
     /// 文の区切りを打ち消すもの
     var isBoundaryCanceler: Bool {
-        [.keyword(.ASWELLAS)].contains(self)
+        [.keyword(.ASWELLAS), .keyword(.MONO)].contains(self)
     }
     /// 直前の句読点をキャンセルする語
     var isPuncuationCanceler: Bool {
@@ -263,7 +262,7 @@ private extension ExpressionStatementParser {
             if isSentenceBoundary(current: expr, next: next) {
                 slices.append(SentenceSlice(
                     expressions: current,
-                    trailingParticle: expr.sentenceParticle
+                    trailingParticle: expr.particle
                 ))
                 current = []
             }
@@ -278,7 +277,7 @@ private extension ExpressionStatementParser {
     }
     /// Sentenceの境界判定
     func isSentenceBoundary(current: Expression, next: Expression?) -> Bool {
-        return current.isTerminalCandidate && (next?.token.isBoundaryCanceler == false)
+        return current.isTerminalCandidate && (next?.valueToken.isBoundaryCanceler == false)
     }
     /// Sentence構築
     func buildSentence(from slice: [Expression]) -> Sentence? {
@@ -292,28 +291,28 @@ private extension ExpressionStatementParser {
                 return buildAssignmentSentence(target: target, kind: .compound, with: slice)
             }
             guard slice.hasAssignmentTarget else {
-                error(message: "代入先が見つかりません。", at: last.sentenceToken)
+                error(message: "代入先が見つかりません。", at: last.valueToken)
                 return nil
             }                                               // immutable代入
         }
         // sliceのLHS候補の確定処理
-        if last.sentenceToken.hasLhsIdentifier {
+        if last.valueToken.hasLhsIdentifier {
             slice.finalizeLhsCandidates()
         } else {
             slice.clearLhsCandidates()
         }
         if last.isPredicate {
             return SimpleSentence(
-                token: last.sentenceToken,
+                token: last.valueToken,
                 auxiliaryVerb: last.auxiliaryVerb,
                 arguments: slice.dropLast(),
-                predicateKind: last.sentenceToken.isPredicate ? .builtin : .custom,
+                predicateKind: last.valueToken.isPredicate ? .builtin : .custom,
                 string: slice.toStringWithComma
             )
         }
         // 述語が無い文
         return ExpressionStatement(
-            token: last.sentenceToken,
+            token: last.valueToken,
             expressions: slice
         )
     }
@@ -337,7 +336,7 @@ private extension ExpressionStatementParser {
         let rhs = getRhs(from: slice.dropLast())
 
         return AssignmentSentence(
-            token: last.sentenceToken,
+            token: last.valueToken,
             auxiliaryVerb: last.auxiliaryVerb,
             kind: kind,
             target: target,
