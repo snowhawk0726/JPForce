@@ -693,8 +693,6 @@ struct AvailableOperator : PredicateOperable {
 /// <列挙子>に<値>を代入 (<値>を<列挙子>に代入)
 /// 3. 識別子に代入(引数２)
 /// <識別子>に<値>を代入 (<値>を<識別子>に代入)
-/// 4.識別子に計算して代入(引数１)
-/// <識別子>(に)<計算し>て代入
 struct AssignOperator : PredicateOperable {
     init(_ environment: Environment) {self.environment = environment}
     let environment: Environment
@@ -706,14 +704,21 @@ struct AssignOperator : PredicateOperable {
                 params.swapAt(0, 2)
                 fallthrough
             case (Token(.WO),Token(.NO),Token(.NI)), (nil,Token(.NO),Token(.NI)):
-                guard let value = params[0].value,
-                      let object = params[1].value else {break}
-                let result = object.assign(value, to: params[2].value)
-                guard !result.isError else {return result}
+                guard let value = params[0].value,  // 代入値
+                      let object = params[1].value  // 代入対象
+                else {break}
+                let position: JpfObject             // 代入位置
+                switch params[2].value {
+                case let ident as JpfIdentifier:    // 識別子 → 値 / 指定子
+                    position = environment.resolvedValue(for: ident) ?? ident
+                case let value?:                    // 値
+                    position = value
+                default:
+                    return assignUsage
+                }
+                let result = object.assign(value, to: position)
                 environment.drop(3)
-                guard let name = params[1].value?.name,     // 代入対象の識別子を得る。
-                      !name.isEmpty else {return result}    // 代入した結果を返す。
-                return environment.assign(result, with: name)// 結果をさらに識別子に代入する。
+                return result                       // 代入した結果を返す。
             default:
                 break
             }
@@ -725,28 +730,14 @@ struct AssignOperator : PredicateOperable {
                 fallthrough
             case (Token(.WO),Token(.NI)), (nil,Token(.NI)):
                 guard let value = params[0].value else {break}
-                if let enumerator = params[1].value as? JpfEnumerator { // 列挙子に代入
-                    environment.drop(2)
-                    return JpfEnumerator(type: enumerator.type, name: enumerator.name, identifier: enumerator.identifier, rawValue: value)  // 列挙子に値を代入し返す。
-                }
-                let name = environment.getName(from: params[1])
-                guard !name.isEmpty else {
-                    return cannotAssignToIdentifier(params[1].value)
+                // 列挙子に代入
+                guard let enumerator = params[1].value as? JpfEnumerator else {
+                    return assignUsage
                 }
                 environment.drop(2)
-                return environment.assign(value, with: params[1].value) // 識別子に値を代入
+                return JpfEnumerator(type: enumerator.type, name: enumerator.name, identifier: enumerator.identifier, rawValue: value)  // 列挙子に値を代入し返す。
             default:
                 break
-            }
-        }
-        if let param = environment.peek {           // 計算して代入
-            guard param.value?.name != "" else {return compoundAssignUsage}
-            if let value = param.value,
-               param.particle == .particle(.TE) {   // 助詞「て」
-                environment.drop()
-                return environment.assign(value, with: value.name)  // 識別子に計算した値を代入
-            } else {
-                return compoundAssignUsage
             }
         }
         return assignUsage
@@ -756,25 +747,31 @@ struct AppendOperator : PredicateOperable {
     init(_ environment: Environment, by op: Token) {self.environment = environment; self.op = op}
     let environment: Environment, op: Token
     func operate() -> JpfObject? {
-        if let operands = environment.peek(3),
-           let appended = appendedDictionary(with: operands) {
-            return appended
+        if let operands = environment.peek(3) {
+            if let result = appendPairToDictionary(with: operands) {
+                return result
+            }
+            if let result = insertValueToArray(with: operands) {
+                return result
+            }
         }   // 入力が３でニ格が辞書でない場合は、以下を試す。
-        guard let params = environment.peek(2) else {return "「\(op.literal) 」" + twoParamsNeeded + appendUsage}
-        return appendedArrayOrDictionary(with: (params[0], params[1]))
+        if let params = environment.peek(2) {
+            return appendElementToContainer(with: (params[0], params[1]))
+        }
+        return "「\(op.literal) 」" + twoParamsNeeded + appendUsage
     }
     /// 「要素を配列に追加する」または「配列(に)要素を追加する」
     /// 「辞書を辞書に追加する」または「辞書(に)辞書を追加する」(キーが重複した場合、上書きされる)
     /// - Parameter pair: ２つの入力(句または値)
     /// - Returns: 追加した配列または辞書を返す。形式が合わない場合は、使い方をエラーとして返す。
-    private func appendedArrayOrDictionary(with pair: (first: JpfObject, second: JpfObject)) -> JpfObject? {
+    private func appendElementToContainer(with pair: (first: JpfObject, second: JpfObject)) -> JpfObject? {
         var first = pair.first, second = pair.second
         switch (first.particle, second.particle) {
         case (.particle(.NI),.particle(.WO)),(nil,.particle(.WO)):
             swap(&first, &second)
             fallthrough
         case (.particle(.WO),.particle(.NI)),(nil,.particle(.NI)):
-            switch second.value {
+            switch environment.resolvedValue(for: second.value) {
             case var array as JpfArray:
                 environment.drop(2)
                 first.value.map {array.elements.append($0)}
@@ -796,14 +793,15 @@ struct AppendOperator : PredicateOperable {
     /// - Parameter operands: ３つの入力(句または値)
     /// - Returns: 追加した辞書を返す。形式が合わない場合は、使い方をエラーとして返す。
     ///            ただし、ニ格の句が辞書でない場合は、nilを返す。
-    private func appendedDictionary(with operands: [JpfObject]) -> JpfObject? {
+    private func appendPairToDictionary(with operands: [JpfObject]) -> JpfObject? {
         var particles: [Token.Particle: JpfObject?] = [.GA: operands[0].value, .WO: operands[1].value, .NI: operands[2].value]
         switch (operands[0].particle, operands[1].particle, operands[2].particle) {
         case (.particle(.NI),.particle(.GA),.particle(.WO)),(nil,.particle(.GA),.particle(.WO)):
             particles[.NI] = operands[0].value; particles[.GA] = operands[1].value; particles[.WO] = operands[2].value
             fallthrough
         case (.particle(.GA),.particle(.WO),.particle(.NI)),(.particle(.GA),nil,.particle(.NI)):
-            guard var dictioncary = particles[.NI] as? JpfDictionary else {return nil}
+            guard let obj = particles[.NI],
+                  var dictioncary = resolveDictionary(for: obj, with: environment) else {return nil}
             guard let key = particles[.GA] as? JpfObject, let value = particles[.WO] as? JpfObject else {break}
             environment.drop(3)
             dictioncary[key] = value
@@ -812,6 +810,50 @@ struct AppendOperator : PredicateOperable {
             return nil
         }
         return appendDictionaryUsage
+    }
+    private func resolveDictionary(for obj: JpfObject?, with env: Environment) -> JpfDictionary? {
+        if let ident = obj as? JpfIdentifier {
+            return env.resolvedValue(for: ident) as? JpfDictionary
+        }
+        return obj as? JpfDictionary
+    }
+    /// 「要素を配列の位置に追加する」または「配列の位置に要素を追加する」
+    /// - Parameter operands: ３つの入力(句または値)
+    /// - Returns: 追加した配列を返す。形式が合わない場合は、使い方をエラーとして返す。
+    private func insertValueToArray(with operands: [JpfObject]) -> JpfObject? {
+        let particles = (operands[0].particle, operands[1].particle, operands[2].particle)
+        var values = [operands[0].value, operands[1].value, operands[2].value]
+        switch particles {
+        case (.particle(.WO), .particle(.NO), .particle(.NI)),
+            (nil, .particle(.NO), .particle(.NI)):
+            values.swapAt(0,1)
+            values.swapAt(1,2)
+            fallthrough
+        case (.particle(.NO), .particle(.NI), .particle(.WO)):
+            guard let array = resolveArray(for: values[0], with: environment),
+                  let position = resolvePosition(for: values[1], with: environment),
+                  let value = values[2]
+            else {
+                return arrayInsertUsage
+            }
+            environment.drop(3)
+            return array.insert(value, at: position)
+        default:
+            return nil
+        }
+    }
+    private func resolveArray(for obj: JpfObject?, with env: Environment) -> JpfArray? {
+        if let ident = obj as? JpfIdentifier {
+            return env.resolvedValue(for: ident) as? JpfArray
+        }
+        return obj as? JpfArray
+    }
+    private func resolvePosition(for obj: JpfObject?, with env: Environment) -> JpfObject? {
+        if let ident = obj as? JpfIdentifier,
+           let value = env.resolvedValue(for: ident) {
+            return value
+        }
+        return obj
     }
 }
 struct RemoveOperator : PredicateOperable {

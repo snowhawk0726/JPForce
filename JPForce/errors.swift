@@ -18,6 +18,7 @@ let beUsage =               JpfError("仕様：(〜が)〜である。または�
 let notUsage =              JpfError("仕様：(〜が)〜で(は)ない。または、(〜は)〜で(は)ない。")
 let returnValueUsage =      JpfError("仕様：(〜を)返す。")
 let appendUsage =           JpfError("仕様：〜(を)〜に追加する。または、〜(に)〜を追加する。")
+let arrayInsertUsage =      JpfError("仕様：〜(を)<配列>の〜に追加する。または、<配列>の〜に〜を追加する。")
 let appendDictionaryUsage = JpfError("仕様：〜が〜(を)〜に追加する。または、〜(に)〜が〜を追加する。")
 let removeUsage =           JpfError("仕様：(〜から)〜を削除する。")
 let rangeCheckUsage =       JpfError("仕様：<数値>が範囲【<範囲式>】に")

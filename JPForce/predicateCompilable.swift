@@ -264,17 +264,17 @@ private extension AssignOperationCompiler {
     }
     /// .ASSIGNに渡す引数を順番に出力(翻訳済みの引数はnil)
     private func emitCollectionAssignmentWithOrder(value: JpfObject?, collection: JpfObject?, key: JpfObject?) throws {
-        if key == nil {
+        guard let key else {
             throw assignKeyNotFound(of: collection?.value?.string)
         }
         if collection == nil {
-            try key?.emit(with: compiler)       // <キー>に
+            try key.emit(with: compiler)        // <キー>に
             try value?.emit(with: compiler)     // <値>を
             return
         }
         try value?.emit(with: compiler)         // <値>を
         try collection?.emit(with: compiler)    // <コレクション>の
-        try key?.emit(with: compiler)           // <キー>に
+        try key.emit(with: compiler)            // <キー>に
     }
     func emitAssignment() throws {              // 引数が翻訳済みの場合の代入
         _ = compiler.emit(predicate: .ASSIGN)   // 代入する

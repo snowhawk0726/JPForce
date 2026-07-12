@@ -179,6 +179,7 @@ extension LoopExpression {
 extension GenitiveExpression {
     var isTerminalCandidate: Bool {right.isTerminalCandidate}
     var isConjunctiveForm: Bool {right.isConjunctiveForm}
+    var particle: Token.Particle? {right.particle}
 }
 extension PropertyExpression {
     var isTerminalCandidate: Bool {true}
@@ -282,28 +283,32 @@ private extension ExpressionStatementParser {
     /// Sentence構築
     func buildSentence(from slice: [Expression]) -> Sentence? {
         guard let last = slice.last else {return nil}
+        var lastToken = last.valueToken
         var slice = slice
         if last.isAssignment {
             if let target = slice.extractLhsIdentifier() {  // 単純代入
                 return buildAssignmentSentence(target: target, kind: .simple, with: slice)
-            } else
-            if let target = parser.leadingIdentifier {      // 複合代入
+            }
+            if slice.count == 1,                            // 前文は「て」で分割済み
+               let target = parser.leadingIdentifier {      // 複合代入
                 return buildAssignmentSentence(target: target, kind: .compound, with: slice)
             }
             guard slice.hasAssignmentTarget else {
                 error(message: "代入先が見つかりません。", at: last.valueToken)
                 return nil
             }                                               // immutable代入
+            lastToken = Token(.ASSIGN)                      // 述語を「代入」に正規化
         }
+        // immutableな代入(設定は代入に正規化)
         // sliceのLHS候補の確定処理
-        if last.valueToken.hasLhsIdentifier {
+        if lastToken.hasLhsIdentifier {
             slice.finalizeLhsCandidates()
         } else {
             slice.clearLhsCandidates()
         }
         if last.isPredicate {
             return SimpleSentence(
-                token: last.valueToken,
+                token: lastToken,
                 auxiliaryVerb: last.auxiliaryVerb,
                 arguments: slice.dropLast(),
                 predicateKind: last.valueToken.isPredicate ? .builtin : .custom,
@@ -312,7 +317,7 @@ private extension ExpressionStatementParser {
         }
         // 述語が無い文
         return ExpressionStatement(
-            token: last.valueToken,
+            token: lastToken,
             expressions: slice
         )
     }
@@ -339,9 +344,9 @@ private extension ExpressionStatementParser {
             token: last.valueToken,
             auxiliaryVerb: last.auxiliaryVerb,
             kind: kind,
-            target: target,
-            position: position,
-            rhs: rhs,
+            referent: target,
+            attribute: position,
+            value: rhs,
             string: slice.toStringWithComma
         )
     }
@@ -407,9 +412,9 @@ private extension ExpressionStatementParser {
             let assignSentence = AssignmentSentence(
                 token: genitive.token,
                 kind: .simple,
-                target: target,
-                position: position,
-                rhs: nil,
+                         referent: target,
+                attribute: position,
+                value: nil,
                 string: genitive.string
             )
             sentences.append(assignSentence)
@@ -527,7 +532,7 @@ private extension ExpressionStatementParser {
             return
         }
         if assignment.kind == .simple {
-            error(message: "複合代入文では、代入先は文頭で指定します。", at: assignment.target.token)
+            error(message: "複合代入文では、代入先は文頭で指定します。", at: assignment.referent.token)
             return
         }
         if sentences.dropLast().contains(where: {$0 is AssignmentSentence}) {

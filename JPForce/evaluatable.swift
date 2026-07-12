@@ -104,7 +104,7 @@ extension Program : Evaluatable {
 extension ExpressionStatement : Evaluatable {
     func evaluate(with environment: Environment) -> JpfObject? {
         defer {environment.remove(name: Environment.OUTER)}
-        expressions.finalizeLhsCandidates() // TODO: parseSentenceに移行後削除予定
+        expressions.finalizeLhsCandidates()
         return expressions.evaluate(with: environment)
     }
 }
@@ -276,9 +276,9 @@ extension SentencePredicateKind {
 }
 extension AssignmentSentence : Evaluatable {
     func evaluate(with environment: Environment) -> JpfObject? {
-        var rhs: JpfObject
+        let rhs: JpfObject
         // 右辺評価
-        if let result = self.rhs?.evaluate(with: environment), let value = result.value {
+        if let result = self.value?.evaluate(with: environment), let value = result.value {
             if result.isError {return result}
             rhs = value
         } else
@@ -288,23 +288,75 @@ extension AssignmentSentence : Evaluatable {
         } else {
             return assignUsage              // 右辺が無い
         }
+        // 単純代入
+        guard let attribute else {
+            do {
+                try environment.assign(ident: referent, value: rhs)
+                return nil
+            } catch {
+                return jpfError(from: error)
+            }
+        }
+        // 設定/代入チェック
+        if let object = environment.value(for: referent),
+           object is JpfInstance || object is JpfType {
+            // 設定
+            if let error = set(rhs, to: attribute, of: object, with: environment) {
+                return error
+            }
+        } else
+        // 代入
+        if let error = assign(rhs, to: attribute, with: environment) {
+            return error
+        }
+        return nil
+    }
+}
+private extension AssignmentSentence {
+    func assign(_ value: JpfObject, to exp: Expression, with env: Environment) -> JpfError? {
+        var value = value
         // 代入位置評価
-        if let result = self.position?.evaluate(with: environment), let position = result.value {
-            if result.isError {return result}
-            guard let container = environment.get(target: target) else {
+        if let position = resolvePosition(from: exp, with: env) {
+            if position.isError {return position.error}
+            guard let container = env.value(for: referent) else {
                 return assignUsage
             }
-            // 要素代入
-            rhs = container.assign(rhs, to: position)
-            if rhs.isError {return rhs}
+            // 要素代入(代入結果をvalueとする)
+            value = container.assign(value, to: position)
+            if value.isError {return value.error}
         }
         // 値代入
         do {
-            try environment.assign(target: target, value: rhs)
+            try env.assign(ident: referent, value: value)
             return nil
         } catch {
             return jpfError(from: error)
         }
+    }
+    func resolvePosition(from exp: Expression?, with env: Environment) -> JpfObject? {
+        guard let phrase = exp as? PhraseExpression else {
+            return exp?.evaluate(with: env)
+        }
+        if let ident = phrase.left as? Identifier,  // 変数
+           let value = env.value(for: ident) {      // 値を辞書から取得
+            return value
+        }   // 辞書になければ指定子(JpfIdentifier)を返す
+        return phrase.left.evaluate(with: env)
+    }
+    func set(_ value: JpfObject, to exp: Expression, of obj: JpfObject, with env: Environment) -> JpfError? {
+        // 代入対象(メンバー)を特定
+        guard let phrase = exp as? PhraseExpression,
+              let ident = phrase.left as? Identifier,
+              let member = ident.evaluate(with: env)
+        else {
+            return setUsage
+        }
+        if member.isError {return member.error}
+        // インスタンス・型のメンバーに値を代入(または算出)
+        let result = obj.assign(value, to: member)
+        if result.isError {return result.error}
+        //
+        return nil
     }
 }
 // MARK: Expression evaluators
@@ -369,6 +421,13 @@ extension Identifier : Evaluatable {
     /// - 返すオブジェクトが算出で実行可であれば、取得(getter)を呼び出す。
     func evaluate(with env: Environment) -> JpfObject? {
         var object: JpfObject? = nil
+        if isLhs {                                                              // 左辺値オブジェクトを返す。
+            let object = JpfIdentifier(from: self, isLhs: true)
+            if isOuter {
+                env.append(object, to: Environment.OUTER)
+            }
+            return object
+        }
         if let o = getProperty(name: value, from: env, check: true) {           // 「ノ格」による属性アクセス
             object = o
         } else {
@@ -380,13 +439,6 @@ extension Identifier : Evaluatable {
             } else
             if let o = getProperty(name: value, from: env) {                    // 属性を取得
                 object = o
-            } else
-            if isLhs {                                                          // 左辺値オブジェクトを返す。
-                let object = JpfIdentifier(from: self)                          // TODO: Sentence方式移行後削除
-                if isOuter {
-                    env.append(object, to: Environment.OUTER)
-                }
-                return object
             } else {
                 return undefinedError
             }
@@ -941,15 +993,6 @@ extension GenitiveExpression : Evaluatable {
     func evaluate(with environment: Environment) -> (any JpfObject)? {
         guard let object = left.evaluate(with: environment) ?? environment.pull() else {return nil}
         guard !object.isError else {return object}
-        if let phrase = right as? PhraseExpression, phrase.hasParticle(.WA) {
-            // 代入文の処理
-            if let result = value?.evaluate(with: environment), result.isError {return result}
-            guard let value = environment.pull() else {return nil}      // 値をスタックから取得
-            let element = getElement(from: phrase.left, with: environment)
-            let result = object.assign(value, to: element)              // 値を要素に代入
-            guard !result.isError else {return result}
-            return environment.assign(result, with: object.name)        // 結果を辞書に登録
-        }
         return evaluate(object, self.right, with: environment)
     }
     /// 属格の右を確認し、<object>の<right>を処理する。
@@ -959,12 +1002,14 @@ extension GenitiveExpression : Evaluatable {
     /// - Parameter environment: 入力の環境
     /// - Returns: 評価結果
     private func evaluate(_ object: JpfObject, _ right: Expression, with environment: Environment) -> JpfObject? {
-        var accessor: JpfObject? = nil
+        var accessor: JpfObject
         let phrase = JpfPhrase(name: object.name, value: object, particle: token)
         switch right {
         case let ident as Identifier:
             if let err = environment.push(phrase) {return err}
-            accessor = ident.evaluate(with: environment)
+            guard let result = ident.evaluate(with: environment) else {return nil}
+            if result.isError {return result}
+            accessor = result
             if environment.peek?.name == object.name && environment.isPeekParticle(.NO) {
                 environment.drop()
             } else {                // objectをsubsciptでアクセス済み
@@ -983,9 +1028,11 @@ extension GenitiveExpression : Evaluatable {
             if let err = environment.push(phrase) {return err}
             return right.evaluate(with: environment)
         default:
-            accessor = right.evaluate(with: environment)
+            guard let result = right.evaluate(with: environment) else {return nil}
+            if result.isError {return result}
+            accessor = result
         }
-        return object.accesse(by: accessor!, with: environment)
+        return object.accesse(by: accessor, with: environment)
     }
     /// オブジェクトの要素を取り出す。
     /// - Parameters:

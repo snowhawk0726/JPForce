@@ -587,7 +587,7 @@ final class ParserTests: XCTestCase {
                 try testPhraseExpression(initStmt.sentences[0].arguments[1], with: "yを")
                 try testKeywordLiteral(initStmt.sentences[0].predicate, "足し")
                 let assignment = try XCTUnwrap(initStmt.sentences[1] as? AssignmentSentence)
-                try testIdentifier(assignment.target, value: "z")
+                try testIdentifier(assignment.referent, value: "z")
                 try testDefineStatement(typeLiteral.body?.statements.first, target: "a", with: 1)
                 print("テスト修了：\(statement.string)")
                 continue

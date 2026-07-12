@@ -124,6 +124,7 @@ extension JpfObject {
     var cannotCount: String     {"\(type)型の要素の数は、数えることができません。"}
     var cannotAdd: String       {"を足すことはできません。"}
     var cannotRemove: String    {"を削除することはできません。"}
+    var removeTargetNotFound: String{"削除しようとする対象が見つかりません。"}
     var cannotCompare: String   {"を比較することはできません。"}
     var cannotCountRange: String{"「範囲」の上下限が数値でないため、数えることができません。"}
     var rangeFormatError: String{"「範囲」の形式が間違っています。"}
@@ -136,8 +137,8 @@ extension JpfObject {
     var cannotReverse: String   {"「\(type)」は逆順にすることはできません。仕様：<配列、文字列>を逆順にする。"}
     var cannotAssign: String    {"「\(type)」に値を代入することはできません。"}
     var identifierNotAvailable: String  {"(識別子)は利用可能ではありません。"}
-    var arrayPositionError: String      {"代入指定位置が、配列内にありません。"}
-    var arrayPositionIsNotNumber: String{"代入指定位置が、数値ではありません。"}
+    var arrayPositionError: String      {"指定位置が、配列内にありません。"}
+    var arrayPositionIsNotNumber: String{"指定位置が、数値ではありません。"}
     var keyIsNotHashable: String        {"キーが、ハッシュ化可能な型ではありません。"}
     var identifierNotFound: String      {"指定した識別子名が見つかりません。"}
     var typeNotFound: String            {"型「\(type)」の定義が見つかりません。"}
@@ -414,34 +415,76 @@ extension JpfArray : ContainerProtocol {
         return JpfError(rangeFormatError)
     }
     func assign(_ value: JpfObject, to target: JpfObject?) -> JpfObject {
-        guard let position = target?.number else {
-            return JpfError(arrayPositionIsNotNumber) + "(指定：\(target?.string ?? "無し"))"
-        }
-        guard case 0..<elements.count = position else {
-            return JpfError(arrayPositionError) + "(位置：\(target?.string ?? "無し"))"
-        }
         var array = self
-        array.elements[position] = value
-        return array
-    }
-    func remove(_ object: JpfObject) -> JpfObject {
-        var objects = elements
-        let error = JpfError("「\(type)」から「\(object.string)」" + cannotRemove)
-        if let index = object.number {
-            guard case 0..<elements.count = index else {return self}
-            objects.remove(at: index)
-        } else
-        if let target = object.value as? JpfString {
-            switch target.value {
-            case "最初", "先頭":    objects.removeFirst()
-            case "最後", "後尾":    objects.removeLast()
-            case "全て":          objects.removeAll()
-            default:            return error
+        do {
+            guard let position = try getNumber(of: target) else {
+                return JpfError(arrayPositionError) + "(位置：\(target?.string ?? "無し"))"
             }
-        } else {
-            return error
+            array.elements[position] = value
+            return array
+        } catch {
+            return jpfError(from: error)
+        }
+    }
+    func insert(_ value: JpfObject, at target: JpfObject?) -> JpfObject {
+        var array = self
+        do {
+            guard let position = try getNumber(of: target) else {
+                return self
+            }
+            array.elements.insert(value, at: position)
+            return array
+        } catch {
+            return jpfError(from: error)
+        }
+    }
+    func remove(_ target: JpfObject) -> JpfObject {
+        var objects = elements
+        do {
+            // TODO: 指定子をJpfStringでなくJpfIdentifierにする
+            if let specifier = getSpecifier(from: target.value),
+               specifier == "全て" {
+                objects.removeAll()
+            } else
+            if let index = try getNumber(of: target) {
+                objects.remove(at: index)
+            } else {    // 削除できない場合
+                return self
+            }
+        } catch {
+            return jpfError(from: error)
         }
         return JpfArray(name: self.name, elements: objects)
+    }
+    /// 指定位置を数値として返す
+    /// - Parameter obj: 指定オブジェクト(正しくない場合は、エラーを投げる)
+    /// - Returns: 指定位置(範囲外はnilを返す)
+    private func getNumber(of obj: JpfObject?) throws -> Int? {
+        // TODO: 指定子をJpfStringでなくJpfIdentifierにする
+        if let specifier = getSpecifier(from: obj?.value) {
+            switch specifier {
+            case "最初", "先頭":    return 0
+            case "最後", "後尾":    return elements.count - 1
+            default:
+                break
+            }
+        }
+        guard let position = obj?.number else {
+            throw JpfError(arrayPositionIsNotNumber) + "(指定：\(obj?.string ?? "無し"))"
+        }
+        guard case 0..<elements.count = position else {
+            return nil
+        }
+        return position
+    }
+    private func getSpecifier(from value: JpfObject?) -> String? {
+        if let ident = value as? JpfIdentifier {
+            return ident.value
+        }
+        if let stirng = value as? JpfString {
+            return stirng.value
+        }
+        return nil
     }
     func contains(_ object: JpfObject) -> JpfObject {
         return JpfBoolean.object(of: elements.contains {
@@ -669,7 +712,8 @@ extension JpfInstance {
         return getProperty(by: name, with: particle)
     }
     func assign(_ value: JpfObject, to target: JpfObject?) -> JpfObject {
-        assign(value, to: target, with: environment)
+        guard availableMembers.contains(target?.name ?? "") else {return JpfError(identifierNotAvailable)}
+        return assign(value, to: target, with: environment)
     }
     private func pushParameters(_ objects: [JpfObject]) {
         if environment.push(objects) != nil {return}

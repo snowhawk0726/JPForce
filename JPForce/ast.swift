@@ -269,23 +269,23 @@ final class AssignmentSentence : Sentence {
     let token: Token                // 代入
     let auxiliaryVerb: AuxiliaryVerb
     let kind: AssignmentKind
-    let target: Identifier          // 左辺
-    let position: Expression?       // 代入要素位置
-    let rhs: Expression?            // 右辺
+    let referent: Identifier        // 左辺(対象)
+    let attribute: Expression?      // 要素/位置(対象の属性)
+    let value: Expression?          // 右辺(値)
     init(token: Token,
          auxiliaryVerb: AuxiliaryVerb = .none,
          kind: AssignmentKind,
-         target: Identifier,
-         position: Expression?,
-         rhs: Expression?,
+         referent: Identifier,
+         attribute: Expression?,
+         value: Expression?,
          string: String
     ) {
         self.token = token
         self.auxiliaryVerb = auxiliaryVerb
         self.kind = kind
-        self.target = target
-        self.position = position
-        self.rhs = rhs
+        self.referent = referent
+        self.attribute = attribute
+        self.value = value
         self.baseString = string
     }
     //

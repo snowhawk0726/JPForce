@@ -134,13 +134,15 @@ struct JpfIdentifier : JpfObject {
     var value: String       // 登録名
     var symbol: Symbol?     // 登録シンボル
     var isLhs: Bool = false // 左辺オブジェクト
+    var isOuter: Bool = false
     //
     var string: String {value.color(.cyan)}
     // インタープリタ用
-    init(from ident: Identifier) {
+    init(from ident: Identifier, isLhs: Bool = false) {
         self.name = ident.value
         self.value = ident.value
-        self.isLhs = ident.isLhs
+        self.isOuter = ident.isOuter
+        self.isLhs = isLhs
     }
 }
 struct RangeBoundary {

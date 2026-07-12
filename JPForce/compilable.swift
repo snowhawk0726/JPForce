@@ -90,7 +90,7 @@ extension Program : Compilable {
 }
 extension ExpressionStatement : Compilable {
     func compile(with c: Compiler) -> JpfObject? {
-        expressions.finalizeLhsCandidates() // TODO: parseSentenceに移行後削除予定
+        expressions.finalizeLhsCandidates()
         if let exit = expressions.compile(with: c) {
             return exit
         }
@@ -219,10 +219,10 @@ extension AssignmentSentence : Compilable {
         if c.optimizeConstantsEnabled {
             switch analyze(with: c) {
             case .evaluated:
-                guard let const = c.environment[target.value] else {
+                guard let const = c.environment[referent.value] else {
                     break
                 }
-                _ = c.symbolTable.define(target.value, kind: const.symbolKind)
+                _ = c.symbolTable.define(referent.value, kind: const.symbolKind)
                 return nil
             case .error(let message):
                 return JpfError(message)
@@ -232,18 +232,18 @@ extension AssignmentSentence : Compilable {
         }
         do {
             // 右辺の翻訳・出力
-            if let value = (rhs as? PhraseExpression)?.left ?? rhs {
+            if let value = (self.value as? PhraseExpression)?.left ?? self.value {
                 if let result = value.compile(with: c) {
                     if result.isError { return result }
                     try result.emit(with: c)
                 }
             }
-            // 代入位置の翻訳
-            if let position {
-                let ident = try JpfIdentifier(ensuring: target, with: c)
+            // 位置/要素の翻訳
+            if let attribute {
+                let ident = try JpfIdentifier(ensuring: referent, with: c)
                 try ident.emit(with: c)
                 _ = c.emit(particle: .NO)
-                if let result = position.compile(with: c) {
+                if let result = attribute.compile(with: c) {
                     if result.isError { return result }
                     try result.emit(with: c)
                 }
@@ -251,7 +251,7 @@ extension AssignmentSentence : Compilable {
                 _ = c.emit(predicate: .ASSIGN)
             }
             // 左辺の出力(値代入)
-            let ident = try JpfIdentifier(ensuring: target, with: c)
+            let ident = try JpfIdentifier(ensuring: referent, with: c)
             try ident.emitOpSet(with: c)
         } catch {
             return jpfError(from: error)

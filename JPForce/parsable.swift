@@ -652,14 +652,14 @@ extension Parsable {
             }
             expressions.append(expression)
             // Existing LHS semantics
-            if expression.isAssignment {
+            if expression.valueToken.isElementAssign {
                 splitElementAssignmentTarget(in: &expressions, from: semanticStartIndex)
-                expressions.markLhsCandidates(from: semanticStartIndex)
-                semanticStartIndex = expressions.count
-            } else if isLhsAssignPredicate(expression) {
+            }
+            if isLhsAssignPredicate(expression) {
                 expressions.markLhsCandidates(from: semanticStartIndex)
                 semanticStartIndex = expressions.count
             }
+            //
             _ = getNext(whenNextIs: .COMMA)     // 読点を読み飛ばし、
             // Stop on next end-of-statement signals or stopWhen condition
             if getNextWhenNextIsEndOfStatement || currentToken.isBreakFactor { break }
@@ -698,14 +698,16 @@ extension Parsable {
         from startIndex: Int
     ) {
         // 分割候補
-        var candidate: (index: Int, left: PhraseExpression, right: PhraseExpression)? = nil
+        var candidates: [(index: Int, left: PhraseExpression, right: PhraseExpression)] = []
+        var isAssignment: Bool = false
         for i in startIndex..<exps.count {
-            if candidate != nil,
-               exps[i] is PredicateExpression {
+            if !candidates.isEmpty,
+               let predicate = exps[i] as? PredicateExpression {
+                isAssignment = predicate.hasKeyword(.ASSIGN)
                 if needToSplit(exps, at: i) {
                     break
                 } else {
-                    candidate = nil // 分割候補をキャンセル
+                    candidates = [] // 分割候補をキャンセル
                 }
             }
             guard let genitive = exps[i] as? GenitiveExpression,
@@ -714,17 +716,25 @@ extension Parsable {
             guard rightPhrase.hasParticle(.NI) || rightPhrase.hasParticle(.WO)
             else { continue }
             // 分割候補を設定
-            candidate = (i, PhraseExpression(token: Token(.NO), left: genitive.left), rightPhrase)
+            let candidate = (i, PhraseExpression(token: Token(.NO), left: genitive.left), rightPhrase)
+            candidates.append(candidate)
         }
-        // 属格を句に分割
-        if let candidate {
+        // 属格を句に分割(<属格>に代入、<属格>(を、に)設定)
+        if !candidates.isEmpty {
+            let candidate = isLhs(candidates.last?.right, isAssignment: isAssignment) ? candidates.last! : candidates.first!
             exps[candidate.index] = candidate.left
             exps.insert(candidate.right, at: candidate.index + 1)
         }
     }
+    private func isLhs(_ exp: Expression?, isAssignment: Bool) -> Bool {
+        guard let phrase = exp as? PhraseExpression else {
+            return false
+        }
+        return phrase.hasParticle(.NI) && isAssignment
+    }
     private func needToSplit(_ exps: [Expression], at i: Int) -> Bool {
         // 代入(設定)する
-        guard exps[i].isAssignment else {
+        guard exps[i].valueToken.isElementAssign else {
             return false
         }
         // 〜て → 複合要素代入なので、分割しない
@@ -863,10 +873,22 @@ extension Array where Element == Expression {
     }
     /// 代入先の識別子を抽出
     func extractLhsIdentifier() -> Identifier? {
-        self
-            .compactMap { $0 as? PhraseExpression }
-            .compactMap { $0.left as? Identifier }
-            .first { $0.isLhsCandidate }
+        for (i, element) in self.enumerated() {
+            // 識別子を抽出
+            guard let phrase = element as? PhraseExpression,
+                  let ident = phrase.left as? Identifier
+            else { continue }
+            // 属格の右項 -> 代入先ではない
+            if i > 0, let previous = self[i-1] as? PhraseExpression,
+               previous.hasParticle(.NO) {
+                return nil
+            }
+            // 代入対象(マークチェック後)
+            if ident.isLhsCandidate {
+                return ident
+            }
+        }
+        return nil
     }
     /// 代入の対象があるかチェック
     /// - Returns:

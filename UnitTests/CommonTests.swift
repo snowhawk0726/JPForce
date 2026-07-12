@@ -129,6 +129,21 @@ final class CommonTests: XCTestCase {
         print("翻訳器・VMテスト開始")
         try runVmTests(with: testPattern)
     }
+    func testSpecifierAccess() throws {
+        let testPattern: [VmTestCase] = [
+            ("配列【1,2,3】の最初に0を代入", [0,2,3]),
+            ("配列【1,2,3】の最後に0を代入", [1,2,0]),
+            ("aは配列【1,2,3】。aの先頭に0を代入。a", [0,2,3]),
+            ("aは配列【1,2,3】。aの後尾は0。a", [1,2,0]),
+            ("配列【1,2,3】の最初は、0。", [0,2,3]),
+            ("配列【1,2,3】の最後は、0。", [1,2,0]),
+//            ("配列【1,2,3】の残りに0を追加", [2,3,0]),   // 属格が分割される(「挿入」の導入で解決)
+       ]
+        print("評価器テスト開始")
+        try evaluateTests(with: testPattern)
+        print("翻訳器・VMテスト開始")
+        try runVmTests(with: testPattern, isOptimized: true)    // TODO: falseにする
+    }
     // MARK: - Helpers
     enum CommonTestError: Error {
         case syntax
