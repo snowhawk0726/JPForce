@@ -32,6 +32,7 @@ protocol Expression : Node {
     func hasParticle(_ p: Token.Particle) -> Bool
     var valueToken: Token {get}             // 式の値を表すトークン
     var particle: Token.Particle? {get}     // 式の格を表すトークン
+    var valueExpression: Expression {get}   // 格を除いた式
     var isConjunction: Bool {get}
 }
 protocol Sentence : Statement {
@@ -42,6 +43,7 @@ protocol Sentence : Statement {
     var baseString: String {get}
     var isIdentifierOnlySentence: Bool {get}
     var isTerminalConnector: Bool {get}
+    func resolveIdentifierRole()
 }
 // 要素valueを持つ式
 protocol ValueExpression : Expression, Equatable {
@@ -61,10 +63,11 @@ extension Statement {
 }
 extension Expression {
     var isPredicate: Bool {false}
-    var isAssignment: Bool {hasKeyword(.ASSIGN) || hasKeyword(.SET)}
+    var isAssignment: Bool {hasKeyword(.ASSIGN)}
     func hasParticle(_ p: Token.Particle) -> Bool {false}
     var valueToken: Token {token}
     var particle: Token.Particle? {nil}
+    var valueExpression: Expression {self}
 }
 extension ValueExpression {
     var tokenLiteral: String {token.literal}
@@ -294,19 +297,27 @@ final class AssignmentSentence : Sentence {
 }
 // MARK: Expressions(式)
 // 値を返すノード
+enum IdentifierRole {   // 解析段階の識別子の役割
+    case value          // 参照値
+    case assignTarget   // 代入対象識別子(名前解決しない)
+    case element        // オブジェクトの要素(要素名で対象を特定)
+    case specifier      // 述語の指定子
+    case property       // 属性名(未使用：GenitiveExpressionの場合は、必ず.property)
+    case unresolved     // 未解決(評価時に役割を決める)
+}
 final class Identifier : Expression {
-    let token: Token                // 識別子(.IDENT(value))トークン
-    let value: String               // 値(識別子名)
-    let auxiliaryToken: Token?      // 補助動詞(する)
-    var isLhsCandidate: Bool = false// 左辺候補
-    var isLhs: Bool = false         // 左辺(代入される側)
-    let isOuter: Bool               // 外部識別子
+    let token: Token                    // 識別子(.IDENT(value))トークン
+    let value: String                   // 値(識別子名)
+    let auxiliaryToken: Token?          // 補助動詞(する)
+    var isTargetCandidate: Bool = false // 代入対象候補(代入の左辺になる識別子)
+    var role: IdentifierRole = .value   // 役割
+    let isOuter: Bool                   // 外部識別子
     //
-    init(token: Token, value: String, auxiliaryToken: Token?, isLhs: Bool = false, isOuter: Bool = false) {
+    init(token: Token, value: String, auxiliaryToken: Token?, isOuter: Bool = false) {
         self.token = token
         self.value = value
         self.auxiliaryToken = auxiliaryToken
-        self.isLhs = isLhs
+        self.role = .value              // 生成時のデフォルトは.value
         self.isOuter = isOuter
     }
     convenience init(from string: String, with auxiliaryToken: Token? = nil, isOuter: Bool = false) {
@@ -325,6 +336,12 @@ final class Identifier : Expression {
     var string: String {token.coloredLiteral + (auxiliaryToken?.coloredLiteral ?? "")}
     //
     static let directoryPath = "ディレクトリパス"
+    //
+    var isAssignTarget: Bool {
+        get {role == .assignTarget}
+        set {if newValue {role = .assignTarget}}
+    }
+    var isSpecifier: Bool { Specifier(rawValue: value) != nil }
 }
 final class StringLiteral : ValueExpression {
     static func == (lhs: StringLiteral, rhs: StringLiteral) -> Bool {

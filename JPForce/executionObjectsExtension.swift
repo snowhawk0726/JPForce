@@ -72,10 +72,10 @@ extension JpfType {
 }
 extension JpfInstance {
     /// 生成、初期化から、インスタンスの初期化を行う。
-    /// - Parameter outer: スタックによる引数を含む環境
+    /// - Parameter type: 生成元の型
+    ///             outer: スタックによる引数を含む環境
     /// - Returns: 成功: nil、失敗: 無(JpfNull)、またはエラー(JpfError)
-    func initialize(with outer: Environment) -> JpfObject? {
-        guard let type = outer[self.type] as? JpfType else {return JpfError(typeNotFound)}
+    func initialize(type: JpfType, with outer: Environment) -> JpfObject? {
         return initialize(type: type, outer: outer) {inits, env in
             outer.execute(inits, with: env)
         }

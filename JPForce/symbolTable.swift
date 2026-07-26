@@ -134,6 +134,9 @@ class SymbolTable : Equatable {
         guard let symbol = outer?.resolve(name) else {return nil}
         return (symbol.isFree || symbol.isLocal) ? define(free: symbol) : symbol
     }
+    func resolve(property: String) -> Symbol? {
+        builtinSymbols[property]
+    }
     func resolve(_ token: Token) -> Symbol? {
         if token.isExplicit {
             return builtinSymbols[token.unwrappedLiteral]

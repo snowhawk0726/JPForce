@@ -765,6 +765,62 @@ final class ParserTests: XCTestCase {
             print("テスト(\(statement.string))終了")
         }
     }
+    // 述語を持つ
+    func testSplitGenitiveExpressions() throws {
+        let testPatterns: [(input: String, parsed: String, arguments: Int)] = [
+            // 基本属格
+            ("aは配列【1,2,3】。aの1に0を代入",
+             "aの1に0を代入", 0),                                // AssignmentSentence
+            ("配列【1,2,3】の1に0を代入",
+             "配列であって、【要素が、1と、2と、3】の1に0を代入", 3), // SimpleSentence
+            ("Aは型【bは0。「b」は利用可能】。aはAから生成。aのbに3を設定",
+             "aのbに3を設定", 3),                                // SimpleSentence
+            ("配列【1,2,3】の1に0を追加",
+             "配列であって、【要素が、1と、2と、3】の1に0を追加", 3), // SimpleSentence
+            ("Aは型【bは0。「b」は利用可能】。aはAから生成。aのbを3に設定",
+             "aのbを3に設定", 3),                               // SimpleSentence
+            ("配列【1,2,3】の1を削除",
+             "配列であって、【要素が、1と、2と、3】の1を削除", 2),   // SimpleSentence
+            // 語順変更
+            ("aは配列【1,2,3】。0を、aの1に代入",
+             "0をaの1に代入", 0),                                // AssignmentSentence
+            ("0を、配列【1,2,3】の1に代入",
+             "0を配列であって、【要素が、1と、2と、3】の1に代入", 3), // SimpleSentence
+            ("Aは型【bは0。「b」は利用可能】。aはAから生成。3を、aのbに設定",
+             "3をaのbに設定", 3),                                // SimpleSentence
+            ("0を、配列【1,2,3】の1に追加",
+             "0を配列であって、【要素が、1と、2と、3】の1に追加", 3), // SimpleSentence
+            // 複数の属格
+            ("aは配列【1,2,3】。aの1に、aの2を代入",
+             "aの1にaの2を代入", 0),                              // AssignmentSentence
+            ("aは配列【1,2,3】。aの1を、aの2に代入",
+             "aの1をaの2に代入", 0),                              // AssignmentSentence
+            ("配列【0,1】の0を、配列【1,2,3】の1に代入",
+             "配列であって、【要素が、0と、1】の0を配列であって、【要素が、1と、2と、3】の1に代入", 3),   // SimpleSentence
+            ("Aは型【bは0。「b」は利用可能】。aはAから生成。aのbに、配列【1,2】の0を設定",
+             "aのbに配列であって、【要素が、1と、2】の0を設定", 3),                                // SimpleSentence
+            ("Aは型【bは0。「b」は利用可能】。aはAから生成。aのbを、配列【1,2】の0に設定",
+             "aのbを配列であって、【要素が、1と、2】の0に設定", 3),                                // SimpleSentence
+            ("配列【配列【0,1】,2】の0の1に、2を代入",
+             "配列であって、【要素が、配列であって、【要素が、0と、1】と、2】の0の1に2を代入", 3),   // SimpleSentence
+            ("aは配列【1,2,3】。aの1に、1を足して代入",
+             "aの1に1を足して、代入", 0),                                                 // AssignmentSentence (複合)
+        ]
+        for test in testPatterns {
+            print("テストパターン: \(test.input)")
+            let program = try XCTUnwrap(parseProgram(with: test.input))
+            let statement = try XCTUnwrap(program.statements.last)
+            // pretty print
+            XCTAssertEqual(statement.string.withoutPeriod, test.parsed)
+            // arguments count
+            var arguments = 0
+            if let simple = statement as? SimpleSentence {
+                arguments = simple.arguments.count
+            }
+            XCTAssertEqual(arguments, test.arguments)
+            print("テスト(\(statement.string.withoutPeriod))終了")
+        }
+    }
     func testConditionalOperations() throws {
         let testPatterns: [(input: String, expected: String)] = [
             ("結果は、条件によって1か2", "結果は、条件によって、1か、2"),

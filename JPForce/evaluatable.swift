@@ -104,7 +104,6 @@ extension Program : Evaluatable {
 extension ExpressionStatement : Evaluatable {
     func evaluate(with environment: Environment) -> JpfObject? {
         defer {environment.remove(name: Environment.OUTER)}
-        expressions.finalizeLhsCandidates()
         return expressions.evaluate(with: environment)
     }
 }
@@ -299,7 +298,7 @@ extension AssignmentSentence : Evaluatable {
         }
         // 設定/代入チェック
         if let object = environment.value(for: referent),
-           object is JpfInstance || object is JpfType {
+           object is JpfInstance || object is JpfType || object is JpfEnum {
             // 設定
             if let error = set(rhs, to: attribute, of: object, with: environment) {
                 return error
@@ -316,7 +315,7 @@ private extension AssignmentSentence {
     func assign(_ value: JpfObject, to exp: Expression, with env: Environment) -> JpfError? {
         var value = value
         // 代入位置評価
-        if let position = resolvePosition(from: exp, with: env) {
+        if let position = resolvePosition(for: exp, with: env) {
             if position.isError {return position.error}
             guard let container = env.value(for: referent) else {
                 return assignUsage
@@ -333,27 +332,29 @@ private extension AssignmentSentence {
             return jpfError(from: error)
         }
     }
-    func resolvePosition(from exp: Expression?, with env: Environment) -> JpfObject? {
+    func resolvePosition(for exp: Expression?, with env: Environment) -> JpfObject? {
         guard let phrase = exp as? PhraseExpression else {
             return exp?.evaluate(with: env)
         }
-        if let ident = phrase.left as? Identifier,  // 変数
-           let value = env.value(for: ident) {      // 値を辞書から取得
-            return value
-        }   // 辞書になければ指定子(JpfIdentifier)を返す
+        if let ident = phrase.left as? Identifier {
+            if let specifier = JpfSpecifier(from: ident) {
+                return specifier                    // 指定子優先
+            }
+            if let value = env.value(for: ident) {  // 値を辞書から取得
+                return value
+            }
+        }
         return phrase.left.evaluate(with: env)
     }
     func set(_ value: JpfObject, to exp: Expression, of obj: JpfObject, with env: Environment) -> JpfError? {
         // 代入対象(メンバー)を特定
         guard let phrase = exp as? PhraseExpression,
-              let ident = phrase.left as? Identifier,
-              let member = ident.evaluate(with: env)
+              let ident = phrase.left as? Identifier
         else {
             return setUsage
         }
-        if member.isError {return member.error}
         // インスタンス・型のメンバーに値を代入(または算出)
-        let result = obj.assign(value, to: member)
+        let result = obj.assign(value, by: ident.value)
         if result.isError {return result.error}
         //
         return nil
@@ -421,27 +422,39 @@ extension Identifier : Evaluatable {
     /// - 返すオブジェクトが算出で実行可であれば、取得(getter)を呼び出す。
     func evaluate(with env: Environment) -> JpfObject? {
         var object: JpfObject? = nil
-        if isLhs {                                                              // 左辺値オブジェクトを返す。
-            let object = JpfIdentifier(from: self, isLhs: true)
-            if isOuter {
-                env.append(object, to: Environment.OUTER)
+        //
+        switch self.role {
+        case .specifier:
+            if let specifier = JpfSpecifier(from: self) {
+                return specifier
             }
-            return object
+        case .assignTarget, .unresolved, .element:
+            // assignTarget: 代入対象(未登録)
+            // unresoleved:  役割が未解決
+            let ident = JpfIdentifier(
+                from: self,
+                isAssignTarget: (role == .assignTarget)
+            )
+            if isOuter {
+                env.append(ident, to: Environment.OUTER)
+            }
+            return ident
+        default:
+            break
         }
-        if let o = getProperty(name: value, from: env, check: true) {           // 「ノ格」による属性アクセス
+        if let o = getMethod(name: value, from: env) {
+            // スタックのオブジェクトからメソッドを取得
+            object = o
+        } else
+        if let o = getObject(name: value, from: env, isOuter: isOuter) {
+            // 辞書からオブジェクトを取得
+            object = o
+        } else
+        if let o = getProperty(name: value, from: env) {
+            // 属性を取得
             object = o
         } else {
-            if let o = getMethod(name: value, from: env) {                      // スタックのオブジェクトからメソッドを取得
-                object = o
-            } else
-            if let o = getObject(name: value, from: env, isOuter: isOuter) {    // 辞書からオブジェクトを取得
-                object = o
-            } else
-            if let o = getProperty(name: value, from: env) {                    // 属性を取得
-                object = o
-            } else {
-                return undefinedError
-            }
+            return undefinedError
         }
         if let computation = object as? JpfComputation, env.isExecutable {
             return computation.getter(with: env)
@@ -496,12 +509,10 @@ extension Identifier : Evaluatable {
     /// - Parameters:
     ///   - name: 属性名
     ///   - env: スタックの環境
-    ///   - check: true: アクセスする格「の」をチェクする
     /// - Returns: 属性
-    private func getProperty(name: String, from env: Environment, check: Bool = false) -> JpfObject? {
+    private func getProperty(name: String, from env: Environment) -> JpfObject? {
         let particle = env.peek?.particle
         if let target = env.unwrappedPeek,          // スタックから対象オブジェクトを取得
-           !check || particle == Token(.NO),        // check = trueの場合、「の格」をチェック
            let obj = target[value, particle] {      // 対象の属性
             env.drop()
             return obj
@@ -1005,26 +1016,48 @@ extension GenitiveExpression : Evaluatable {
         var accessor: JpfObject
         let phrase = JpfPhrase(name: object.name, value: object, particle: token)
         switch right {
-        case let ident as Identifier:
-            if let err = environment.push(phrase) {return err}
-            guard let result = ident.evaluate(with: environment) else {return nil}
-            if result.isError {return result}
-            accessor = result
-            if environment.peek?.name == object.name && environment.isPeekParticle(.NO) {
-                environment.drop()
-            } else {                // objectをsubsciptでアクセス済み
-                return accessor
+        case let ident as Identifier where ident.isProperty:
+            // <オブジェクト>の属性 → 属性値を返す(属値取得より優先)
+            return object[ident.value, token]
+        case let ident as Identifier where object.contains(name: ident.value):
+            // <オブジェクト>の<識別子> → オブジェクトの要素
+            let element = object[ident.value, token]
+            if let computation = element as? JpfComputation, environment.isExecutable {
+                // <要素>が算出
+                return computation.getter(with: environment)
             }
+            if let function = element as? JpfFunction, ident.auxiliaryToken != nil {
+                // <要素>が関数(実行)
+                return function.execute(with: environment)
+            }
+            // 要素を返す
+            return element
+        case let ident as Identifier where environment.contains(ident.value):
+            // <オブジェクト>に属さない<識別子> → 値
+            guard let value = environment.value(for: ident) else {
+                return undefinedIdentifier(ident.value)
+            }
+            // オブジェクトを<句>に戻す
+            if let err = environment.push(phrase) {return err}
+            if let computation = value as? JpfComputation, environment.isExecutable {
+                // 値が算出(<句>は引数)
+                return computation.getter(with: environment)
+            }
+            // <オブジェクト>を<値>でアクセス
+            accessor = value
         case is ComputationLiteral:
+            // 算出(オブジェクトから取得)
             if let err = environment.push(phrase) {return err}
             if let c = right.evaluate(with: environment) as? JpfComputation {
                 return environment.isExecutable ? c.getter(with: environment) : c
             }
             return nil
         case let expression as PhraseExpression:
+            // <オブジェクト>の<式><格> → <格>を除き再帰呼び出し後、<格>を付加した<句>を返す
             let object = evaluate(object, expression.left, with: environment)
             return JpfPhrase(name: "", value: object, particle: expression.token)
         case is PredicateExpression, is Label, is CaseExpression:
+            // <オブジェクト>の<述語> / <オブジェクト>の場合
             if let err = environment.push(phrase) {return err}
             return right.evaluate(with: environment)
         default:
@@ -1032,18 +1065,6 @@ extension GenitiveExpression : Evaluatable {
             if result.isError {return result}
             accessor = result
         }
-        return object.accesse(by: accessor, with: environment)
-    }
-    /// オブジェクトの要素を取り出す。
-    /// - Parameters:
-    ///   - expression: 要素を表す式
-    ///   - environment: 要素を含む環境
-    /// - Returns: 要素オブジェクト、または識別子名のオブジェクト
-    private func getElement(from expression: Expression, with environment: Environment) -> JpfObject? {
-        if let ident = expression as? Identifier {
-            if let object = environment[ident.value] {return object}
-            return JpfString(value: ident.value)
-        }
-        return expression.evaluate(with: environment)
+        return object.access(by: accessor, with: environment)
     }
 }

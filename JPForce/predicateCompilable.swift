@@ -204,6 +204,8 @@ struct AssignOperationCompiler : PredicateCompilable {
                 try emitAssignment(value: second, target: third)
             case (.none, Token(.NI), Token(.WO)):
                 try emitAssignment(value: third, target: second)
+            case (.none, .none, Token(.WO)):
+                try emitAssignment(value: third, target: nil)
                 // 実行時(コード出力済み)処理
             default:
                 try emitAssignment()
@@ -248,9 +250,14 @@ private extension AssignOperationCompiler {
         }
         // 「<値>を<識別子>に代入」をemit
         try value?.value?.emit(with: compiler)
-        // 引数から識別子名を取得し、opSetXXをemit
-        let ident = try JpfIdentifier(ensuring: target, with: compiler)
-        try ident.emitOpSet(with: compiler)
+        if let target {
+            // 引数から識別子名を取得し、opSetXXをemit
+            let ident = try JpfIdentifier(ensuring: target, with: compiler)
+            try ident.emitOpSet(with: compiler)
+        } else {    // 「値」を出力後(targetがコンパイル済みである場合)
+            // 出力された引数に続いて、述語「代入」を出力
+            try emitAssignment()
+        }
     }
     func emitCollectionAssignment(value: JpfObject?, collection: JpfObject?, key: JpfObject?) throws {
         // 引数を適切な順序で、emit
@@ -360,14 +367,17 @@ private extension PullOperationCompiler {
     }
     /// 個数指定区分に対応した値変換(map)をemit
     func emitValueConversion(using mode: ValueMode, for kind: CountKind) throws {
-        guard mode != .none else { return }
-        // 配列に対する map
-        if case .symbol = kind {
+        if mode.isPassthrough { return }
+        //
+        switch kind {
+        case .symbol:
             try emitMapProperty(by: mode)
-            return
-        }
-        if case .number(let count) = kind, count > 1 {
-            try emitMapProperty(by: mode)
+        case .number(let count), .single(let count):
+            if count > 1 {
+                try emitMapProperty(by: mode)
+            } else {
+                try emitGetProperty(by: mode)
+            }
         }
     }
     /// 代入をemit
@@ -394,25 +404,27 @@ private extension PullOperationCompiler {
     }
     /// 値を変換(map)
     private func emitMapProperty(by mode: ValueMode) throws {
-        try compiler.emitMapProperty(name: mode.rawValue)
+        guard let name = mode.string else { return }
+        try compiler.emitMapProperty(name: name)
     }
     /// 値を変換(stack)
     private func emitGetProperty(by mode: ValueMode) throws {
-        try compiler.emitGetProperty(name: mode.rawValue)
+        guard let name = mode.string else { return }
+        try compiler.emitGetProperty(name: name)
     }
     /// 識別子に代入するコードを出力する。
     /// - Parameters:
     ///   - identifiers: 出力する識別子
     ///   - mode:        値変換モード
-    func emitSetInstructions(to identifiers: [String], by mode: ValueMode = .none) throws {
+    func emitSetInstructions(to identifiers: [String], by mode: ValueMode = .passthrough) throws {
         try identifiers.reversed().forEach { name in
-            if mode != .none && identifiers.count > 1 {
+            if mode.isSpecified && identifiers.count > 1 {
                 try emitGetProperty(by: mode)
             }
             let symbol = compiler.symbolTable.define(name)
             symbol.emitOpSet(with: compiler)
         }
-        if identifiers.isEmpty, mode != .none {
+        if identifiers.isEmpty, mode.isSpecified {
             try emitGetProperty(by: mode)
         }
     }

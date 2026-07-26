@@ -106,6 +106,7 @@ enum Token : Equatable {
         case RANGE      = "範囲"
         case APPEND     = "追加"
         case REMOVE     = "削除"
+        case INSERT     = "挿入"
         case FOREACH    = "繰り返す"
         case MAP        = "写像"
         case REDUCE     = "まとめる"
@@ -307,7 +308,7 @@ enum Token : Equatable {
         .RETURN, .GOBACK, .BREAK, .CONTINUE,
         .MONO, .INPUT, .KOTO, .IT, .ITS, .ELSE,
         .DROP, /*.EMPTY,*/ .DUPLICATE, .PULL, .PUSH,
-        .APPEND, .REMOVE, .CONTAINS, .FOREACH, .MAP, .FILTER, .REDUCE, .SORT, .REVERSE,
+        .APPEND, .INSERT, .REMOVE, .CONTAINS, .FOREACH, .MAP, .FILTER, .REDUCE, .SORT, .REVERSE,
         .PRINT, .ASK, .NEWLINE, .READ, .FILES, .IDENTIFIERS,
         .ASSIGN, .SET, .SWAP,
         .EXECUTE, .CREATE, .INITIALIZATION, .AVAILABLE,
@@ -334,12 +335,33 @@ enum Token : Equatable {
         d["≫"] = .RDABRACKET
         return d
     }()
-    // MARK: - 左辺識別子を持つ述語
-    static let assignmentLikePredicates: Set<Token.Keyword> = [.ASSIGN, .PULL, .DUPLICATE, .SET, .APPEND]
-    var hasLhsIdentifier: Bool {Self.assignmentLikePredicates.contains {self.isKeyword($0)}}
-    // MARK: - 要素代入を行う述語
-    static let elementAssignPredicates: Set<Token.Keyword> = [.ASSIGN, .SET, .APPEND]
-    var isElementAssign: Bool {Self.elementAssignPredicates.contains {self.isKeyword($0)}}
+    // MARK: - (未定義を含む)代入対象を持つ述語
+    static let assignmentLikePredicates: Set<Token.Keyword> = [.ASSIGN, .PULL, .DUPLICATE]
+    var hasAssignTarget: Bool {Self.assignmentLikePredicates.contains {self.isKeyword($0)}}
+    // MARK: - 指定子を持つ述語
+    static let specifierPredicates: [Token.Keyword : [Specifier]] = [
+        /* .ASSIGNの指定子は、属格(左項)が「配列」の場合に確定する。*/
+        //.ASSIGN : [.first, .last, .head, .tail],
+        .INSERT : [.first, .last, .head, .tail],
+        .SORT : [.ascending, .descending],
+        .REMOVE : [.first, .last, .head, .tail, .all, .rest],
+        .PULL : [.value, .number], .DUPLICATE : [.value, .number],
+    ]
+    var hasSpecifier: Bool {Self.specifierPredicates.keys.contains {self.isKeyword($0)}}
+    var specifiers: [Specifier] {
+        guard let k = self.unwrappedKeyword else { return [] }
+        return Token.specifierPredicates[k] ?? []
+    }
+    // MARK: - GenitiveExpression(aのb)を引数に持つ述語と引数の格(aのb<格>)
+    // 例： aのbにcを代入 → .ASSIGN : .NI
+    static let genitiveParticles: [Token.Keyword : [Token.Particle]] = [
+        .ASSIGN : [.NI],  .SET : [.NI, .WO], .APPEND : [.NI], .INSERT : [.NI], .REMOVE : [.WO]
+    ]
+    var hasGenitivePredicate: Bool {Self.genitiveParticles.keys.contains {self.isKeyword($0)}}
+    var genitiveParticles: [Token.Particle] {
+        guard let k = self.unwrappedKeyword else { return [] }
+        return Token.genitiveParticles[k] ?? []
+    }
     // MARK: - 助詞一覧とそのインデックス
     static let particles = Particle.allCases
     var particleIndex: Int? {Token.particles.firstIndex {self.isParticle($0)}}
@@ -381,7 +403,7 @@ extension Token.Keyword {
     var predicateKind: PredicateKind? {
         switch self {
         case .TRUE, .FALSE, .NULL, .EMPTY, .INPUT, .ARRAY, .DICTIONARY, .FILES, .IDENTIFIERS,   // 名詞
-             .ADD, .SUBSTRACT, .MULTIPLY, .DIVIDE, .NEGATE, .EQUAL, .BE, .NOT, .LT, .GT, .EXECUTE, .CREATE, .AVAILABLE, .APPEND, .REMOVE, .FOREACH, .MAP, .REDUCE, .FILTER, .SORT, .REVERSE, .CONTAINS, .PULL, .DUPLICATE, .SURU:   // 動詞、形容詞
+                .ADD, .SUBSTRACT, .MULTIPLY, .DIVIDE, .NEGATE, .EQUAL, .BE, .NOT, .LT, .GT, .EXECUTE, .CREATE, .AVAILABLE, .APPEND,  .INSERT, .REMOVE, .FOREACH, .MAP, .REDUCE, .FILTER, .SORT, .REVERSE, .CONTAINS, .PULL, .DUPLICATE, .SURU:   // 動詞、形容詞
             return .value
         case .ASSIGN, .SWAP, .SET, .INITIALIZATION, .PRINT, .ASK, .NEWLINE, .READ, .PUSH, .DROP:
             return .void

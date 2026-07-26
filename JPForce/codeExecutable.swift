@@ -207,7 +207,7 @@ struct GenitiveExecuter : CodeExecutable {
     func execute() throws {
         guard let index = vm.pull(), let left = vm.pull() else {throw genitiveParamError}
         let environment = Environment(with: vm.stack)
-        guard let result = left.accesse(by: index, with: environment) else {return}
+        guard let result = left.access(by: index, with: environment) else {return}
         if result.isError {throw result.error!}
         try vm.push(result)
     }

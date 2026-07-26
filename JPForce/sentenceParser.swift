@@ -117,17 +117,17 @@ extension Expression {
     var auxiliaryVerb: AuxiliaryVerb {.none}
     var isTerminalCandidate: Bool {false}
     var isConjunctiveForm: Bool {false}
-    var isLhsExpression: Bool {
-        guard
-            let phrase = self as? PhraseExpression,
-            let identifier = phrase.left as? Identifier
-        else {
+    var isPredicateToAssign: Bool {
+        guard let predicate = self as? PredicateExpression else {
             return false
         }
-        return identifier.isLhs
+        return predicate.token.hasAssignTarget
     }
     func hasKeyword(_ k: Token.Keyword) -> Bool {false}
     var isConjunction: Bool {false}
+    var hasGenitivePredicate: Bool {
+        valueToken.hasGenitivePredicate
+    }
 }
 extension PredicateExpression {
     var isPredicate: Bool {token.isPredicate}
@@ -157,6 +157,7 @@ extension PhraseExpression {
         if case .particle(let p) = token.type {return p}
         return nil
     }
+    var valueExpression: (any Expression) {left}
 }
 extension CaseExpression {
     var isTerminalCandidate: Bool {lastBlcok.isTerminalCandidate}
@@ -180,6 +181,12 @@ extension GenitiveExpression {
     var isTerminalCandidate: Bool {right.isTerminalCandidate}
     var isConjunctiveForm: Bool {right.isConjunctiveForm}
     var particle: Token.Particle? {right.particle}
+    var valueExpression: (any Expression) {
+        GenitiveExpression(token: token, left: left, right: right.valueExpression)
+    }
+    var leftPhrase: PhraseExpression {
+        PhraseExpression(token: token, left: left)
+    }
 }
 extension PropertyExpression {
     var isTerminalCandidate: Bool {true}
@@ -231,6 +238,8 @@ extension ExpressionStatementParser {
         guard parser.errors.isEmpty else {      // 構文エラー
             return nil
         }
+        resolveSpecifierRole(in: sentences)
+        resolveAssignIdentifierRole(in: sentences)
         if sentences.count == 1 {
             // 単文の場合、式文が連用形でなければ明示句点を付与
             if let singleES = sentences.first as? ExpressionStatement,
@@ -283,8 +292,7 @@ private extension ExpressionStatementParser {
     /// Sentence構築
     func buildSentence(from slice: [Expression]) -> Sentence? {
         guard let last = slice.last else {return nil}
-        var lastToken = last.valueToken
-        var slice = slice
+        let lastToken = last.valueToken
         if last.isAssignment {
             if let target = slice.extractLhsIdentifier() {  // 単純代入
                 return buildAssignmentSentence(target: target, kind: .simple, with: slice)
@@ -297,15 +305,8 @@ private extension ExpressionStatementParser {
                 error(message: "代入先が見つかりません。", at: last.valueToken)
                 return nil
             }                                               // immutable代入
-            lastToken = Token(.ASSIGN)                      // 述語を「代入」に正規化
         }
-        // immutableな代入(設定は代入に正規化)
-        // sliceのLHS候補の確定処理
-        if lastToken.hasLhsIdentifier {
-            slice.finalizeLhsCandidates()
-        } else {
-            slice.clearLhsCandidates()
-        }
+        // 述語(immutableな代入を含む)のチェック
         if last.isPredicate {
             return SimpleSentence(
                 token: lastToken,
@@ -324,18 +325,8 @@ private extension ExpressionStatementParser {
     /// 代入節構築
     func buildAssignmentSentence(target: Identifier, kind: AssignmentKind, with slice: [Expression]) -> AssignmentSentence? {
         guard let last = slice.last else {return nil}
-        // 代入先属性設定(compoundの場合は、代入先は既存(代入前に評価される))
-        if kind == .simple {
-            target.isLhsCandidate = false
-            target.isLhs = true
-        }
         // 代入位置抽出(なければnil)
         let positionExpr = (kind == .compound) ? parser.leadingPosition : extractPosition(from: slice)
-        if let ident = positionExpr as? Identifier,
-           kind == .simple {
-            ident.isLhsCandidate = false
-            ident.isLhs = true
-        }
         let position = positionExpr.map { PhraseExpression(token: Token(.NI), left: $0) }
         // 右辺抽出
         let rhs = getRhs(from: slice.dropLast())
@@ -400,19 +391,13 @@ private extension ExpressionStatementParser {
         // 指定位置(〜は → 〜に)
         guard let phrase = genitive.right as? PhraseExpression else {return nil}
         let position = PhraseExpression(token: Token(.NI), left: phrase.left)
-        if let ident = position.left as? Identifier {
-            ident.isLhsCandidate = false
-            ident.isLhs = true
-        }
         //
         if let target = genitive.left as? Identifier {
-            target.isLhsCandidate = false
-            target.isLhs = true
             // 変数に代入
             let assignSentence = AssignmentSentence(
                 token: genitive.token,
                 kind: .simple,
-                         referent: target,
+                referent: target,
                 attribute: position,
                 value: nil,
                 string: genitive.string
@@ -420,17 +405,17 @@ private extension ExpressionStatementParser {
             sentences.append(assignSentence)
         } else {
             // 代入したオブジェクトを返す
-            let left = PhraseExpression(token: Token(.NO), left: genitive.left)
             let simpleSentence = SimpleSentence(
                 token: Token(.ASSIGN),
                 auxiliaryVerb: .none,
-                arguments: [left, position],
+                arguments: [genitive.leftPhrase, position],
                 predicateKind: .builtin,
                 string: genitive.string
             )
             sentences.append(simpleSentence)
         }
         guard let token = sentences.first?.token else {return nil}
+        resolveAssignIdentifierRole(in: sentences)
         return CompoundStatement(
             token: token,
             sentences: sentences,
@@ -473,6 +458,14 @@ private extension ExpressionStatementParser {
             }
         }
         return result
+    }
+    // 識別子の役割が「指定子」であるものを確定する
+    func resolveSpecifierRole(in sentences: [Sentence]) {
+        sentences.forEach { $0.resolveSpeicifierRole() }
+    }
+    // 要素代入の識別子の役割を解決する。(型がわからない場合は、unredolved)
+    func resolveAssignIdentifierRole(in sentences: [Sentence]) {
+        sentences.forEach { $0.resolveIdentifierRole() }
     }
     /// 〜かによって、のチェック
     func validateQuestionPlacement(from es: ExpressionStatement) {
@@ -545,6 +538,18 @@ private extension ExpressionStatementParser {
         }
     }
 }
+extension Sentence {
+    func resolveIdentifierRole() {}
+    func resolveSpeicifierRole() {
+        guard predicate?.token.hasSpecifier == true else { return }
+        arguments
+            .compactMap { $0 as? PhraseExpression }
+            .compactMap { $0.left as? Identifier }
+            .filter { $0.isSpecifier }
+            .forEach { $0.role = .specifier }
+        /* predicateとargumentsは、Sentenceが実装 */
+    }
+}
 /// Setenceインタフェース
 extension SimpleSentence {
     var predicate: (any Expression)? {
@@ -562,15 +567,131 @@ extension SimpleSentence {
         }
         return token
     }
+    func resolveIdentifierRole() {
+        if token.isKeyword(.SET) {
+            let ident = findSetElement(in: arguments)
+            ident?.role = .element
+            return
+        }
+        guard token.hasAssignTarget else { return }
+        if token.isKeyword(.ASSIGN),
+           let (left, rightIdent) = findGenitiveLeftAndRightIdentifier(in: arguments) {
+            // 属格(要素)代入の右項の役割を決める
+            if rightIdent.isSpecifier {
+                rightIdent.role = determineRoleForRightIdentifier(genitiveLeft: left)
+            }
+            return
+        }
+        // 左辺代入対象の識別子の役割(.assignTarget)を決める
+        let identifiers = findAssignTargets(in: arguments)
+        identifiers.forEach { $0.role = .assignTarget }
+    }
+}
+private extension SimpleSentence {
+    /// 引数から「aのbに」を探し、aとbを返す。
+    func findGenitiveLeftAndRightIdentifier(in args: [any Expression]) -> (genitive: any Expression, ident: Identifier)? {
+        for (i, arg) in args.enumerated() {
+            guard let genitive = arg as? PhraseExpression,
+                  genitive.hasParticle(.NO)
+            else { continue }
+            let nextIndex = i + 1
+            guard nextIndex < args.count,
+                  let niPhrase = args[nextIndex] as? PhraseExpression,
+                  niPhrase.hasParticle(.NI)
+            else { continue }
+            guard let ident = niPhrase.left as? Identifier else { continue }
+            return (genitive.left, ident)
+        }
+        return nil
+    }
+    /// 属格の左項が配列であれば、識別子は「指定子」、それ以外は「未解決」
+    func determineRoleForRightIdentifier(genitiveLeft: any Expression) -> IdentifierRole {
+        if genitiveLeft is ArrayLiteral {
+            return .specifier
+        }
+        return .unresolved
+    }
+    /// 代入の対象となる識別子を返す。
+    func findAssignTargets(in args: [any Expression]) -> [Identifier] {
+        var identifiers: [Identifier] = []
+        for arg in args {
+            guard let phrase = arg as? PhraseExpression,
+                  let ident = phrase.left as? Identifier
+            else { continue }
+            switch phrase.token {
+            case Token(.TO):
+                identifiers.append(ident)
+                continue
+            case Token(.NI):
+                identifiers.append(ident)
+            default:
+                continue
+            }
+            break
+        }
+        return identifiers
+    }
+    // 設定の対象となる要素の識別子を返す
+    func findSetElement(in args: [any Expression]) -> Identifier? {
+        for (i, arg) in args.enumerated() {
+            guard let noPhrase = arg as? PhraseExpression, noPhrase.hasParticle(.NO)
+            else { continue }
+            let nextIndex = i + 1
+            guard nextIndex < args.count, let nextPhrase = args[nextIndex] as? PhraseExpression
+            else { continue }
+            switch nextPhrase.token {
+            case Token(.NI), Token(.WO):
+                if let ident = nextPhrase.left as? Identifier { return ident }
+            default:
+                continue
+            }
+        }
+        return nil
+    }
+}
+extension AssignmentSentence {
+    func resolveIdentifierRole() {
+        // 1.aに代入
+        if attribute == nil && kind == .simple {    // 単純代入
+            referent.role = .assignTarget
+            return
+        }
+        // 2.aのbに代入
+        guard let phrase = attribute as? PhraseExpression,
+              let rightIdent = phrase.left as? Identifier
+        else { return }
+        // 属格(要素)代入の右項の役割は、.unresolved(左項の型が不明)
+        if rightIdent.isSpecifier {
+            rightIdent.role = .unresolved
+        }
+    }
 }
 /// 旧AST互換インタフェース
 extension ExpressionStatement {
-    var predicate: (any Expression)? {expressions.last}
+    var predicate: (any Expression)? {
+        guard let idx = predicateIndex else { return nil }
+        let e = expressions[idx]
+        if let p = e as? PhraseExpression, p.left.isPredicate {
+            return p.left
+        }
+        return e
+    }
     var arguments: [any Expression] {
-        predicate != nil ? expressions.dropLast() : expressions
+        guard let idx = predicateIndex else { return expressions }
+        if idx == 0 { return [] }
+        return Array(expressions.prefix(idx))
     }
     var expressionCount: Int {expressions.count}
     var literal: Expression? {expressions.first}
+    //
+    private var predicateIndex: Int? {
+        for (i, e) in expressions.enumerated() {
+            if e.isPredicate { return i }
+            if let p = e as? PhraseExpression,
+               p.left is PredicateExpression { return i }
+        }
+        return nil
+    }
 }
 extension DefineStatement {
     var rhsCount: Int {value.expressionCount}

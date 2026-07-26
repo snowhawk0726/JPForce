@@ -19,7 +19,7 @@ protocol ArgumentResolver {
 extension ArgumentResolver {
     var argumentsNotFound:      JpfError {JpfError("解析すべき引数がありません。")}
     var countValueNotFouond:    JpfError {JpfError("個数の値が見つかりません。")}
-    var wrongValueMode:         JpfError {JpfError("変換は「値」または「数値」を指定します。)")}
+    var wrongValueMode:         JpfError {JpfError("変換は「中身」または「数値」を指定します。(かぎ括弧「」は不要)")}
     var worngIdentifier:        JpfError {JpfError("識別子の指定が誤っています。")}
 }
 // MARK: - predicates
@@ -27,12 +27,12 @@ extension ArgumentResolver {
 struct PullArgumentResolver: ArgumentResolver {
     func resolve(_ arguments: [JpfObject]) throws -> PullArgumentSpec {
         var resolvedCount = 0
-        var lhs: [String] = []
-        var valueMode = ValueMode.none
+        var assignTarget: [String] = []
+        var valueMode = ValueMode.passthrough
         var countSpec = CountSpec.one
         //
         guard !arguments.isEmpty else {
-            return PullArgumentSpec(resolvedCount: 0, lhs: [], valueMode: .none, countSpec: .one)
+            return PullArgumentSpec(resolvedCount: 0, lhs: [], valueMode: .passthrough, countSpec: .one)
         }
         let args = ArgumentIterator(arguments)
         var argument = args.next()
@@ -52,8 +52,8 @@ struct PullArgumentResolver: ArgumentResolver {
         // 値変換指定
         if let arg = argument, arg.isParticle(.WO) {
             guard
-                let string = arg.value as? JpfString,
-                let mode = ValueMode(rawValue: string.value)
+                let s = arg.value?.specifier,
+                let mode = ValueMode(specifier: s)
             else {
                 throw wrongValueMode
             }
@@ -65,12 +65,12 @@ struct PullArgumentResolver: ArgumentResolver {
         if let arg = argument, arg.isParticle(.NI) {
             repeat {
                 guard
-                    let ident = argument?.value as? JpfIdentifier, ident.isLhs,
+                    let ident = argument?.value as? JpfIdentifier, ident.isAssignTarget,
                     !ident.name.isEmpty
                 else {
                     throw worngIdentifier
                 }
-                lhs.insert(ident.name, at: 0)
+                assignTarget.insert(ident.name, at: 0)
                 resolvedCount += 1
                 argument = args.next()
             } while argument?.isParticle(.TO) ?? false
@@ -78,7 +78,7 @@ struct PullArgumentResolver: ArgumentResolver {
         // 仕様作成
         let spec = PullArgumentSpec(
             resolvedCount: resolvedCount,
-            lhs: lhs,
+            lhs: assignTarget,
             valueMode: valueMode,
             countSpec: countSpec
         )
@@ -118,10 +118,29 @@ struct PullArgumentSpec {
 extension PullArgumentSpec {
     var multipleLhsWithArray:   JpfError {JpfError("スタック値の配列を複数の識別子に割り当てることはできません。")}
 }
-enum ValueMode : String {
-    case value  = "値"
-    case number = "数値"
-    case none   = "無し"
+enum ValueMode {
+    case value          // 中身
+    case number         // 数値
+    case passthrough    // そのまま
+    //
+    init?(specifier: Specifier) {
+        switch specifier {
+        case .value: self = .value
+        case .number: self = .number
+        default:
+            return nil
+        }
+    }
+    var string: String? {
+        switch self {
+        case .value: return Specifier.value.rawValue
+        case .number: return Specifier.number.rawValue
+        default:
+            return nil
+        }
+    }
+    var isPassthrough: Bool {self == .passthrough}
+    var isSpecified: Bool {!isPassthrough}
 }
 enum CountSpec {
     case one                // 1個

@@ -38,6 +38,8 @@ protocol JpfObject : Accessible {
     // 演算
     func add(_ object: JpfObject) -> JpfObject
     func remove(_ object: JpfObject) -> JpfObject
+    func removeFirstValue(_ object: JpfObject) -> JpfObject
+    func removeAllValues(_ object: JpfObject) -> JpfObject
     func contains(_ object: JpfObject) -> JpfObject
     func contains(where function: JpfFunction, with environment: Environment) -> JpfObject
     func foreach(_ function: JpfFunction, with environment: Environment) -> JpfObject?
@@ -45,10 +47,11 @@ protocol JpfObject : Accessible {
     func filter(_ function: JpfFunction, with environment: Environment) -> JpfObject
     func reduce(_ initial: JpfObject, _ function: JpfFunction, with environment: Environment) -> JpfObject
     func sorted() -> JpfObject
-    func sorted(by string: JpfString) -> JpfObject
+    func sorted(by specifier: Specifier) -> JpfObject
     func sorted(by function: JpfFunction, with environment: Environment) -> JpfObject
     func reversed() -> JpfObject
     func assign(_ value: JpfObject, to target: JpfObject?) -> JpfObject
+    func assign(_ value: JpfObject, by name: String) -> JpfObject
     var count: JpfObject {get}
     var isEmpty: JpfObject {get}
     // コンパイラ用(in compilerObjectsExtension.swift)
@@ -133,16 +136,49 @@ struct JpfIdentifier : JpfObject {
     var name: String = ""   // AST上の識別子名
     var value: String       // 登録名
     var symbol: Symbol?     // 登録シンボル
-    var isLhs: Bool = false // 左辺オブジェクト
+    var isAssignTarget: Bool = false // 左辺オブジェクト
     var isOuter: Bool = false
     //
     var string: String {value.color(.cyan)}
     // インタープリタ用
-    init(from ident: Identifier, isLhs: Bool = false) {
+    init(from ident: Identifier, isAssignTarget: Bool = false) {
         self.name = ident.value
         self.value = ident.value
         self.isOuter = ident.isOuter
-        self.isLhs = isLhs
+        self.isAssignTarget = isAssignTarget
+    }
+}
+enum Specifier : String {
+    case first          = "最初"  // 配列
+    case last           = "最後"
+    case head           = "先頭"
+    case tail           = "末尾"
+    case all            = "全て"  //(削除)
+    case rest           = "残り"  //(削除)
+    case ascending      = "昇順"  // 並べ替える
+    case descending     = "降順"
+    case value          = "中身"  // 得る・写す
+    case number         = "数値"
+    //
+    var isAll: Bool         {self == .all}
+    var isAscending: Bool   {self == .ascending}
+    var isDescending: Bool  {self == .descending}
+}
+struct JpfSpecifier : JpfObject {
+    static let type = "指定子"
+    var name: String = ""
+    var value: Specifier
+    var string: String {value.rawValue.color(.cyan)}
+    //
+    init?(name: String) {
+        guard let specifier = Specifier(rawValue: name) else {return nil}
+        self.value = specifier
+    }
+    init?(from ident: Identifier) {self.init(name: ident.value)}
+}
+extension JpfObject {
+    var specifier: Specifier? {
+        (self.value as? JpfSpecifier)?.value
     }
 }
 struct RangeBoundary {
@@ -295,7 +331,7 @@ struct JpfInstance : JpfObject {
     var protocols: [String]         // 準拠する規約
     var availableMembers: Set<String>   // 外部から利用可能なメンバー
     //
-    var string: String {"型が、\(type)で、要素が、\(environment.enumerated.map {$0.key}.joined(separator: "と、"))。" + availableMembers.map {"「\($0)」"}.joined(separator: "と") + "は利用可能。"}
+    var string: String {"型が、「\(type)」で、要素が、\(environment.enumerated.map {$0.key}.joined(separator: "と、"))。" + availableMembers.map {"「\($0)」"}.joined(separator: "と") + "は利用可能。"}
 }
 struct JpfProtocol : JpfObject {
     static let type = "規約"

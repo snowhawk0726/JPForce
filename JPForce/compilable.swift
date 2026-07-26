@@ -90,7 +90,6 @@ extension Program : Compilable {
 }
 extension ExpressionStatement : Compilable {
     func compile(with c: Compiler) -> JpfObject? {
-        expressions.finalizeLhsCandidates()
         if let exit = expressions.compile(with: c) {
             return exit
         }
@@ -231,7 +230,7 @@ extension AssignmentSentence : Compilable {
             }
         }
         do {
-            // 右辺の翻訳・出力
+            // 右辺(value)の翻訳・出力
             if let value = (self.value as? PhraseExpression)?.left ?? self.value {
                 if let result = value.compile(with: c) {
                     if result.isError { return result }
@@ -240,8 +239,9 @@ extension AssignmentSentence : Compilable {
             }
             // 位置/要素の翻訳
             if let attribute {
-                let ident = try JpfIdentifier(ensuring: referent, with: c)
-                try ident.emit(with: c)
+                // 要素代入「aのb(左辺)に代入」を翻訳・出力
+                let resolvedReferent = try JpfIdentifier(resolving: referent, with: c)
+                try resolvedReferent.emit(with: c)
                 _ = c.emit(particle: .NO)
                 if let result = attribute.compile(with: c) {
                     if result.isError { return result }
@@ -250,9 +250,9 @@ extension AssignmentSentence : Compilable {
                 // 要素代入
                 _ = c.emit(predicate: .ASSIGN)
             }
-            // 左辺の出力(値代入)
-            let ident = try JpfIdentifier(ensuring: referent, with: c)
-            try ident.emitOpSet(with: c)
+            // 左辺の出力(値代入) *: 既存propertyに優先するため強制シンボル登録・出力
+            let symbol = c.symbolTable.define(referent.value)
+            symbol.emitOpSet(with: c)
         } catch {
             return jpfError(from: error)
         }
@@ -275,12 +275,15 @@ extension Identifier : Compilable {
             }
         }
         do {
-            let ident = try JpfIdentifier(resolving: self, with: c)
-            guard ident.hasSymbol || ident.isLhs else { // 登録済み、または左辺識別子
-                return undefinedIdentifier(value)
+            if self.role == .specifier {// 指定子を優先(定数登録し述語に渡す)
+                return JpfSpecifier(from: self)
             }
-            if ident.isLhs {            // 左辺の場合、識別子オブジェクトを返す
-                return ident
+            if self.isAssignTarget {    // 左辺の場合、識別子オブジェクトを返す
+                return try JpfIdentifier(ensuring: self, with: c)
+            }
+            let ident = try JpfIdentifier(resolving: self, with: c)
+            guard ident.hasSymbol else {// 登録済み
+                return undefinedIdentifier(value)
             }
             try c.emitAllCashe()
             try ident.emit(with: c)     // scopeに応じたコードを出力
@@ -460,12 +463,12 @@ extension GenitiveExpression : Compilable {
         if let result = left.compile(with: c) {  // 左項コンパイル
             return emit(result, with: c)
         }
-        return compileRight(with: c)            // 右項コンパイル
+        return compile(right, with: c)            // 右項コンパイル
     }
 }
 private extension GenitiveExpression {
     /// 右項を翻訳
-    func compileRight(with c: Compiler) -> JpfObject? {
+    func compile(_ right: Expression, with c: Compiler) -> JpfObject? {
         // 右項の種類により必要なコードをemit
         var needOpGenitive = false
         switch right {
@@ -475,12 +478,10 @@ private extension GenitiveExpression {
             _ = c.emit(predicate: .BE)          // ある
         case let ident as Identifier
             where ident.isProperty:             // 〜の<属性>
-            break
+            _ = c.emit(property: ident.value)   // 属性取得(opGetProperty)
+            return nil
         case let phrase as PhraseExpression:    // 〜の<句>
-            if let value = phrase.left.compile(with: c) {
-                if let error = emit(value, with: c) { return error }
-            }
-            _ = c.emit(op: .opGenitive)
+            if let error = compile(phrase.left, with: c) { return error }
             // 格を付け加える
             _ = c.emit(particle: phrase.token)
             return nil

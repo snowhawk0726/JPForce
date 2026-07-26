@@ -115,6 +115,14 @@ class Compiler {
         currentScope.setLastInstruction(op: op, at: position)
         return position
     }
+    /// builtinのシンボルテーブルを参照し、強制的に属性シンボルを取得し、opGetPropertyをemit
+    func emit(property name: String) -> JpfError? {
+        guard let symbol = symbolTable.resolve(property: name) else {
+            return JpfError("「\(name)」は属性名ではありません。")
+        }
+        symbol.emitOpGet(with: self)
+        return nil
+    }
     func emit(predicate keyword: Token.Keyword) -> Int {
         emit(op: .opPredicate, operand: PredicateOperableFactory.index(of: keyword)!)
     }
@@ -277,7 +285,7 @@ extension Compiler {
     func emitAllCashe() throws {
         for obj in pullAll() {
             if let ident = obj.value as? JpfIdentifier, !ident.hasSymbol {
-                if !ident.isLhs {
+                if ident.isAssignTarget != true {
                     throw undefinedIdentifier(ident.value)
                 }
             }

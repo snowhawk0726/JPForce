@@ -225,24 +225,34 @@ extension Parsable {
         getNext()
         return currentToken
     }
-    /// 上限(〜<式>(<未満>)(<格>))解析
-    /// - Returns: 上限式、格(上限に付随する助詞)
-    func parseUpperBoundary() -> (Expression?, Token?) {
-        guard nextToken.isIdent || nextToken.isNumber else { return (nil, nil) }
+    /// 上限(〜<式>(未満)(<格>)(<式>))の解析
+    /// - Returns: 上限情報(UpperInfo)
+    func parseUpperBoundary() -> BoundaryInfo? {
+        guard nextToken.isIdent || nextToken.isNumber else { return nil }   // 上限なし
         getNext()
         guard let exp = ExpressionParser(parser).parse() else {
             error(message: "〜<式>で、式の解釈に失敗しました。")
-            return (nil, nil)
+            return nil
         }
         var particle: Token?
-        if nextToken.isParticle {   // <式>未満<格>
-            particle = nextToken
-            getNext()
+        var right: Expression?
+        if exp is PhraseExpression {    // <句>である場合、追加の解析
+            // <式>未満<格> の <格>を検出
+            if nextToken.isParticle {
+                particle = nextToken
+                getNext()
+            }
+            // 〜の〜 の <右項>を検出
+            if particle?.isParticle(.NO) == true || exp.hasParticle(.NO) {
+                getNext()
+                right = ExpressionParser(parser).parse()
+            }
         }
-        return (exp, particle)
+        // 解析結果の式、格、右項から、BoundaryInfoを構築
+        return normalizeUpper(from: exp, particle, right)
     }
     /// 上限式から上限情報(UpperInfo)を構築
-    func normalizeUpper(from exp: Expression?, _ nextParticle: Token?) -> BoundaryInfo? {
+    func normalizeUpper(from exp: Expression?, _ nextParticle: Token?, _ right: Expression?) -> BoundaryInfo? {
         guard let exp else { return nil }
         switch exp {
         case is IntegerLiteral, is Identifier:
@@ -261,7 +271,7 @@ extension Parsable {
                 boundary = BoundaryExpression(kind: .lte, expression: phrase.left)
                 particle = phrase.token
             }
-            return BoundaryInfo(boundary: boundary, particle: particle, right: nil)
+            return BoundaryInfo(boundary: boundary, particle: particle, right: right)
         case let genitive as GenitiveExpression:
             let boundary = BoundaryExpression(kind: .lte, expression: genitive.left)
             return BoundaryInfo(boundary: boundary, particle: nil, right: genitive.right)
@@ -651,11 +661,12 @@ extension Parsable {
                 return nil
             }
             expressions.append(expression)
-            // Existing LHS semantics
-            if expression.valueToken.isElementAssign {
-                splitElementAssignmentTarget(in: &expressions, from: semanticStartIndex)
+            // Semantic analysis
+            if expression.hasGenitivePredicate {    // 「aのb」を引数に持つ述語
+                let genitiveParticles = expression.valueToken.genitiveParticles // 述語の引数である対象の属格の句の格
+                splitGenitiveExpression(in: &expressions, from: semanticStartIndex, with: genitiveParticles)
             }
-            if isLhsAssignPredicate(expression) {
+            if expression.isPredicateToAssign {     // 代入対象となる左辺識別子に印をつける。
                 expressions.markLhsCandidates(from: semanticStartIndex)
                 semanticStartIndex = expressions.count
             }
@@ -685,65 +696,45 @@ extension Parsable {
         getNext(whenNextIs: .RBBRACKET) ||
         getNext(whenNextIs: .EOL)
     }
-    /// 式が左辺(代入される対象の識別子)を持つ述語かどうか
-    private func isLhsAssignPredicate(_ exp: Expression) -> Bool {
-        guard let predicate = exp as? PredicateExpression else {
-            return false
-        }
-        return predicate.token.hasLhsIdentifier
-    }
-    /// 要素代入する対象の属格を２つの句に分割する
-    private func splitElementAssignmentTarget(
+    /// 属格を引数に持つ述語の属格を分解する。
+    /// 1. startIndexから、述語までの式を走査しparticlesを使って候補を特定する。
+    /// 2. 対象を持つ述語(hasGenitivePredicate)を見つけたら候補で属格を分割する。
+    /// 3. 対象を持たない述語を見つけたら候補をキャンセルし、走査を続行
+    /// 4. 複合代入である場合は、候補をキャンセルし、走査を続行
+    private func splitGenitiveExpression(
         in exps: inout [Expression],
-        from startIndex: Int
+        from startIndex: Int,
+        with particles: [Token.Particle]    // 分割対象となる属格の格
     ) {
         // 分割候補
-        var candidates: [(index: Int, left: PhraseExpression, right: PhraseExpression)] = []
-        var isAssignment: Bool = false
+        var firstTarget: (index: Int, left: PhraseExpression, right: PhraseExpression)?
+        
         for i in startIndex..<exps.count {
-            if !candidates.isEmpty,
-               let predicate = exps[i] as? PredicateExpression {
-                isAssignment = predicate.hasKeyword(.ASSIGN)
-                if needToSplit(exps, at: i) {
-                    break
-                } else {
-                    candidates = [] // 分割候補をキャンセル
+            if firstTarget != nil {
+                // 述語待ち
+                guard exps[i].valueExpression is PredicateExpression else { continue }
+                // 分割しないパターンをチェック
+                guard exps[i].valueToken.hasGenitivePredicate,          // 分割対象を持たない述語(例：1を足し、aに代入)
+                      !(i > 0 && exps[i-1].hasParticle(.TE))            // 前式が「〜て」 → 複合要素代入
+                else {
+                    firstTarget = nil                                   // 分割対象をキャンセル
+                    continue
                 }
+                break   // 分割
             }
+            // aのb<格>
             guard let genitive = exps[i] as? GenitiveExpression,
-                  let rightPhrase = genitive.right as? PhraseExpression
-            else { continue }
-            guard rightPhrase.hasParticle(.NI) || rightPhrase.hasParticle(.WO)
+                  let rightPhrase = genitive.right as? PhraseExpression,
+                  particles.contains(where: rightPhrase.hasParticle)    // <格>が分割対象 (hasParticle(_:)のメソッド参照)
             else { continue }
             // 分割候補を設定
-            let candidate = (i, PhraseExpression(token: Token(.NO), left: genitive.left), rightPhrase)
-            candidates.append(candidate)
+            firstTarget = (i, genitive.leftPhrase, rightPhrase)
         }
-        // 属格を句に分割(<属格>に代入、<属格>(を、に)設定)
-        if !candidates.isEmpty {
-            let candidate = isLhs(candidates.last?.right, isAssignment: isAssignment) ? candidates.last! : candidates.first!
-            exps[candidate.index] = candidate.left
-            exps.insert(candidate.right, at: candidate.index + 1)
+        // 属格を句に分割
+        if let firstTarget {
+            exps[firstTarget.index] = firstTarget.left
+            exps.insert(firstTarget.right, at: firstTarget.index + 1)
         }
-    }
-    private func isLhs(_ exp: Expression?, isAssignment: Bool) -> Bool {
-        guard let phrase = exp as? PhraseExpression else {
-            return false
-        }
-        return phrase.hasParticle(.NI) && isAssignment
-    }
-    private func needToSplit(_ exps: [Expression], at i: Int) -> Bool {
-        // 代入(設定)する
-        guard exps[i].valueToken.isElementAssign else {
-            return false
-        }
-        // 〜て → 複合要素代入なので、分割しない
-        if i > 0, let phrase = exps[i-1] as? PhraseExpression,
-           phrase.hasParticle(.TE) {
-            return false
-        }
-        // 分割する
-        return true
     }
     private func foldRangeLiterals(in exps: inout [Expression]) {
         var i = 0
@@ -860,17 +851,6 @@ extension RangeLiteral {
 }
 /// 式文要素の左辺候補の操作を行う。
 extension Array where Element == Expression {
-    /// 文中に仮の左辺候補としてマークされた識別子を正式な左辺として確定する
-    func finalizeLhsCandidates() {
-        self
-            .compactMap { $0 as? PhraseExpression }
-            .compactMap { $0.left as? Identifier }
-            .filter { $0.isLhsCandidate }
-            .forEach {
-                $0.isLhs = true
-                $0.isLhsCandidate = false
-            }
-    }
     /// 代入先の識別子を抽出
     func extractLhsIdentifier() -> Identifier? {
         for (i, element) in self.enumerated() {
@@ -884,7 +864,7 @@ extension Array where Element == Expression {
                 return nil
             }
             // 代入対象(マークチェック後)
-            if ident.isLhsCandidate {
+            if ident.isTargetCandidate {
                 return ident
             }
         }
@@ -934,7 +914,7 @@ extension Array where Element == Expression {
         func mark() {
             switch self {
             case .TO(let id),.NO(let id),.NI(let id?):
-                id.isLhsCandidate = true
+                id.isTargetCandidate = true
             default:
                 return
             }
@@ -945,7 +925,7 @@ extension Array where Element == Expression {
         for exp in self[startIndex...] {
             // 文中に関係の無い述語があれば、その前の候補をキャンセル
             if let predicate = exp as? PredicateExpression,
-               !predicate.token.hasLhsIdentifier {
+               !predicate.token.hasAssignTarget {
                 candidates.removeAll()
                 continue
             }
@@ -969,15 +949,6 @@ extension Array where Element == Expression {
         }
         // 確定した候補の識別子のフラグをオンにする。
         candidates.forEach { $0.mark() }
-    }
-    /// 識別子候補を破棄する。
-    mutating func clearLhsCandidates() {
-        for i in indices {
-            if let phrase = self[i] as? PhraseExpression,
-               let ident = phrase.left as? Identifier {
-                ident.isLhsCandidate = false
-            }
-        }
     }
 }
 extension Token {
@@ -1513,13 +1484,13 @@ struct TildeUpperRangeParser : ExpressionParsable {
     func parse() -> Expression? {
         defer {parser.isInRangeParser = false}
         parser.isInRangeParser = true   // ParticleRangeParserの抑止
-        let (upper, particle) = parseUpperBoundary()
-        guard let upper else {
-            error(message: "「〜<式>」で範囲を指定できる式は、「数値」または「識別子」のみです。")
+        guard let upper = parseUpperBoundary() else {
+            if !nextToken.isNumber && !nextToken.isIdent {
+                error(message: "「〜<式>」で範囲を指定できる式は、「数値」または「識別子」のみです。")
+            }
             return nil
         }
-        let normalized = normalizeUpper(from: upper, particle)
-        return buildRange(lowerInfo: nil, upperInfo: normalized)
+        return buildRange(lowerInfo: nil, upperInfo: upper)
     }
 }
 struct FunctionLiteralParser : ExpressionParsable {
@@ -2194,9 +2165,8 @@ struct TildeLowerRangeParser : ExpressionParsable {
         defer {parser.isInRangeParser = false}
         parser.isInRangeParser = true   // ParticleRangeParserの抑止
         guard let lower = parseLowerBoundary() else { return nil }
-        let (upper, particle) = parseUpperBoundary()
-        let normalized = normalizeUpper(from: upper, particle)
-        return buildRange(lowerInfo: lower, upperInfo: normalized)
+        let upper = parseUpperBoundary()
+        return buildRange(lowerInfo: lower, upperInfo: upper)
     }
     // 下限(<式>〜(<格>)解析
     /// - Returns: 下限情報

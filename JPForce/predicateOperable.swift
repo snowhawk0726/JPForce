@@ -19,51 +19,53 @@ struct PredicateOperableFactory {
     // 予約語とそれを実行するPredicateOperableを返す関数の配列
     static let predicates: [(keyword: Token.Keyword, operator: (Environment) -> PredicateOperable)] = [
         (.APPEND,       {AppendOperator($0, by: Token(.APPEND))}),      // 0
+        (.INSERT,       {AppendOperator($0, by: Token(.INSERT))}),
         (.REMOVE,       {RemoveOperator($0, by: Token(.REMOVE))}),
         (.CONTAINS,     {ContainsOperator($0, by: Token(.CONTAINS))}),
         (.FOREACH,      {ForeachOperator($0, by: Token(.FOREACH))}),
-        (.MAP,          {MapOperator($0, by: Token(.MAP))}),
-        (.FILTER,       {FilterOperator($0, by: Token(.FILTER))}),      // 5
+        (.MAP,          {MapOperator($0, by: Token(.MAP))}),            // 5
+        (.FILTER,       {FilterOperator($0, by: Token(.FILTER))}),
         (.REDUCE,       {ReduceOperator($0, by: Token(.REDUCE))}),
         (.SORT,         {SortOperator($0, by: Token(.SORT))}),
         (.REVERSE,      {ReverseOperator($0, by: Token(.REVERSE))}),
-        (.PRINT,        {PrintOperator($0, by: Token(.PRINT))}),
-        (.ASK,          {PrintOperator($0, by: Token(.ASK))}),          // 10
+        (.PRINT,        {PrintOperator($0, by: Token(.PRINT))}),        // 10
+        (.ASK,          {PrintOperator($0, by: Token(.ASK))}),
         (.NEWLINE,      {NewlineOperator($0)}),
         (.READ,         {ReadOperator($0, by: Token(.READ))}),
         (.FILES,        {FilesOperator($0, by: Token(.FILES))}),
-        (.INPUT,        {StackOperator($0)}),
-        (.DROP,         {DropOperator($0)}),                            // 15
+        (.INPUT,        {StackOperator($0)}),                           // 15
+        (.DROP,         {DropOperator($0)}),
         (.EMPTY,        {EmptyOperator($0, by: Token(.EMPTY))}),
         (.DUPLICATE,    {PullOperator($0, by: Token(.DUPLICATE))}),
         (.PULL,         {PullOperator($0, by: Token(.PULL))}),
-        (.PUSH,         {PushOperator($0, by: Token(.PUSH))}),
-        (.ASSIGN,       {AssignOperator($0)}),                          // 20
+        (.PUSH,         {PushOperator($0, by: Token(.PUSH))}),          // 20
+        (.ASSIGN,       {AssignOperator($0)}),
+        (.SET,          {SetOperator($0, by: Token(.SET))}),
         (.SWAP,         {SwapOperator($0, by: Token(.SWAP))}),
         (.IDENTIFIERS,  {IdentifiersOperator($0, by: Token(.IDENTIFIERS))}),
-        (.ADD,          {AddOperator($0)}),
+        (.ADD,          {AddOperator($0)}),                             // 25
         (.MULTIPLY,     {MultiplyOperator($0, by: Token(.MULTIPLY))}),
-        (.SUBSTRACT,    {SubstractOperator($0, by: Token(.SUBSTRACT))}),// 25
+        (.SUBSTRACT,    {SubstractOperator($0, by: Token(.SUBSTRACT))}),
         (.DIVIDE,       {DivideOperator($0, by: Token(.DIVIDE))}),
         (.NEGATE,       {NegateOperator($0, by: Token(.NEGATE))}),
-        (.LT,           {CompareOperator($0, by: Token(.LT))}),
+        (.LT,           {CompareOperator($0, by: Token(.LT))}),         // 30
         (.GT,           {CompareOperator($0, by: Token(.GT))}),
-        (.EQUAL,        {BooleanOperator($0, by: Token(.EQUAL))}),      // 30
+        (.EQUAL,        {BooleanOperator($0, by: Token(.EQUAL))}),
         (.BE,           {BooleanOperator($0, by: Token(.BE))}),
         (.NOT,          {BooleanOperator($0, by: Token(.NOT))}),
-        (.RETURN,       {ReturnOperator($0)}),
+        (.RETURN,       {ReturnOperator($0)}),                          // 35
         (.GOBACK,       {GobackOperator($0)}),
-        (.BREAK,        {LoopControlOperator($0, by: Token(.BREAK))}),  // 35
+        (.BREAK,        {LoopControlOperator($0, by: Token(.BREAK))}),
         (.CONTINUE,     {LoopControlOperator($0, by: Token(.CONTINUE))}),
         (.MONO,         {UnwrapOperator($0, by: Token(.MONO))}),        // 〜たもの
-        (.NULL,         {NullOperator($0)}),
+        (.NULL,         {NullOperator($0)}),                            // 40
         (.EXECUTE,      {ExecuteOperator($0)}),                         // (関数)を実行
-        (.CREATE,       {CreateOperator($0)}),                          // 40 (型)から生成
+        (.CREATE,       {CreateOperator($0)}),                          // (型)から生成
         (.INITIALIZATION,   {InitializeOperator($0)}),
         (.SURU,         {PerformOperator($0)}),                         // 〜にする、〜をする
-        (.AVAILABLE,    {AvailableOperator($0)}),
+        (.AVAILABLE,    {AvailableOperator($0)}),                       // 45
         (.KOTO,         {NopOperator($0)}),
-        (.IT,           {ItOperator($0)}),                              // 45
+        (.IT,           {ItOperator($0)}),
     ]
     static let dictionary: [Token.Keyword : (Environment) -> PredicateOperable] = {
         Dictionary(uniqueKeysWithValues: predicates.map {($0.keyword, $0.operator)})
@@ -209,7 +211,7 @@ extension PredicateOperable {
         return nil
     }
     /// エスケープ文字を(Swiftの)制御コードに変換する。
-    /// 「\改行なし」が文字列の後尾にある場合、改行をせずに表示する。
+    /// 「\改行なし」が文字列の末尾にある場合、改行をせずに表示する。
     /// 　(\は、そのまま使えるが、Swiftに合わせた。(「"」とか「'」は合わせてない))
     private func replaced(_ string: String) -> String {
         let codes = [("\\t","\t"),("\\n","\n"),("\\r","\r"),("\\0","\0"),("\\\\","\\"),("\\「","「"),("\\」","」"),("\\『","『"),("\\』","』"),("\\改行なし","\\末尾")]
@@ -248,6 +250,7 @@ extension PredicateOperable {
     var valueOfEnumeratorNotFound: JpfError {JpfError("指定の値が見つかりません。指定値：")}
     var cannotCreateFromProtocol:  JpfError {JpfError("規約からインスタンスは生成できません。")}
     var cannotInitialize: JpfError      {JpfError("オブジェクトの初期化ができません。")}
+    var typeNotFound: JpfError          {JpfError("指定された型の定義が見つかりません。")}
     var detectParserError: JpfError     {JpfError("構文解析器がエラーを検出しました。")}
     func cannotAssignToIdentifier(_ o: JpfObject?) -> JpfError {JpfError("「\(o?.string ?? "??")」には代入できません。")}
 }
@@ -606,7 +609,7 @@ struct CreateOperator : PredicateOperable {
             switch type.create(with: environment) {
             case let instance as JpfInstance:
                 let ident = getIdentifier() // 識別子を抽出
-                if let result = instance.initialize(with: environment) {return result}
+                if let result = instance.initialize(type: type, with: environment) {return result}
                 if let i = ident {          // 識別子あり？
                     environment[i.value] = instance // 生成したインスタンスを代入
                     return nil
@@ -664,7 +667,8 @@ struct InitializeOperator : PredicateOperable {
     func operate() -> JpfObject? {
         guard let instance = environment.unwrappedPeek as? JpfInstance else {return cannotInitialize}
         environment.drop()
-        if let result = instance.initialize(with: environment), result.isError {return result} // 初期化
+        guard let type = environment[instance.type] as? JpfType else {return typeNotFound}
+        if let result = instance.initialize(type: type, with: environment), result.isError {return result} // 初期化
         return nil
     }
 }
@@ -709,6 +713,8 @@ struct AssignOperator : PredicateOperable {
                 else {break}
                 let position: JpfObject             // 代入位置
                 switch params[2].value {
+                case let specifier as JpfSpecifier:
+                    position = specifier
                 case let ident as JpfIdentifier:    // 識別子 → 値 / 指定子
                     position = environment.resolvedValue(for: ident) ?? ident
                 case let value?:                    // 値
@@ -743,19 +749,56 @@ struct AssignOperator : PredicateOperable {
         return assignUsage
     }
 }
+/// オブジェクトの要素に値を設定する。
+/// <値>(を)<オブジェクト>の「<識別子>に設定する。
+/// <オブジェクト>の<識別子>に<値>を設定する。
+/// <オブジェクト>の<識別子>を<値>に設定する。
+struct SetOperator : PredicateOperable {
+    init(_ environment: Environment, by op: Token) {self.environment = environment; self.op = op}
+    let environment: Environment, op: Token
+    func operate() -> JpfObject? {
+        if var params = environment.peek(3) {
+            switch (params[0].particle, params[1].particle, params[2].particle) {
+            case (Token(.NO),Token(.NI),Token(.WO)),    // 対象の要素に値を設定
+                 (Token(.NO),Token(.WO),Token(.NI)):    // 対象の要素を値に設定
+                params.swapAt(0, 1)
+                params.swapAt(0, 2)
+                fallthrough
+            case (Token(.WO),Token(.NO),Token(.NI)):    // 値を、対象の要素に設定
+                guard let value = params[0].value,
+                      let object = params[1].value,
+                      let ident = params[2].value as? JpfIdentifier
+                else { break }
+                let result = object.assign(value, by: ident.value)
+                guard !result.isError else { return result }
+                environment.drop(3)
+                return nil
+            default:
+                break
+            }
+        }
+        return setUsage
+    }
+}
 struct AppendOperator : PredicateOperable {
     init(_ environment: Environment, by op: Token) {self.environment = environment; self.op = op}
     let environment: Environment, op: Token
     func operate() -> JpfObject? {
         if let operands = environment.peek(3) {
-            if let result = appendPairToDictionary(with: operands) {
-                return result
-            }
-            if let result = insertValueToArray(with: operands) {
-                return result
+            switch op {
+            case Token(.APPEND):
+                if let result = appendPairToDictionary(with: operands) {
+                    return result
+                }
+            case Token(.INSERT):
+                if let result = insertValueToArray(with: operands) {
+                    return result
+                }
+            default:
+                break
             }
         }   // 入力が３でニ格が辞書でない場合は、以下を試す。
-        if let params = environment.peek(2) {
+        if op == Token(.APPEND), let params = environment.peek(2) {
             return appendElementToContainer(with: (params[0], params[1]))
         }
         return "「\(op.literal) 」" + twoParamsNeeded + appendUsage
@@ -817,9 +860,9 @@ struct AppendOperator : PredicateOperable {
         }
         return obj as? JpfDictionary
     }
-    /// 「要素を配列の位置に追加する」または「配列の位置に要素を追加する」
+    /// 「要素を配列の位置に挿入する」または「配列の位置に要素を挿入する」
     /// - Parameter operands: ３つの入力(句または値)
-    /// - Returns: 追加した配列を返す。形式が合わない場合は、使い方をエラーとして返す。
+    /// - Returns: 挿入した配列を返す。形式が合わない場合は、使い方をエラーとして返す。
     private func insertValueToArray(with operands: [JpfObject]) -> JpfObject? {
         let particles = (operands[0].particle, operands[1].particle, operands[2].particle)
         var values = [operands[0].value, operands[1].value, operands[2].value]
@@ -834,7 +877,7 @@ struct AppendOperator : PredicateOperable {
                   let position = resolvePosition(for: values[1], with: environment),
                   let value = values[2]
             else {
-                return arrayInsertUsage
+                return insertArrayUsage
             }
             environment.drop(3)
             return array.insert(value, at: position)
@@ -860,21 +903,56 @@ struct RemoveOperator : PredicateOperable {
     init(_ environment: Environment, by op: Token) {self.environment = environment; self.op = op}
     let environment: Environment, op: Token
     func operate() -> JpfObject? {
-        if var params = environment.peek(2) {
-            switch (params[0].particle, params[1].particle) {
-            case (.particle(.KARA),.particle(.WO)), (nil,.particle(.WO)):
+        var result: JpfObject
+        if var params = environment.peek(3) {
+            switch (params[0].particle, params[1].particle, params[2].particle) {
+            // <オブジェクト>から<指定子>の<オブジェクト>を削除
+            case (.particle(.KARA), .particle(.NO), .particle(.WO)):
                 params.swapAt(0, 1)
+                params.swapAt(1, 2)
                 fallthrough
-            case (.particle(.WO),.particle(.KARA)):
-                guard let object = params[1].value else {return removeUsage}
-                let result = object.remove(params[0])
-                guard !result.isError else {return result}
-                environment.drop(2)
+            // <指定子>の<オブジェクト>を<オブジェクト>から削除
+            case (.particle(.NO), .particle(.WO), .particle(.KARA)):
+                guard let object = params[2].value,
+                      let specifier = params[0].specifier
+                else { return removeUsage3 }
+                switch specifier {  // 指定子
+                case .first, .head:  // 最初/先頭
+                    result = object.removeFirstValue(params[1])
+                case .all:          // 全て
+                    result = object.removeAllValues(params[1])
+                default:
+                    return removeUsage3
+                }
+                if result.isError {return result}
+                environment.drop(3)
                 return result
             default:
                 break
             }
         }
+        if var params = environment.peek(2) {
+            switch (params[0].particle, params[1].particle) {
+            // <オブジェクト>から(最初の)<オブジェクト>を削除
+            case (.particle(.KARA),.particle(.WO)):
+                params.swapAt(0, 1)
+                fallthrough
+            // (最初の)<オブジェクト>を<オブジェクト>から削除
+            case (.particle(.WO),.particle(.KARA)):
+                guard let object = params[1].value else {return removeUsage2}
+                result = object.removeFirstValue(params[0])
+            // <オブジェクト>の<位置/キー>を削除 / <位置/キー>を削除
+            case (.particle(.NO),.particle(.WO)), (nil,.particle(.WO)):
+                guard let object = params[0].value else {return removeUsage}
+                result = object.remove(params[1])
+            default:
+                return removeUsage2
+            }
+            if result.isError {return result}
+            environment.drop(2)
+            return result
+        }
+        // <識別子オブジェクト>を削除
         if isPeekParticle(.WO), let object = environment.peek?.value, !object.name.isEmpty {
             environment.drop()
             environment[object.name] = nil          // 対象を辞書から消す
@@ -958,24 +1036,24 @@ struct SortOperator : PredicateOperable {
     let environment: Environment, op: Token
     func operate() -> JpfObject? {
         if let params = environment.peek(2),
-            (params[0].particle == .particle(.WO) || params[0].particle == nil),
-            let left = params[0].value {
-            if params[1].particle == .particle(.DE), let right = params[1].value as? JpfFunction {
+            (params[0].isParticle(.WO) || params[0].particle == nil),
+            let object = params[0].value {
+            if params[1].isParticle(.DE), let function = params[1].value as? JpfFunction {
                 environment.drop(2)
-                return left.sorted(by: right, with: environment)
+                return object.sorted(by: function, with: environment)
             } else
-            if params[1].particle == .particle(.NI), let right = params[1].value as? JpfString {
+            if params[1].isParticle(.NI), let order = params[1].specifier {
                 environment.drop(2)
-                return left.sorted(by: right)
+                return object.sorted(by: order)
             } else {
                 return sortUsage
             }
         } else
         if let param = environment.peek,
-           (param.particle == .particle(.WO) || param.particle == nil) {
-            guard let left = param.value else {return sortUsage}
+           (param.isParticle(.WO) || param.particle == nil) {
+            guard let object = param.value else {return sortUsage}
             environment.drop()
-            return left.sorted()
+            return object.sorted()
         }
         return sortUsage
     }
@@ -1087,9 +1165,10 @@ private extension PullOperator {
     }
     /// 仕様に従い値変換
     private func applyValueMode(_ mode: ValueMode, to objs: [JpfObject]) -> [JpfObject] {
-        guard mode != .none else {return objs}
+        // 指定子で値を変換
+        guard let name = mode.string else { return objs }
         return objs.map {
-            $0.getProperty(by: mode.rawValue) ?? JpfNull.object
+            $0.getProperty(by: name) ?? JpfNull.object
         }
     }
 }

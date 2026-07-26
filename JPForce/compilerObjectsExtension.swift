@@ -33,19 +33,19 @@ extension JpfString {
     var symbolKind: SymbolKind {.constant}
 }
 extension JpfIdentifier {
-    // 初期化
+    /// 初期化(名前解決)
     init(resolving ident: Identifier, with c: Compiler) throws {
         try self.init(
             resolving: ident.value,
             with: c,
-            isLhs: ident.isLhs,
+            isAssignTarget: ident.isAssignTarget,
             isOuter: ident.isOuter
         )
     }
-    init(resolving name: String, with c: Compiler, isLhs: Bool = false, isOuter: Bool = false) throws {
+    init(resolving name: String, with c: Compiler, isAssignTarget: Bool = false, isOuter: Bool = false) throws {
         self.name = name
         self.value = name
-        self.isLhs = isLhs
+        self.isAssignTarget = isAssignTarget
         if isOuter && c.symbolTable.outer == nil {
             throw outerUndefinedIdentifier(name)
         }
@@ -55,11 +55,12 @@ extension JpfIdentifier {
             throw outerUndefinedIdentifier(name)
         }
     }
+    /// 初期化(名前の存在を保証) → 名前解決できなければシンボル定義
     init(ensuring ident: Identifier, with c: Compiler) throws {
         try self.init(
             ensuring: ident.value,
             with: c,
-            isLhs: ident.isLhs,
+            isAssignTarget: ident.isAssignTarget,
             isOuter: ident.isOuter
         )
     }
@@ -69,11 +70,11 @@ extension JpfIdentifier {
         }
         self.name = ident.name
         self.value = ident.value
-        self.isLhs = ident.isLhs
+        self.isAssignTarget = ident.isAssignTarget
         self.symbol = ident.symbol ?? c.symbolTable.define(ident.value)
     }
-    init(ensuring name: String, with c: Compiler, isLhs: Bool = false, isOuter: Bool = false) throws {
-        try self.init(resolving: name, with: c, isLhs: isLhs, isOuter: isOuter)
+    init(ensuring name: String, with c: Compiler, isAssignTarget: Bool = false, isOuter: Bool = false) throws {
+        try self.init(resolving: name, with: c, isAssignTarget: isAssignTarget, isOuter: isOuter)
         defineIfNeeded(with: c)
     }
     // コンパイル
