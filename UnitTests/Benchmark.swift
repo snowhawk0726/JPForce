@@ -6,10 +6,11 @@
 //
 
 import XCTest
+import Testing
 
 final class Benchmark : XCTestCase {
     func testFibonacci() {
-        let paramenter = 25
+        let paramenter = 35
         print("パラメータは、\(paramenter)。")
         let input = """
         fibonacciは、関数【入力がx。
@@ -52,7 +53,7 @@ final class Benchmark : XCTestCase {
         print("インタープリタ:\t結果は、\(result)、実行時間は、\(duration)秒")
         // compiler
         let compiler = Compiler(from: program)
-        compiler.optimizeConstantsEnabled = true
+        compiler.optimizeConstantsEnabled = false
         start = Date()
         if let error = compiler.compile() as? JpfError {
             XCTFail("コンパイルエラー：\(error.message)")
@@ -80,4 +81,34 @@ final class Benchmark : XCTestCase {
         duration = Date().timeIntervalSince(start)
         print("Swift:\t\t\t結果は、\(number)、実行時間は、\(duration)秒")
     }
+}
+struct BenchmarkTests {
+    @Test(arguments: [100_000_000])
+    func testOpAdd(_ n: Int) async throws {
+        let constants: [JpfObject] = [
+            JpfInteger(value: 1),
+            JpfInteger(value: 2),
+        ]
+        let instructions: [Instruction] = [
+            make(op: .opConstant, operand: 0),
+            make(op: .opConstant, operand: 1),
+            make(op: .opAdd, operand: 0),
+            make(op: .opDrop),
+        ]
+        let bytecode = Bytecode(Instructions(instructions), constants)
+        let vm = VM(with: bytecode)
+        let start = Date()
+        for _ in 0..<n {
+            _ = vm.run()
+        }
+        let duration = Date().timeIntervalSince(start)
+        print("実行時間は、\(duration)秒(\(n.formatted())回)")
+        // 2026/8/6:   実行時間は、13.636877059936523秒(100,000,000回)
+        // 2026/09/17: 実行時間は、3.338766932487488秒(100,000,000回) ← Release版
+        print("Value size (int(Int))")
+        print("    size:   \(MemoryLayout<JpfObject>.size)")
+        print("    stride: \(MemoryLayout<JpfObject>.stride)")
+        print("    align:  \(MemoryLayout<JpfObject>.alignment)")
+    }
+
 }

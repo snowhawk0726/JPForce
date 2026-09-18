@@ -33,6 +33,7 @@ extension CodeExecutable {
     var invalidRangeIndex: JpfError         {JpfError("範囲の格インデックスが正しくありせん。")}
     func dictionaryKeyNotHashable(_ key: JpfObject) -> JpfError {
         JpfError("辞書のキー「\(key)」がハッシュ可能な型ではありません。")}
+    var addParameterError: JpfError         {JpfError("引数が数値でありません。")}
 }
 // MARK: - instance factory
 struct CodeExecutableFactory {
@@ -72,6 +73,7 @@ struct CodeExecutableFactory {
         case .opArrayConcat:    return ArrayConcatExecuter(vm)
         case .opComparisonConst:return ComparisonExecuter(vm, with: operandBytes)
         case .opArrayRepeat:    return ArrayRepeatExecuter(vm)
+        case .opAdd:            return AddOperationExecuter(vm, with: operandBytes)
         }
     }
 }
@@ -504,5 +506,22 @@ private extension CodeExecutable {
         }
         if let err = result.error {throw err}
         return result
+    }
+}
+struct AddOperationExecuter : CodeExecutable {
+    init(_ vm: VM, with bytes: [Byte]) {self.vm = vm; self.bytes = bytes}
+    let vm: VM, bytes: [Byte]
+    func execute() throws {
+        let kind = Int(readUInt8(from: bytes))
+        vm.currentFrame.advanceIp(by: 1)
+        guard
+            kind == 0,
+            let rhs = vm.pull()?.number,
+            let lhs = vm.pull()?.number
+        else {
+            throw addParameterError
+        }
+        // Only support integer addition for now
+        try vm.push(JpfInteger(value: lhs + rhs))
     }
 }

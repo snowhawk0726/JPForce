@@ -48,6 +48,7 @@ enum Opcode : Byte {
     case opArrayConcat      // ２つの値を配列化し連結
     case opComparisonConst
     case opArrayRepeat
+    case opAdd
     //
     var definition: (name: String, operandWidths: [Int]) {
         switch self {
@@ -86,6 +87,7 @@ enum Opcode : Byte {
         case .opArrayConcat:    (name: "OpArrayConcat",   operandWidths: [])
         case .opComparisonConst:(name: "OpComparison",    operandWidths: [1])   // 比較種別インデックス
         case .opArrayRepeat:    (name: "OpArrayRepeat",   operandWidths: [])    // 要素数指定配列
+        case .opAdd:            (name: "OpAdd",           operandWidths: [1])   // 0: 数値、1: 文字列
         }
     }
     var name: String {definition.name}                  // オペコード名

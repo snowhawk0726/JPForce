@@ -1,0 +1,677 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Scheme
+   LastUpgradeVersion = "2700"
+   version = "1.7">
+   <BuildAction
+      parallelizeBuildables = "YES"
+      buildImplicitDependencies = "YES"
+      buildArchitectures = "Automatic">
+   </BuildAction>
+   <TestAction
+      buildConfiguration = "Release"
+      selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
+      selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
+      shouldUseLaunchSchemeArgsEnv = "YES"
+      shouldAutocreateTestPlan = "YES">
+      <Testables>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "5042123329B58E1500D2EA98"
+               BuildableName = "UnitTests.xctest"
+               ReferencedContainer = "container:JPForce.xcodeproj">
+            </BuildableReference>
+            <SkippedTests>
+               <Test
+                  Identifier = "AstTests">
+               </Test>
+               <Test
+                  Identifier = "AstTests/testString()">
+               </Test>
+               <Test
+                  Identifier = "CodeTests">
+               </Test>
+               <Test
+                  Identifier = "CodeTests/testInstructionsString()">
+               </Test>
+               <Test
+                  Identifier = "CodeTests/testMake()">
+               </Test>
+               <Test
+                  Identifier = "CodeTests/testReadOperands()">
+               </Test>
+               <Test
+                  Identifier = "CodeTests/testVmCodes()">
+               </Test>
+               <Test
+                  Identifier = "CommonTests">
+               </Test>
+               <Test
+                  Identifier = "CommonTests/testArrayInitialization()">
+               </Test>
+               <Test
+                  Identifier = "CommonTests/testLhsAssingments()">
+               </Test>
+               <Test
+                  Identifier = "CommonTests/testRangeCheckings()">
+               </Test>
+               <Test
+                  Identifier = "CommonTests/testRedefinedKeywords()">
+               </Test>
+               <Test
+                  Identifier = "CommonTests/testSentences()">
+               </Test>
+               <Test
+                  Identifier = "CommonTests/testSpecifierAccess()">
+               </Test>
+               <Test
+                  Identifier = "CompilerTests">
+               </Test>
+               <Test
+                  Identifier = "CompilerTests/testArrayLiterals()">
+               </Test>
+               <Test
+                  Identifier = "CompilerTests/testBooleanExpressions()">
+               </Test>
+               <Test
+                  Identifier = "CompilerTests/testBuiltins()">
+               </Test>
+               <Test
+                  Identifier = "CompilerTests/testClosures()">
+               </Test>
+               <Test
+                  Identifier = "CompilerTests/testCompilerScopes()">
+               </Test>
+               <Test
+                  Identifier = "CompilerTests/testConditionals()">
+               </Test>
+               <Test
+                  Identifier = "CompilerTests/testDefineStatementScopes()">
+               </Test>
+               <Test
+                  Identifier = "CompilerTests/testDictionaryLiterals()">
+               </Test>
+               <Test
+                  Identifier = "CompilerTests/testFunctionCalls()">
+               </Test>
+               <Test
+                  Identifier = "CompilerTests/testFunctions()">
+               </Test>
+               <Test
+                  Identifier = "CompilerTests/testFunctionsWithoutReturnValue()">
+               </Test>
+               <Test
+                  Identifier = "CompilerTests/testGenitiveExpressions()">
+               </Test>
+               <Test
+                  Identifier = "CompilerTests/testGlobalDefStatements()">
+               </Test>
+               <Test
+                  Identifier = "CompilerTests/testIndexExpressions()">
+               </Test>
+               <Test
+                  Identifier = "CompilerTests/testIntegerArithmetic()">
+               </Test>
+               <Test
+                  Identifier = "CompilerTests/testPhraseExpressions()">
+               </Test>
+               <Test
+                  Identifier = "CompilerTests/testRangeLiterals()">
+               </Test>
+               <Test
+                  Identifier = "CompilerTests/testRecursiveFunctions()">
+               </Test>
+               <Test
+                  Identifier = "CompilerTests/testStackOperations()">
+               </Test>
+               <Test
+                  Identifier = "CompilerTests/testStringExpressions()">
+               </Test>
+               <Test
+                  Identifier = "ConstAnalysisTests">
+               </Test>
+               <Test
+                  Identifier = "ConstAnalysisTests/testConstants()">
+               </Test>
+               <Test
+                  Identifier = "ConstAnalysisTests/testDefineStatements()">
+               </Test>
+               <Test
+                  Identifier = "ConstAnalysisTests/testEvaluatedConstant()">
+               </Test>
+               <Test
+                  Identifier = "ConstAnalysisTests/testExpressions()">
+               </Test>
+               <Test
+                  Identifier = "ConstAnalysisTests/testRangeLiterals()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testArrayAppendedsAndInserts()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testArrayDeletes()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testArrayIndexExpressions()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testArrayLiteral()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testAsWellAsPredicate()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testAssignAndSwapOperations()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testAssignToContainers()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testBooleanExpressions()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testBuiltinFunctions()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testBuiltinOperations()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testCaseExpressions()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testClosure()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testCompoundAssignmentOperations()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testComputationOverloads()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testComputations()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testConditionalOperations()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testConformanceErrors()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testDefaultParameterValues()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testDefineStatements()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testDictionaryAppendeds()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testDictionaryDeletes()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testDictionaryLiteral()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testDitctionaryIndexExpressions()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testEndOfElements()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testEnumOperations()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testEnumProperties()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testErrorHandling()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testFunctionApplications()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testFunctionCalls()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testFunctionObject()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testInitializers()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testInstanceMethods()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testIntegerExpressions()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testLabelExpressions()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testLogicalOperations()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testLoopControlExpressions()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testLoopControls()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testLoopOperations()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testOrPhrase()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testOuterIdentifiers()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testOutputs()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testOverloadExecution()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testOverloadedComputation()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testOverloadedConformance()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testOverloadedFunction()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testOverloadedPredicates()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testParameterConformance()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testPhraseExpressions()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testPredicateNots()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testProtocolConformances()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testProtocolOperation()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testRedefinedComputation()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testReturnExpressions()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testReturnOperations()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testReturnTypeConformance()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testReturnTypesChecking()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testSelectiveOrEvaluations()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testStackOperations()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testStringBuiltins()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testStringLiteral()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testTypeExtension()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testTypeInitExtensions()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testTypeInitOverloads()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testTypeMembers()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testTypeMethods()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testTypeObject()">
+               </Test>
+               <Test
+                  Identifier = "EvaluatorTests/testTypeOperation()">
+               </Test>
+               <Test
+                  Identifier = "LexerTests">
+               </Test>
+               <Test
+                  Identifier = "LexerTests/testNextParticle()">
+               </Test>
+               <Test
+                  Identifier = "LexerTests/testNextSymbol()">
+               </Test>
+               <Test
+                  Identifier = "LexerTests/testNextToken()">
+               </Test>
+               <Test
+                  Identifier = "LexerTests/testNumberAndUnits()">
+               </Test>
+               <Test
+                  Identifier = "ObjectTests">
+               </Test>
+               <Test
+                  Identifier = "ObjectTests/testStringHashKey()">
+               </Test>
+               <Test
+                  Identifier = "ParserTests">
+               </Test>
+               <Test
+                  Identifier = "ParserTests/testArrayLiterals()">
+               </Test>
+               <Test
+                  Identifier = "ParserTests/testBlockStatementParsings()">
+               </Test>
+               <Test
+                  Identifier = "ParserTests/testBooleanExpressions()">
+               </Test>
+               <Test
+                  Identifier = "ParserTests/testCallExpressionParsing()">
+               </Test>
+               <Test
+                  Identifier = "ParserTests/testCaseConsequences()">
+               </Test>
+               <Test
+                  Identifier = "ParserTests/testCaseExpressions()">
+               </Test>
+               <Test
+                  Identifier = "ParserTests/testComputationDefinitionStatements()">
+               </Test>
+               <Test
+                  Identifier = "ParserTests/testConditionalOperations()">
+               </Test>
+               <Test
+                  Identifier = "ParserTests/testDefaultParameterParsing()">
+               </Test>
+               <Test
+                  Identifier = "ParserTests/testDefineStatements()">
+               </Test>
+               <Test
+                  Identifier = "ParserTests/testEndOfStatements()">
+               </Test>
+               <Test
+                  Identifier = "ParserTests/testEnumLiteralParsings()">
+               </Test>
+               <Test
+                  Identifier = "ParserTests/testEnumeratorLiteralParsings()">
+               </Test>
+               <Test
+                  Identifier = "ParserTests/testFunctionLiteralParsings()">
+               </Test>
+               <Test
+                  Identifier = "ParserTests/testFunctionLiteralWithName()">
+               </Test>
+               <Test
+                  Identifier = "ParserTests/testFunctionParamForms()">
+               </Test>
+               <Test
+                  Identifier = "ParserTests/testFunctionParameterParsing()">
+               </Test>
+               <Test
+                  Identifier = "ParserTests/testFunctionRturnTypesParsing()">
+               </Test>
+               <Test
+                  Identifier = "ParserTests/testGenitiveExpressions()">
+               </Test>
+               <Test
+                  Identifier = "ParserTests/testIdentifierExpressions()">
+               </Test>
+               <Test
+                  Identifier = "ParserTests/testIntegerLiteralExpression()">
+               </Test>
+               <Test
+                  Identifier = "ParserTests/testItsParsings()">
+               </Test>
+               <Test
+                  Identifier = "ParserTests/testLabelExpressions()">
+               </Test>
+               <Test
+                  Identifier = "ParserTests/testLogicalExpressions()">
+               </Test>
+               <Test
+                  Identifier = "ParserTests/testLoopExpressions()">
+               </Test>
+               <Test
+                  Identifier = "ParserTests/testParseSentences()">
+               </Test>
+               <Test
+                  Identifier = "ParserTests/testParsingDictionaryLiteralWithExpressions()">
+               </Test>
+               <Test
+                  Identifier = "ParserTests/testParsingDictionaryLiteralsStringKeys()">
+               </Test>
+               <Test
+                  Identifier = "ParserTests/testParsingEmptyDictionaryLiteral()">
+               </Test>
+               <Test
+                  Identifier = "ParserTests/testParsingNotExpressions()">
+               </Test>
+               <Test
+                  Identifier = "ParserTests/testParsingPredicateExpressions()">
+               </Test>
+               <Test
+                  Identifier = "ParserTests/testProtocolComformingProtocols()">
+               </Test>
+               <Test
+                  Identifier = "ParserTests/testProtocolLiteralParsings()">
+               </Test>
+               <Test
+                  Identifier = "ParserTests/testRangeCombinationErrors()">
+               </Test>
+               <Test
+                  Identifier = "ParserTests/testRangeExpressions()">
+               </Test>
+               <Test
+                  Identifier = "ParserTests/testRangeLiterals()">
+               </Test>
+               <Test
+                  Identifier = "ParserTests/testReturnExpressions()">
+               </Test>
+               <Test
+                  Identifier = "ParserTests/testRhsStatement()">
+               </Test>
+               <Test
+                  Identifier = "ParserTests/testSelectiveOrExpression()">
+               </Test>
+               <Test
+                  Identifier = "ParserTests/testSentenceTreminators()">
+               </Test>
+               <Test
+                  Identifier = "ParserTests/testSplitGenitiveExpressions()">
+               </Test>
+               <Test
+                  Identifier = "ParserTests/testStringLiteralExpression()">
+               </Test>
+               <Test
+                  Identifier = "ParserTests/testSwitchCaseExpression()">
+               </Test>
+               <Test
+                  Identifier = "ParserTests/testTypeLiteralParsings()">
+               </Test>
+               <Test
+                  Identifier = "SymbolTableTests">
+               </Test>
+               <Test
+                  Identifier = "SymbolTableTests/testDefine()">
+               </Test>
+               <Test
+                  Identifier = "SymbolTableTests/testDefineAndResolveFunctionName()">
+               </Test>
+               <Test
+                  Identifier = "SymbolTableTests/testDefineResolevePredicates()">
+               </Test>
+               <Test
+                  Identifier = "SymbolTableTests/testDefineResoleveProperties()">
+               </Test>
+               <Test
+                  Identifier = "SymbolTableTests/testResolveFree()">
+               </Test>
+               <Test
+                  Identifier = "SymbolTableTests/testResolveGlobal()">
+               </Test>
+               <Test
+                  Identifier = "SymbolTableTests/testResolveLocal()">
+               </Test>
+               <Test
+                  Identifier = "SymbolTableTests/testResolveNestedLocal()">
+               </Test>
+               <Test
+                  Identifier = "SymbolTableTests/testResolveUnresolvableFree()">
+               </Test>
+               <Test
+                  Identifier = "SymbolTableTests/testShadowingFunctionName()">
+               </Test>
+               <Test
+                  Identifier = "TokenTests">
+               </Test>
+               <Test
+                  Identifier = "TokenTests/testSameCategories()">
+               </Test>
+               <Test
+                  Identifier = "TokenTests/testWordInitializers()">
+               </Test>
+               <Test
+                  Identifier = "VMTests">
+               </Test>
+               <Test
+                  Identifier = "VMTests/testArrayConcats()">
+               </Test>
+               <Test
+                  Identifier = "VMTests/testArrayLiterals()">
+               </Test>
+               <Test
+                  Identifier = "VMTests/testAssignOperations()">
+               </Test>
+               <Test
+                  Identifier = "VMTests/testBooleanExpressions()">
+               </Test>
+               <Test
+                  Identifier = "VMTests/testBooleanObjectExpressions()">
+               </Test>
+               <Test
+                  Identifier = "VMTests/testBuiltinFunctions()">
+               </Test>
+               <Test
+                  Identifier = "VMTests/testCallingFunctionsWithoutArguments()">
+               </Test>
+               <Test
+                  Identifier = "VMTests/testCallingFuntionsWithArgumentsAndBindings()">
+               </Test>
+               <Test
+                  Identifier = "VMTests/testCallingFuntionsWithBindings()">
+               </Test>
+               <Test
+                  Identifier = "VMTests/testCallingFuntionsWithWrongArguments()">
+               </Test>
+               <Test
+                  Identifier = "VMTests/testClosures()">
+               </Test>
+               <Test
+                  Identifier = "VMTests/testConditionalBranchings()">
+               </Test>
+               <Test
+                  Identifier = "VMTests/testConditionals()">
+               </Test>
+               <Test
+                  Identifier = "VMTests/testDictionaryLiterals()">
+               </Test>
+               <Test
+                  Identifier = "VMTests/testFirstClassFunctions()">
+               </Test>
+               <Test
+                  Identifier = "VMTests/testFunctionsWithRturnStatement()">
+               </Test>
+               <Test
+                  Identifier = "VMTests/testFunctionsWithoutReturnValue()">
+               </Test>
+               <Test
+                  Identifier = "VMTests/testGenitiveExpressions()">
+               </Test>
+               <Test
+                  Identifier = "VMTests/testGlobalDefineStatements()">
+               </Test>
+               <Test
+                  Identifier = "VMTests/testIntegerArithmetic()">
+               </Test>
+               <Test
+                  Identifier = "VMTests/testNulls()">
+               </Test>
+               <Test
+                  Identifier = "VMTests/testRecursiveFunctions()">
+               </Test>
+               <Test
+                  Identifier = "VMTests/testReturnValueStatements()">
+               </Test>
+               <Test
+                  Identifier = "VMTests/testStackOperations()">
+               </Test>
+               <Test
+                  Identifier = "VMTests/testStringExpressions()">
+               </Test>
+            </SkippedTests>
+         </TestableReference>
+      </Testables>
+   </TestAction>
+   <LaunchAction
+      buildConfiguration = "Debug"
+      selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
+      selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
+      launchStyle = "0"
+      useCustomWorkingDirectory = "NO"
+      ignoresPersistentStateOnLaunch = "NO"
+      debugDocumentVersioning = "YES"
+      debugServiceExtension = "internal"
+      allowLocationSimulation = "YES"
+      queueDebuggingEnabled = "No">
+      <BuildableProductRunnable
+         runnableDebuggingMode = "0">
+         <BuildableReference
+            BuildableIdentifier = "primary"
+            BlueprintIdentifier = "5042121229B58CA700D2EA98"
+            BuildableName = "JPForce"
+            ReferencedContainer = "container:JPForce.xcodeproj">
+         </BuildableReference>
+      </BuildableProductRunnable>
+   </LaunchAction>
+   <ProfileAction
+      buildConfiguration = "Release"
+      shouldUseLaunchSchemeArgsEnv = "YES"
+      savedToolIdentifier = ""
+      useCustomWorkingDirectory = "NO"
+      debugDocumentVersioning = "YES">
+      <MacroExpansion>
+         <BuildableReference
+            BuildableIdentifier = "primary"
+            BlueprintIdentifier = "5042121229B58CA700D2EA98"
+            BuildableName = "JPForce"
+            ReferencedContainer = "container:JPForce.xcodeproj">
+         </BuildableReference>
+      </MacroExpansion>
+   </ProfileAction>
+   <AnalyzeAction
+      buildConfiguration = "Debug">
+   </AnalyzeAction>
+   <ArchiveAction
+      buildConfiguration = "Release"
+      revealArchiveInOrganizer = "YES">
+   </ArchiveAction>
+</Scheme>

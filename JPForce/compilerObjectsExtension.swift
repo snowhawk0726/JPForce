@@ -181,7 +181,7 @@ extension JpfDictionary {
             try $0.key.emit(with: c)
             try $0.value.emit(with: c)
         }
-        _ = c.emit(op: .opDictionary, operand: pairs.count * 2)
+        _ = c.emit(op: .opDictionaryConst, operand: pairs.count * 2)
 #endif
     }
     var symbolKind: SymbolKind {.constant}
